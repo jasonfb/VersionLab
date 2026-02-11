@@ -487,15 +487,15 @@ to-regex-range@^5.0.1:
   dependencies:
     is-number "^7.0.0"
 
-vite-plugin-ruby@^5.1.2:
-  version "5.1.2"
-  resolved "https://registry.yarnpkg.com/vite-plugin-ruby/-/vite-plugin-ruby-5.1.2.tgz#a478e94679b9da7c443cf3156c882f244e72a6da"
-  integrity sha512-aIhAhq9BOVhfWGYuludgYK9ch58SQClpDVyF8WfpNsr5xr6dCw24mgpFso2KsXYONGYzX2kDt+cca54nDzkitg==
+vite-plugin-ruby@5.1.1:
+  version "5.1.1"
+  resolved "https://registry.yarnpkg.com/vite-plugin-ruby/-/vite-plugin-ruby-5.1.1.tgz#ecd72591ddb90a23613051005bd70a6410945129"
+  integrity sha512-I1dXJq2ywdvTD2Cz5LYNcYLujqQ3eUxPoCjruRdfm2QBtHBY15NEeb6x5HuPM3T5S+y8S3p9fwRsieQQCjk0gg==
   dependencies:
     debug "^4.3.4"
     fast-glob "^3.3.2"
 
-vite@^5.4.21:
+vite@^5:
   version "5.4.21"
   resolved "https://registry.yarnpkg.com/vite/-/vite-5.4.21.tgz#84a4f7c5d860b071676d39ba513c0d598fdc7027"
   integrity sha512-o5a9xKjbtuhY6Bi5S3+HvbRERmouabWbyUcpXXUA1u+GNUKoROi9byOJ8M0nHbHYHkYICiMlqxkg1KkYmm25Sw==
