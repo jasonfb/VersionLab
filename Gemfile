@@ -86,3 +86,5 @@ gem "hot-glue", "~> 0.7.5"
 gem "cssbundling-rails", "~> 1.4"
 
 gem "pagy", "~> 43.2"
+
+gem "nonschema_migrations", "~> 7.0"
