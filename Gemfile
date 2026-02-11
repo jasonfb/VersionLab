@@ -84,3 +84,5 @@ gem "rubycritic", "~> 5.0", group: :dev
 gem "hot-glue", "~> 0.7.5"
 
 gem "cssbundling-rails", "~> 1.4"
+
+gem "pagy", "~> 43.2"
