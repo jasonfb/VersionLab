@@ -8,6 +8,10 @@ Bundler.require(*Rails.groups)
 
 module VersionLab
   class Application < Rails::Application
+    config.generators do |generate|
+      generate.orm :active_record, primary_key_type: :uuid
+    end
+
    config.generators do |generate|
       generate.helper false
 
