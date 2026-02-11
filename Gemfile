@@ -92,3 +92,5 @@ gem "nonschema_migrations", "~> 7.0"
 gem "devise", "~> 5.0"
 
 gem "aws-sdk-s3", "~> 1.213"
+
+gem "pundit", "~> 2.5"
