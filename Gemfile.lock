@@ -350,6 +350,9 @@ GEM
     thruster (0.1.18-x86_64-linux)
     timeout (0.6.0)
     tsort (0.2.0)
+    turbo-rails (2.0.23)
+      actionpack (>= 7.1.0)
+      railties (>= 7.1.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     unicode-display_width (3.2.0)
@@ -410,6 +413,7 @@ DEPENDENCIES
   solid_cache
   solid_queue
   thruster
+  turbo-rails
   tzinfo-data
   vite_rails (~> 3.0)
   web-console
