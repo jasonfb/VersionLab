@@ -61,3 +61,15 @@ end
 
 gem "vite_rails", "~> 3.0"
 gem "turbo-rails"
+
+gem "rspec-rails", "~> 8.0", groups: [:development, :test]
+gem "rspec-wait", "~> 1.0", groups: [:development, :test]
+gem "factory_bot_rails", "~> 6.5", groups: [:development, :test]
+gem "ffaker", "~> 2.25", groups: [:development, :test]
+gem "vcr", "~> 6.4", groups: [:development, :test]
+gem "simplecov", "~> 0.22.0", groups: [:development, :test]
+gem "dotenv-rails", "~> 3.2", groups: [:development, :test]
+gem "webmock", "~> 3.26", groups: [:development, :test]
+
+gem "simplecov-rcov", "~> 0.3.7", group: :test
+gem "launchy", "~> 3.1", group: :test
