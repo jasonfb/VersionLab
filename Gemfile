@@ -80,3 +80,5 @@ gem "byebug", "~> 13.0", groups: [:development, :test]
 gem "annotaterb", "~> 4.21", groups: [:development, :test]
 
 gem "rubycritic", "~> 5.0", group: :dev
+
+gem "hot-glue", "~> 0.7.5"
