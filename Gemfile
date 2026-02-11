@@ -73,3 +73,8 @@ gem "webmock", "~> 3.26", groups: [:development, :test]
 
 gem "simplecov-rcov", "~> 0.3.7", group: :test
 gem "launchy", "~> 3.1", group: :test
+
+gem "bullet", "~> 8.1", groups: [:development, :test]
+gem "active_record_query_trace", "~> 1.9", groups: [:development, :test]
+gem "byebug", "~> 13.0", groups: [:development, :test]
+gem "annotaterb", "~> 4.21", groups: [:development, :test]
