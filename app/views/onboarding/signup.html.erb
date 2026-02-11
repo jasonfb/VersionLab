@@ -1,0 +1,43 @@
+<h2 class="card-title text-center mb-4">Complete Your Account</h2>
+
+<%= form_with model: @user, url: onboarding_create_path, scope: :onboarding, method: :post do |f| %>
+  <% if @user.errors.any? %>
+    <div class="alert alert-danger">
+      <% @user.errors.full_messages.each do |message| %>
+        <div><%= message %></div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= f.hidden_field :email, value: @email %>
+
+  <div class="mb-3">
+    <label class="form-label">Email address</label>
+    <input type="email" class="form-control" value="<%= @email %>" disabled>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :account_name, "Organization name", class: "form-label" %>
+    <%= f.text_field :account_name, class: "form-control", required: true, autofocus: true %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :password, class: "form-label" %>
+    <small class="text-muted">(6 characters minimum)</small>
+    <%= f.password_field :password, autocomplete: "new-password", class: "form-control", required: true %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :password_confirmation, class: "form-label" %>
+    <%= f.password_field :password_confirmation, autocomplete: "new-password", class: "form-control", required: true %>
+  </div>
+
+  <div class="d-grid">
+    <%= f.submit "Create Account", class: "btn btn-primary" %>
+  </div>
+<% end %>
+
+<hr>
+<p class="text-center mb-0">
+  Already have an account? <%= link_to "Log in", new_user_session_path %>
+</p>

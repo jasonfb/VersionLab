@@ -8,6 +8,14 @@ Rails.application.routes.draw do
   # Marketing at root
   root to: "marketing/pages#home"
 
+  # Onboarding flow
+  scope :start do
+    get "/", to: "onboarding#new", as: :onboarding
+    post "/check_email", to: "onboarding#check_email", as: :onboarding_check_email
+    get "/signup", to: "onboarding#signup", as: :onboarding_signup
+    post "/", to: "onboarding#create", as: :onboarding_create
+  end
+
   # Health check
   get "up" => "rails/health#show", as: :rails_health_check
 

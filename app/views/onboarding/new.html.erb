@@ -1,0 +1,19 @@
+<h2 class="card-title text-center mb-4">Create an Account</h2>
+
+<%= form_with url: onboarding_check_email_path, method: :post, data: { turbo_frame: "onboarding_form" } do |f| %>
+  <turbo-frame id="onboarding_form">
+    <div class="mb-3">
+      <%= f.label :email, "Email address", class: "form-label" %>
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", class: "form-control", required: true %>
+    </div>
+
+    <div class="d-grid">
+      <%= f.submit "Continue", class: "btn btn-primary" %>
+    </div>
+  </turbo-frame>
+<% end %>
+
+<hr>
+<p class="text-center mb-0">
+  Already have an account? <%= link_to "Log in", new_user_session_path %>
+</p>
