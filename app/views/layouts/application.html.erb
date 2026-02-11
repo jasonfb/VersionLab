@@ -15,7 +15,11 @@
     <%= stylesheet_link_tag :app %>
   </head>
 
-  <body>
+  <body><% if user_signed_in? %>
+   <div>  Logged in as <%= current_user.email %>\n      <%= button_to "Logout", destroy_user_session_path, method: :delete %><hr /></div>
+  <% elsif ! controller.class.to_s.include?("Devise")%>
+    <%= link_to "Login", new_user_session_path %> | <%= link_to "Signup", new_user_registration_path %><hr /></div>
+  <% end %>
 
   <%= render partial: 'layouts/flash_notices' %>
   
