@@ -8,6 +8,21 @@ Bundler.require(*Rails.groups)
 
 module VersionLab
   class Application < Rails::Application
+   config.generators do |generate|
+      generate.helper false
+
+      generate.assets false
+      generate.stylesheets false
+      generate.test_framework :rspec,
+                              request_specs: false,
+                              view_specs: false,
+                              controller_specs: false,
+                              helper_specs: false,
+                              routing_specs: false,
+                              fixture: false,
+                              fixture_replacement: 'factory_bot'
+    end
+
 	  config.generators do |generate|
       generate.helper false
 
