@@ -9,4 +9,8 @@ class User < ApplicationRecord
 
   has_many :user_roles
   has_many :roles, through: :user_roles
+
+
+  has_many :account_users
+  has_many :users, through: :account_users
 end

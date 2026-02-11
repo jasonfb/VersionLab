@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for(:title) || "Version Lab" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%= stylesheet_link_tag :app %>
+  </head>
+
+  <body class="bg-light">
+    <div class="d-flex align-items-center justify-content-center min-vh-100">
+      <div class="w-100" style="max-width: 440px;">
+        <%= render partial: 'layouts/flash_notices' %>
+        <div class="card shadow-sm">
+          <div class="card-body p-4">
+            <%= yield %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
