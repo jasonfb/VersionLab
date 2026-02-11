@@ -13,3 +13,8 @@ or run `bin/dev` in single window and access site at http://127.0.0.1:5100
 # Run Specs
 
 run with `bin/rake`
+
+
+## Annotate models
+
+`annotaterb models --exclude fixtures`

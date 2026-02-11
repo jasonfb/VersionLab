@@ -78,3 +78,5 @@ gem "bullet", "~> 8.1", groups: [:development, :test]
 gem "active_record_query_trace", "~> 1.9", groups: [:development, :test]
 gem "byebug", "~> 13.0", groups: [:development, :test]
 gem "annotaterb", "~> 4.21", groups: [:development, :test]
+
+gem "rubycritic", "~> 5.0", group: :dev
