@@ -1,6 +1,6 @@
 <h2 class="card-title text-center mb-4">Complete Your Account</h2>
 
-<%= form_with model: @user, url: onboarding_create_path, scope: :onboarding, method: :post do |f| %>
+<%= form_with model: @user, url: onboarding_create_path, scope: :onboarding, method: :post, data: { turbo: false } do |f| %>
   <% if @user.errors.any? %>
     <div class="alert alert-danger">
       <% @user.errors.full_messages.each do |message| %>

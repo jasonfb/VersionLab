@@ -8,7 +8,7 @@ class OnboardingController < ApplicationController
     email = params[:email].to_s.strip.downcase
 
     if User.exists?(email: email)
-      render partial: "already_exists", locals: { email: email }
+      redirect_to onboarding_path, alert: "#{email} is already registered. Please ask your organization's admin to add you, or log in."
     else
       redirect_to onboarding_signup_path(email: email)
     end

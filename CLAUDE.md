@@ -23,6 +23,9 @@ bin/rails test test/models/foo_test.rb:42     # Run a single test by line number
 bin/rails test:system      # Run system tests (Capybara + Selenium)
 ```
 
+### Database
+- don't use rails References. instead use uuids for foreign keys
+
 ### Linting & Security
 
 ```bash

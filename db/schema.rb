@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_11_185218) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_12_141213) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -57,8 +57,34 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_11_185218) do
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
+  create_table "assets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "account_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "height"
+    t.string "name"
+    t.datetime "updated_at", null: false
+    t.integer "width"
+    t.index ["account_id"], name: "index_assets_on_account_id"
+  end
+
   create_table "data_migrations", id: false, force: :cascade do |t|
     t.string "version"
+  end
+
+  create_table "email_template_sections", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "email_template_id", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email_template_id", "position"], name: "idx_on_email_template_id_position_c662290fc5"
+  end
+
+  create_table "email_templates", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "account_id"
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.text "raw_source_html"
+    t.datetime "updated_at", null: false
   end
 
   create_table "roles", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -66,6 +92,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_11_185218) do
     t.string "label"
     t.string "name"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "template_variables", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "default_value", null: false
+    t.uuid "email_template_section_id", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.string "variable_type", default: "text", null: false
+    t.index ["email_template_section_id", "position"], name: "idx_on_email_template_section_id_position_ec7798dbd9"
   end
 
   create_table "user_roles", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

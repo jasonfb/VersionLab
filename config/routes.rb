@@ -16,6 +16,18 @@ Rails.application.routes.draw do
     post "/", to: "onboarding#create", as: :onboarding_create
   end
 
+  # API endpoints for React SPA
+  namespace :api do
+    resources :accounts, only: [:index]
+    resources :email_templates, only: [:index, :show, :create, :update, :destroy] do
+      resources :sections, controller: "email_template_sections", only: [:index, :create, :destroy] do
+        resources :variables, controller: "template_variables", only: [:index, :create, :update, :destroy]
+      end
+    end
+    resources :assets, only: [:index, :create, :destroy]
+    post "switch_account", to: "accounts#switch"
+  end
+
   # Health check
   get "up" => "rails/health#show", as: :rails_health_check
 

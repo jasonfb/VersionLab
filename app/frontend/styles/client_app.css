@@ -1,0 +1,70 @@
+.app-layout {
+  background-color: #f8f9fa;
+}
+
+/* Skinny icon sidebar */
+.app-sidebar {
+  width: 56px;
+  background-color: #1a1a2e;
+  flex-shrink: 0;
+}
+
+.sidebar-logo {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 8px;
+}
+
+.sidebar-icon {
+  width: 40px;
+  height: 40px;
+  color: #8b8fa3;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.sidebar-icon:hover {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-icon.active {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Sidebar tooltips */
+.sidebar-icon {
+  position: relative;
+}
+
+.sidebar-icon[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #222;
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.sidebar-icon[data-tooltip]:hover::after {
+  opacity: 1;
+}
+
+/* Top bar */
+.app-topbar {
+  height: 48px;
+  background-color: #fff;
+  flex-shrink: 0;
+}
