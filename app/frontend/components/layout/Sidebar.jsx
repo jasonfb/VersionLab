@@ -1,5 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
+import logoIcon from '../../../assets/images/version-lab-icon.png'
 
 const navItems = [
   { to: '/templates', icon: 'bi-file-earmark-code', label: 'Templates' },
@@ -12,7 +13,7 @@ export default function Sidebar() {
   return (
     <div className="app-sidebar d-flex flex-column align-items-center py-3">
       <div className="sidebar-logo mb-4">
-        <span className="fw-bold text-danger fs-5">V</span>
+        <img src={logoIcon} alt="Version Lab" />
       </div>
       <nav className="flex-grow-1 d-flex flex-column gap-1">
         {navItems.map(({ to, icon, label }) => (
