@@ -2,6 +2,7 @@ import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
 import AppLayout from './layout/AppLayout'
+import ProjectsIndex from './projects/ProjectsIndex'
 import TemplatesIndex from './templates/TemplatesIndex'
 import TemplateNew from './templates/TemplateNew'
 import TemplateEdit from './templates/TemplateEdit'
@@ -15,10 +16,11 @@ export default function App() {
     <BrowserRouter basename="/app">
       <Routes>
         <Route element={<AppLayout />}>
-          <Route index element={<Navigate to="/templates" replace />} />
-          <Route path="templates" element={<TemplatesIndex />} />
-          <Route path="templates/new" element={<TemplateNew />} />
-          <Route path="templates/:id" element={<TemplateEdit />} />
+          <Route index element={<Navigate to="/projects" replace />} />
+          <Route path="projects" element={<ProjectsIndex />} />
+          <Route path="projects/:projectId/templates" element={<TemplatesIndex />} />
+          <Route path="projects/:projectId/templates/new" element={<TemplateNew />} />
+          <Route path="projects/:projectId/templates/:id" element={<TemplateEdit />} />
           <Route path="assets" element={<AssetsIndex />} />
           <Route path="merge" element={<MergePlaceholder />} />
           <Route path="settings" element={<SettingsPlaceholder />} />

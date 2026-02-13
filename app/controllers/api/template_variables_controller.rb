@@ -46,7 +46,8 @@ class Api::TemplateVariablesController < Api::BaseController
   private
 
   def set_section
-    template = @current_account.email_templates.find(params[:email_template_id])
+    project = @current_account.projects.find(params[:project_id])
+    template = project.email_templates.find(params[:email_template_id])
     @section = template.sections.find(params[:section_id])
   end
 

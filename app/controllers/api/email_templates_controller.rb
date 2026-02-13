@@ -1,8 +1,9 @@
 class Api::EmailTemplatesController < Api::BaseController
+  before_action :set_project
   before_action :set_email_template, only: [:show, :update, :destroy]
 
   def index
-    templates = @current_account.email_templates.order(updated_at: :desc)
+    templates = @project.email_templates.order(updated_at: :desc)
     render json: templates.map { |t|
       { id: t.id, name: t.name, updated_at: t.updated_at }
     }
@@ -27,7 +28,7 @@ class Api::EmailTemplatesController < Api::BaseController
   end
 
   def create
-    template = @current_account.email_templates.build(email_template_params)
+    template = @project.email_templates.build(email_template_params)
     if template.save
       render json: { id: template.id, name: template.name }, status: :created
     else
@@ -50,8 +51,12 @@ class Api::EmailTemplatesController < Api::BaseController
 
   private
 
+  def set_project
+    @project = @current_account.projects.find(params[:project_id])
+  end
+
   def set_email_template
-    @email_template = @current_account.email_templates.find(params[:id])
+    @email_template = @project.email_templates.find(params[:id])
   end
 
   def email_template_params

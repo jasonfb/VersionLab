@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import logoIcon from '../../../assets/images/version-lab-icon.png'
 
 const navItems = [
-  { to: '/templates', icon: 'bi-file-earmark-code', label: 'Templates' },
+  { to: '/projects', icon: 'bi-folder', label: 'Projects' },
   { to: '/assets', icon: 'bi-images', label: 'Assets' },
   { to: '/merge', icon: 'bi-intersect', label: 'Merge' },
   { to: '/settings', icon: 'bi-gear', label: 'Settings' },

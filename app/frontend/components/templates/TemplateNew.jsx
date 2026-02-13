@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '~/lib/api'
 
 export default function TemplateNew() {
+  const { projectId } = useParams()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [rawSourceHtml, setRawSourceHtml] = useState('')
@@ -14,13 +15,13 @@ export default function TemplateNew() {
     setSaving(true)
     setError(null)
     try {
-      const result = await apiFetch('/api/email_templates', {
+      const result = await apiFetch(`/api/projects/${projectId}/email_templates`, {
         method: 'POST',
         body: JSON.stringify({
           email_template: { name, raw_source_html: rawSourceHtml },
         }),
       })
-      navigate(`/templates/${result.id}`)
+      navigate(`/projects/${projectId}/templates/${result.id}`)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -63,7 +64,7 @@ export default function TemplateNew() {
           <button
             type="button"
             className="btn btn-outline-secondary"
-            onClick={() => navigate('/templates')}
+            onClick={() => navigate(`/projects/${projectId}/templates`)}
           >
             Cancel
           </button>

@@ -10,7 +10,7 @@ import {
 import VariablePopover from './VariablePopover'
 
 export default function TemplateEdit() {
-  const { id } = useParams()
+  const { projectId, id } = useParams()
   const navigate = useNavigate()
   const iframeRef = useRef(null)
   const [template, setTemplate] = useState(null)
@@ -26,7 +26,7 @@ export default function TemplateEdit() {
   const [hoveredVarId, setHoveredVarId] = useState(null)
 
   useEffect(() => {
-    apiFetch(`/api/email_templates/${id}`)
+    apiFetch(`/api/projects/${projectId}/email_templates/${id}`)
       .then((data) => {
         setTemplate(data)
         setName(data.name)
@@ -137,7 +137,7 @@ export default function TemplateEdit() {
     setSaving(true)
     setError(null)
     try {
-      await apiFetch(`/api/email_templates/${id}`, {
+      await apiFetch(`/api/projects/${projectId}/email_templates/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           email_template: { name, raw_source_html: rawSourceHtml },
@@ -153,7 +153,7 @@ export default function TemplateEdit() {
 
   const handleAddSection = async () => {
     try {
-      const data = await apiFetch(`/api/email_templates/${id}/sections`, {
+      const data = await apiFetch(`/api/projects/${projectId}/email_templates/${id}/sections`, {
         method: 'POST',
       })
       setSections((prev) => [...prev, { ...data, variables: [] }])
@@ -165,7 +165,7 @@ export default function TemplateEdit() {
 
   const handleDeleteSection = async (sectionId) => {
     try {
-      await apiFetch(`/api/email_templates/${id}/sections/${sectionId}`, {
+      await apiFetch(`/api/projects/${projectId}/email_templates/${id}/sections/${sectionId}`, {
         method: 'DELETE',
       })
       setSections((prev) => {
@@ -202,7 +202,7 @@ export default function TemplateEdit() {
 
       try {
         const data = await apiFetch(
-          `/api/email_templates/${id}/sections/${expandedSection}/variables`,
+          `/api/projects/${projectId}/email_templates/${id}/sections/${expandedSection}/variables`,
           {
             method: 'POST',
             body: JSON.stringify({
@@ -233,7 +233,7 @@ export default function TemplateEdit() {
 
       setPopover(null)
     },
-    [id, expandedSection, popover]
+    [projectId, id, expandedSection, popover]
   )
 
   const handleDeleteVariable = useCallback(
@@ -245,7 +245,7 @@ export default function TemplateEdit() {
 
       try {
         await apiFetch(
-          `/api/email_templates/${id}/sections/${sectionId}/variables/${varId}`,
+          `/api/projects/${projectId}/email_templates/${id}/sections/${sectionId}/variables/${varId}`,
           {
             method: 'DELETE',
             body: JSON.stringify({ raw_source_html: updatedHtml }),
@@ -264,7 +264,7 @@ export default function TemplateEdit() {
         setError(err.message)
       }
     },
-    [id, rawSourceHtml]
+    [projectId, id, rawSourceHtml]
   )
 
   const cancelPopover = useCallback(() => setPopover(null), [])
@@ -291,7 +291,7 @@ export default function TemplateEdit() {
         <div className="p-3 border-bottom d-flex align-items-center gap-2">
           <button
             className="btn btn-sm btn-link text-dark p-0"
-            onClick={() => navigate('/templates')}
+            onClick={() => navigate(`/projects/${projectId}/templates`)}
           >
             <i className="bi bi-arrow-left"></i>
           </button>
