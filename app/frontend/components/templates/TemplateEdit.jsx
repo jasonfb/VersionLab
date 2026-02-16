@@ -25,6 +25,7 @@ export default function TemplateEdit() {
   const [error, setError] = useState(null)
   const [popover, setPopover] = useState(null)
   const [hoveredVarId, setHoveredVarId] = useState(null)
+  const expandedSectionRef = useRef(null)
 
   // Flat list of every variable across all sections (for preview builder)
   const allVariables = useMemo(
@@ -43,41 +44,33 @@ export default function TemplateEdit() {
       .finally(() => setLoading(false))
   }, [id])
 
-  // Write preview HTML into iframe whenever source or variables change
+  // Keep ref in sync so iframe handlers always read the latest value
+  // without needing to re-run the effect (which rewrites the document).
+  useEffect(() => {
+    expandedSectionRef.current = expandedSection
+  }, [expandedSection])
+
+  // Write preview HTML into iframe and attach event listeners.
+  // Uses expandedSectionRef so we only rewrite when content changes.
   useEffect(() => {
     const iframe = iframeRef.current
     if (!iframe || !rawSourceHtml) return
 
     const preview = buildPreviewHtml(rawSourceHtml, allVariables)
+    let removeListeners = null
 
-    const writeToIframe = () => {
+    const writeAndAttach = () => {
       const doc = iframe.contentDocument
       if (!doc) return
+
       doc.open()
       doc.write(preview)
       doc.close()
-    }
-
-    if (iframe.contentDocument?.readyState === 'complete') {
-      writeToIframe()
-    } else {
-      iframe.addEventListener('load', writeToIframe, { once: true })
-    }
-  }, [rawSourceHtml, allVariables])
-
-  // Attach iframe event listeners for selection and image clicks
-  useEffect(() => {
-    const iframe = iframeRef.current
-    if (!iframe || !rawSourceHtml) return
-
-    const attachListeners = () => {
-      const doc = iframe.contentDocument
-      if (!doc) return
 
       const handleMouseUp = () => {
         const selection = doc.getSelection()
         if (!selection || selection.isCollapsed || !selection.toString().trim()) return
-        if (!expandedSection) return
+        if (!expandedSectionRef.current) return
 
         // Don't allow selecting inside an existing variable span
         const anchor = selection.anchorNode?.parentElement
@@ -89,6 +82,7 @@ export default function TemplateEdit() {
 
         setPopover({
           type: 'text',
+          selectedText: selection.toString(),
           top: iframeRect.top + rect.bottom + 4,
           left: iframeRect.left + rect.left,
         })
@@ -97,7 +91,7 @@ export default function TemplateEdit() {
       const handleClick = (e) => {
         const img = e.target.closest('img')
         if (!img || img.hasAttribute('data-vl-var')) return
-        if (!expandedSection) return
+        if (!expandedSectionRef.current) return
 
         e.preventDefault()
         const rect = img.getBoundingClientRect()
@@ -114,16 +108,22 @@ export default function TemplateEdit() {
       doc.addEventListener('mouseup', handleMouseUp)
       doc.addEventListener('click', handleClick)
 
-      return () => {
+      removeListeners = () => {
         doc.removeEventListener('mouseup', handleMouseUp)
         doc.removeEventListener('click', handleClick)
       }
     }
 
-    // Small delay to ensure doc is written
-    const timer = setTimeout(attachListeners, 100)
-    return () => clearTimeout(timer)
-  }, [rawSourceHtml, allVariables, expandedSection])
+    if (iframe.contentDocument?.readyState === 'complete') {
+      writeAndAttach()
+    } else {
+      iframe.addEventListener('load', writeAndAttach, { once: true })
+    }
+
+    return () => {
+      if (removeListeners) removeListeners()
+    }
+  }, [rawSourceHtml, allVariables])
 
   // Highlight hovered variable in iframe
   useEffect(() => {
@@ -187,33 +187,39 @@ export default function TemplateEdit() {
 
   const handleCreateVariable = useCallback(
     async () => {
-      const doc = iframeRef.current?.contentDocument
-      if (!doc || !expandedSection) return
+      console.log('[createVar] called', { expandedSection, popover, rawSourceHtmlLen: rawSourceHtml?.length })
+      if (!expandedSection) {
+        console.log('[createVar] BAIL: no expanded section')
+        return
+      }
 
       const varId = crypto.randomUUID()
       let defaultValue, updatedHtml
 
       if (popover.type === 'image') {
+        console.log('[createVar] image type, imgSrc:', popover.imgSrc)
         const result = insertImageMarker(rawSourceHtml, popover.imgSrc, varId)
         defaultValue = result.defaultValue
         updatedHtml = result.updatedHtml
       } else {
-        const selection = doc.getSelection()
-        if (!selection || selection.isCollapsed) {
+        const selectedText = popover.selectedText
+        console.log('[createVar] text type, selectedText:', JSON.stringify(selectedText))
+        if (!selectedText) {
+          console.log('[createVar] BAIL: no selectedText in popover')
           setPopover(null)
           return
         }
-        const selectedText = selection.toString()
         const result = insertTextPlaceholder(rawSourceHtml, selectedText, varId)
+        console.log('[createVar] insertTextPlaceholder result:', result ? 'found match' : 'null (no match in raw HTML)')
         if (!result) {
           setPopover(null)
           return
         }
         defaultValue = result.defaultValue
         updatedHtml = result.updatedHtml
-        selection.removeAllRanges()
       }
 
+      console.log('[createVar] sending API request, varId:', varId, 'defaultValue:', defaultValue)
       try {
         const data = await apiFetch(
           `/api/projects/${projectId}/email_templates/${id}/sections/${expandedSection}/variables`,
@@ -230,6 +236,7 @@ export default function TemplateEdit() {
             }),
           }
         )
+        console.log('[createVar] API success, response:', data)
 
         setRawSourceHtml(updatedHtml)
         setSections((prev) =>
@@ -240,6 +247,7 @@ export default function TemplateEdit() {
           )
         )
       } catch (err) {
+        console.error('[createVar] API error:', err)
         setError(err.message)
       }
 

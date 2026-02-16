@@ -43,6 +43,9 @@ module VersionLab
                               fixture_replacement: "factory_bot"
     end
 
+    require_relative "../app/middleware/force_localhost"
+    config.middleware.insert_before 0, ForceLocalhost
+
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
 

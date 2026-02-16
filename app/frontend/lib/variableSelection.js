@@ -20,27 +20,103 @@ export function insertTextPlaceholder(rawHtml, selectedText, varId) {
 
   const placeholder = `{{vl:${varId}}}`
 
-  // Try a direct match first
+  // Try a direct match first (works when selected text has no tags in between)
   let index = rawHtml.indexOf(selectedText)
-  let matchLength = selectedText.length
-
-  // Fall back to an HTML-encoded version of the selected text
-  if (index === -1) {
-    const encoded = selectedText
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-    index = rawHtml.indexOf(encoded)
-    matchLength = encoded.length
+  if (index !== -1) {
+    const updatedHtml =
+      rawHtml.slice(0, index) + placeholder + rawHtml.slice(index + selectedText.length)
+    return { defaultValue: selectedText, updatedHtml }
   }
 
-  if (index === -1) return null
+  // Fall back to an HTML-encoded version
+  const encoded = selectedText
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+  index = rawHtml.indexOf(encoded)
+  if (index !== -1) {
+    const updatedHtml =
+      rawHtml.slice(0, index) + placeholder + rawHtml.slice(index + encoded.length)
+    return { defaultValue: selectedText, updatedHtml }
+  }
+
+  // The selected text likely spans across HTML tags. Build a mapping from
+  // the visible (tag-stripped) text back to positions in the raw HTML, then
+  // find the selected text in the visible version and replace the
+  // corresponding raw HTML range.
+  const { visibleText, rawIndices } = buildTextMap(rawHtml)
+  const normalizedSelected = normalizeWhitespace(selectedText)
+  const normalizedVisible = normalizeWhitespace(visibleText)
+  const visibleIndex = normalizedVisible.indexOf(normalizedSelected)
+  if (visibleIndex === -1) return null
+
+  // Map visible start/end back to raw HTML positions
+  const rawStart = rawIndices[visibleIndex]
+  const rawEnd = rawIndices[visibleIndex + normalizedSelected.length - 1] + 1
 
   const updatedHtml =
-    rawHtml.slice(0, index) + placeholder + rawHtml.slice(index + matchLength)
+    rawHtml.slice(0, rawStart) + placeholder + rawHtml.slice(rawEnd)
 
   return { defaultValue: selectedText, updatedHtml }
+}
+
+/**
+ * Builds a character-by-character map from visible text positions to raw HTML
+ * positions, skipping over HTML tags and decoding entities.
+ */
+function buildTextMap(html) {
+  let visibleText = ''
+  const rawIndices = [] // rawIndices[visiblePos] = index in html
+  let i = 0
+
+  while (i < html.length) {
+    if (html[i] === '<') {
+      // Skip entire tag
+      const close = html.indexOf('>', i)
+      i = close === -1 ? html.length : close + 1
+    } else if (html[i] === '&') {
+      // Decode HTML entity
+      const semi = html.indexOf(';', i)
+      if (semi !== -1 && semi - i < 10) {
+        const entity = html.slice(i, semi + 1)
+        const decoded = decodeEntity(entity)
+        for (let c = 0; c < decoded.length; c++) {
+          rawIndices.push(i)
+          visibleText += decoded[c]
+        }
+        i = semi + 1
+      } else {
+        rawIndices.push(i)
+        visibleText += html[i]
+        i++
+      }
+    } else {
+      rawIndices.push(i)
+      visibleText += html[i]
+      i++
+    }
+  }
+
+  return { visibleText, rawIndices }
+}
+
+function decodeEntity(entity) {
+  const map = {
+    '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"',
+    '&apos;': "'", '&nbsp;': ' ', '&#160;': ' ', '&#8203;': '',
+  }
+  if (map[entity]) return map[entity]
+  // Numeric entities
+  const m = entity.match(/^&#(\d+);$/)
+  if (m) return String.fromCodePoint(Number(m[1]))
+  const mx = entity.match(/^&#x([0-9a-fA-F]+);$/)
+  if (mx) return String.fromCodePoint(parseInt(mx[1], 16))
+  return entity // unknown entity, keep as-is
+}
+
+function normalizeWhitespace(str) {
+  return str.replace(/\s+/g, ' ')
 }
 
 /**
