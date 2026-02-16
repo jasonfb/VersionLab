@@ -62,7 +62,14 @@ export function insertTextPlaceholder(rawHtml, selectedText, varId, occurrenceIn
   const origStart = normToOrigMap[bestNormIdx]
   const origEnd = normToOrigMap[bestNormIdx + normalizedSelected.length - 1]
   const rawStart = rawIndices[origStart]
-  const rawEnd = rawIndices[origEnd] + 1
+  let rawEnd = rawIndices[origEnd] + 1
+
+  // If the last matched character is an HTML entity (starts with &), include
+  // the full entity so we don't leave a dangling "nbsp;" etc.
+  if (rawHtml[rawIndices[origEnd]] === '&') {
+    const semi = rawHtml.indexOf(';', rawIndices[origEnd])
+    if (semi !== -1 && semi - rawIndices[origEnd] < 10) rawEnd = semi + 1
+  }
 
   console.log('[insertTextPlaceholder] replacing raw range', {
     rawStart,

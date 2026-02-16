@@ -80,6 +80,16 @@ export default function TemplateEdit() {
         if (anchor?.closest('[data-vl-var]')) return
 
         const range = selection.getRangeAt(0)
+
+        // Prevent cross-tag selections that span block elements or links,
+        // because replacing them with a single token destroys HTML structure.
+        const container = range.commonAncestorContainer
+        const containerEl = container.nodeType === 3 ? container.parentElement : container
+        if (containerEl) {
+          const fragment = range.cloneContents()
+          const hasBlockOrLink = fragment.querySelector('a, p, h1, h2, h3, h4, h5, h6, div, td, tr, table, li, ul, ol')
+          if (hasBlockOrLink) return
+        }
         const rect = range.getBoundingClientRect()
         const iframeRect = iframe.getBoundingClientRect()
 
