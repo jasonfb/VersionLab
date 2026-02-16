@@ -65,6 +65,8 @@ export function insertTextPlaceholder(rawHtml, selectedText, varId) {
  * Builds a character-by-character map from visible text positions to raw HTML
  * positions, skipping over HTML tags and decoding entities.
  */
+const BLOCK_TAGS = /^\/?(br|p|div|table|tr|td|th|li|ul|ol|h[1-6]|hr|blockquote|section|article|header|footer)\b/i
+
 function buildTextMap(html) {
   let visibleText = ''
   const rawIndices = [] // rawIndices[visiblePos] = index in html
@@ -74,7 +76,14 @@ function buildTextMap(html) {
     if (html[i] === '<') {
       // Skip entire tag
       const close = html.indexOf('>', i)
-      i = close === -1 ? html.length : close + 1
+      if (close === -1) { i = html.length; continue }
+      const tagInner = html.slice(i + 1, close)
+      i = close + 1
+      // Insert a space for block-level tags so word boundaries are preserved
+      if (BLOCK_TAGS.test(tagInner) && visibleText.length > 0 && !/\s$/.test(visibleText)) {
+        rawIndices.push(i - 1)
+        visibleText += ' '
+      }
     } else if (html[i] === '&') {
       // Decode HTML entity
       const semi = html.indexOf(';', i)
@@ -166,6 +175,8 @@ export function buildPreviewHtml(html, allVariables) {
     const span = `<span data-vl-var="${v.id}">${escapeHtml(v.default_value)}</span>`
     result = result.replaceAll(placeholder, span)
   }
+  // Strip any orphaned tokens (e.g. variable's section was deleted)
+  result = result.replace(/\{\{vl:[0-9a-f-]+\}\}/g, '')
   return result
 }
 

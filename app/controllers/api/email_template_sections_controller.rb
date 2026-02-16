@@ -23,6 +23,9 @@ class Api::EmailTemplateSectionsController < Api::BaseController
     section = @email_template.sections.find(params[:id])
     section.destroy
     reorder_sections
+    if params[:raw_source_html].present?
+      @email_template.update!(raw_source_html: params[:raw_source_html])
+    end
     head :no_content
   end
 

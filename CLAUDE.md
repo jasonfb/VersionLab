@@ -40,6 +40,11 @@ bin/ci                     # Full CI suite locally
 ```bash
 bin/setup                  # Full setup: bundle install, db:prepare, etc.
 ```
+### Local
+For local development, always use localhost:3100 to access the site (not 127.0.0.1)
+
+A good local username is jason@heliosdev.shop with password "password"
+
 
 ## Architecture
 

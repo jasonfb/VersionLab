@@ -171,10 +171,25 @@ export default function TemplateEdit() {
   }
 
   const handleDeleteSection = async (sectionId) => {
+    // Remove any variable tokens/markers from the HTML before deleting
+    const section = sections.find((s) => s.id === sectionId)
+    let updatedHtml = rawSourceHtml
+    if (section?.variables?.length) {
+      for (const v of section.variables) {
+        if (v.variable_type === 'image') {
+          updatedHtml = removeImageMarker(updatedHtml, v.id)
+        } else {
+          updatedHtml = removeTextPlaceholder(updatedHtml, v.id, v.default_value)
+        }
+      }
+    }
+
     try {
       await apiFetch(`/api/projects/${projectId}/email_templates/${id}/sections/${sectionId}`, {
         method: 'DELETE',
+        body: JSON.stringify({ raw_source_html: updatedHtml }),
       })
+      setRawSourceHtml(updatedHtml)
       setSections((prev) => {
         const updated = prev.filter((s) => s.id !== sectionId)
         return updated.map((s, i) => ({ ...s, position: i + 1 }))
