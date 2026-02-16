@@ -7,6 +7,7 @@
   width: 56px;
   background-color: #000;
   flex-shrink: 0;
+  z-index: 1050;
 }
 
 .sidebar-logo {
@@ -62,6 +63,7 @@
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s;
+  z-index: 1050;
 }
 
 .sidebar-icon[data-tooltip]:hover::after {

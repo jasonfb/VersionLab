@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { apiFetch } from '~/lib/api'
 
 export default function ProjectsIndex() {
@@ -8,6 +7,9 @@ export default function ProjectsIndex() {
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState(null)
+  const [editingId, setEditingId] = useState(null)
+  const [editingName, setEditingName] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     apiFetch('/api/projects')
@@ -31,6 +33,38 @@ export default function ProjectsIndex() {
       setError(err.message)
     } finally {
       setCreating(false)
+    }
+  }
+
+  const startEditing = (project) => {
+    setEditingId(project.id)
+    setEditingName(project.name)
+  }
+
+  const cancelEditing = () => {
+    setEditingId(null)
+    setEditingName('')
+  }
+
+  const handleUpdate = async (e) => {
+    e.preventDefault()
+    if (!editingName.trim()) return
+    setSaving(true)
+    setError(null)
+    try {
+      const updated = await apiFetch(`/api/projects/${editingId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ project: { name: editingName.trim() } }),
+      })
+      setProjects((prev) =>
+        prev.map((p) => (p.id === editingId ? { ...p, name: updated.name } : p))
+      )
+      setEditingId(null)
+      setEditingName('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -76,17 +110,42 @@ export default function ProjectsIndex() {
       ) : (
         <div className="list-group">
           {projects.map((p) => (
-            <Link
+            <div
               key={p.id}
-              to={`/projects/${p.id}/templates`}
-              className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+              className="list-group-item d-flex justify-content-between align-items-center"
             >
-              <div>
-                <i className="bi bi-folder me-2 text-muted"></i>
-                {p.name}
-              </div>
-              <i className="bi bi-chevron-right text-muted"></i>
-            </Link>
+              {editingId === p.id ? (
+                <form onSubmit={handleUpdate} className="d-flex align-items-center gap-2 flex-grow-1">
+                  <input
+                    type="text"
+                    className="form-control form-control-sm"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                  <button className="btn btn-sm btn-danger" type="submit" disabled={saving}>
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button className="btn btn-sm btn-outline-secondary" type="button" onClick={cancelEditing}>
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <div>
+                    <i className="bi bi-folder me-2 text-muted"></i>
+                    {p.name}
+                  </div>
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => startEditing(p)}
+                  >
+                    <i className="bi bi-pencil"></i>
+                  </button>
+                </>
+              )}
+            </div>
           ))}
         </div>
       )}

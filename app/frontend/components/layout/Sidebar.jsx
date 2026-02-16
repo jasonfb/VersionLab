@@ -4,6 +4,8 @@ import logoIcon from '../../../assets/images/version-lab-icon.png'
 
 const navItems = [
   { to: '/projects', icon: 'bi-folder', label: 'Projects' },
+  { to: '/templates', icon: 'bi-file-earmark-code', label: 'Templates' },
+  { to: '/audiences', icon: 'bi-people', label: 'Audiences' },
   { to: '/assets', icon: 'bi-images', label: 'Assets' },
   { to: '/merge', icon: 'bi-intersect', label: 'Merge' },
   { to: '/settings', icon: 'bi-gear', label: 'Settings' },

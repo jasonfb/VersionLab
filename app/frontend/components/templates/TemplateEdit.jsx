@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { apiFetch } from '~/lib/api'
 import {
-  wrapTextSelection,
-  markImageVariable,
-  removeVariableMarker,
-  serializeIframeHtml,
+  insertTextPlaceholder,
+  removeTextPlaceholder,
+  insertImageMarker,
+  removeImageMarker,
+  buildPreviewHtml,
 } from '~/lib/variableSelection'
 import VariablePopover from './VariablePopover'
 
@@ -25,6 +26,12 @@ export default function TemplateEdit() {
   const [popover, setPopover] = useState(null)
   const [hoveredVarId, setHoveredVarId] = useState(null)
 
+  // Flat list of every variable across all sections (for preview builder)
+  const allVariables = useMemo(
+    () => sections.flatMap((s) => s.variables || []),
+    [sections],
+  )
+
   useEffect(() => {
     apiFetch(`/api/projects/${projectId}/email_templates/${id}`)
       .then((data) => {
@@ -36,26 +43,27 @@ export default function TemplateEdit() {
       .finally(() => setLoading(false))
   }, [id])
 
-  // Write HTML into iframe when rawSourceHtml changes
+  // Write preview HTML into iframe whenever source or variables change
   useEffect(() => {
     const iframe = iframeRef.current
     if (!iframe || !rawSourceHtml) return
+
+    const preview = buildPreviewHtml(rawSourceHtml, allVariables)
 
     const writeToIframe = () => {
       const doc = iframe.contentDocument
       if (!doc) return
       doc.open()
-      doc.write(rawSourceHtml)
+      doc.write(preview)
       doc.close()
     }
 
-    // If iframe is already loaded, write immediately; otherwise wait
     if (iframe.contentDocument?.readyState === 'complete') {
       writeToIframe()
     } else {
       iframe.addEventListener('load', writeToIframe, { once: true })
     }
-  }, [rawSourceHtml])
+  }, [rawSourceHtml, allVariables])
 
   // Attach iframe event listeners for selection and image clicks
   useEffect(() => {
@@ -71,7 +79,7 @@ export default function TemplateEdit() {
         if (!selection || selection.isCollapsed || !selection.toString().trim()) return
         if (!expandedSection) return
 
-        // Check if selection is already inside a variable span
+        // Don't allow selecting inside an existing variable span
         const anchor = selection.anchorNode?.parentElement
         if (anchor?.closest('[data-vl-var]')) return
 
@@ -97,7 +105,7 @@ export default function TemplateEdit() {
 
         setPopover({
           type: 'image',
-          imgEl: img,
+          imgSrc: img.getAttribute('src') || '',
           top: iframeRect.top + rect.bottom + 4,
           left: iframeRect.left + rect.left,
         })
@@ -115,14 +123,13 @@ export default function TemplateEdit() {
     // Small delay to ensure doc is written
     const timer = setTimeout(attachListeners, 100)
     return () => clearTimeout(timer)
-  }, [rawSourceHtml, expandedSection])
+  }, [rawSourceHtml, allVariables, expandedSection])
 
   // Highlight hovered variable in iframe
   useEffect(() => {
     const doc = iframeRef.current?.contentDocument
     if (!doc) return
 
-    // Clear previous highlights
     doc.querySelectorAll('[data-vl-var]').forEach((el) => {
       el.style.outline = ''
     })
@@ -184,21 +191,28 @@ export default function TemplateEdit() {
       if (!doc || !expandedSection) return
 
       const varId = crypto.randomUUID()
-      let defaultValue
+      let defaultValue, updatedHtml
 
-      if (popover.type === 'image' && popover.imgEl) {
-        const result = markImageVariable(popover.imgEl, varId)
+      if (popover.type === 'image') {
+        const result = insertImageMarker(rawSourceHtml, popover.imgSrc, varId)
         defaultValue = result.defaultValue
+        updatedHtml = result.updatedHtml
       } else {
-        const result = wrapTextSelection(doc, varId)
+        const selection = doc.getSelection()
+        if (!selection || selection.isCollapsed) {
+          setPopover(null)
+          return
+        }
+        const selectedText = selection.toString()
+        const result = insertTextPlaceholder(rawSourceHtml, selectedText, varId)
         if (!result) {
           setPopover(null)
           return
         }
         defaultValue = result.defaultValue
+        updatedHtml = result.updatedHtml
+        selection.removeAllRanges()
       }
-
-      const updatedHtml = serializeIframeHtml(doc)
 
       try {
         const data = await apiFetch(
@@ -226,22 +240,26 @@ export default function TemplateEdit() {
           )
         )
       } catch (err) {
-        // Revert DOM change on failure
-        removeVariableMarker(doc, varId)
         setError(err.message)
       }
 
       setPopover(null)
     },
-    [projectId, id, expandedSection, popover]
+    [projectId, id, expandedSection, popover, rawSourceHtml]
   )
 
   const handleDeleteVariable = useCallback(
     async (sectionId, varId) => {
-      const doc = iframeRef.current?.contentDocument
-      if (doc) removeVariableMarker(doc, varId)
+      const section = sections.find((s) => s.id === sectionId)
+      const variable = section?.variables?.find((v) => v.id === varId)
+      if (!variable) return
 
-      const updatedHtml = doc ? serializeIframeHtml(doc) : rawSourceHtml
+      let updatedHtml
+      if (variable.variable_type === 'image') {
+        updatedHtml = removeImageMarker(rawSourceHtml, varId)
+      } else {
+        updatedHtml = removeTextPlaceholder(rawSourceHtml, varId, variable.default_value)
+      }
 
       try {
         await apiFetch(
@@ -264,7 +282,7 @@ export default function TemplateEdit() {
         setError(err.message)
       }
     },
-    [projectId, id, rawSourceHtml]
+    [projectId, id, rawSourceHtml, sections]
   )
 
   const cancelPopover = useCallback(() => setPopover(null), [])

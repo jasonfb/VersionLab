@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_13_020757) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_13_220336) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -65,6 +65,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_13_020757) do
     t.datetime "updated_at", null: false
     t.integer "width"
     t.index ["account_id"], name: "index_assets_on_account_id"
+  end
+
+  create_table "audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "details"
+    t.string "name", null: false
+    t.uuid "project_id", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "data_migrations", id: false, force: :cascade do |t|

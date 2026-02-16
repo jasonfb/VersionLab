@@ -15,6 +15,15 @@ class Api::ProjectsController < Api::BaseController
     end
   end
 
+  def update
+    project = @current_account.projects.find(params[:id])
+    if project.update(project_params)
+      render json: { id: project.id, name: project.name, updated_at: project.updated_at }
+    else
+      render json: { errors: project.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def project_params

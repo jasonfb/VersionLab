@@ -19,12 +19,13 @@ Rails.application.routes.draw do
   # API endpoints for React SPA
   namespace :api do
     resources :accounts, only: [:index]
-    resources :projects, only: [:index, :create] do
+    resources :projects, only: [:index, :create, :update] do
       resources :email_templates, only: [:index, :show, :create, :update, :destroy] do
         resources :sections, controller: "email_template_sections", only: [:index, :create, :destroy] do
           resources :variables, controller: "template_variables", only: [:index, :create, :update, :destroy]
         end
       end
+      resources :audiences, only: [:index, :create, :update, :destroy]
     end
     resources :assets, only: [:index, :create, :destroy]
     post "switch_account", to: "accounts#switch"
