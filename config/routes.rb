@@ -21,6 +21,9 @@ Rails.application.routes.draw do
     resources :accounts, only: [:index]
     resources :projects, only: [:index, :create, :update] do
       resources :email_templates, only: [:index, :show, :create, :update, :destroy] do
+        member do
+          post :reset
+        end
         resources :sections, controller: "email_template_sections", only: [:index, :create, :destroy] do
           resources :variables, controller: "template_variables", only: [:index, :create, :update, :destroy]
         end

@@ -3,6 +3,25 @@ class EmailTemplate < ApplicationRecord
   has_many :sections, class_name: "EmailTemplateSection", dependent: :destroy
   has_many :template_variables, through: :sections
 
+  before_create :snapshot_original_html
+
+  def reset_to_original!
+    transaction do
+      self.raw_source_html = original_raw_source_html
+      sections.destroy_all
+      save!
+    end
+  end
+
+  def reset_to_blank!
+    transaction do
+      self.raw_source_html = nil
+      self.original_raw_source_html = nil
+      sections.destroy_all
+      save!
+    end
+  end
+
   def render_html(overrides = {})
     return "" if raw_source_html.blank?
 
@@ -26,5 +45,11 @@ class EmailTemplate < ApplicationRecord
       node.remove_attribute("data-vl-var")
     end
     doc.to_html
+  end
+
+  private
+
+  def snapshot_original_html
+    self.original_raw_source_html ||= raw_source_html
   end
 end

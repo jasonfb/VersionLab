@@ -19,12 +19,14 @@ export default function TemplateEdit() {
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
   const [rawSourceHtml, setRawSourceHtml] = useState('')
+  const [originalRawSourceHtml, setOriginalRawSourceHtml] = useState(null)
   const [sections, setSections] = useState([])
   const [expandedSection, setExpandedSection] = useState(null)
   const [activeTab, setActiveTab] = useState('sections')
   const [error, setError] = useState(null)
   const [popover, setPopover] = useState(null)
   const [hoveredVarId, setHoveredVarId] = useState(null)
+  const [resetting, setResetting] = useState(false)
   const expandedSectionRef = useRef(null)
 
   // Flat list of every variable across all sections (for preview builder)
@@ -39,6 +41,7 @@ export default function TemplateEdit() {
         setTemplate(data)
         setName(data.name)
         setRawSourceHtml(data.raw_source_html || '')
+        setOriginalRawSourceHtml(data.original_raw_source_html || null)
         setSections(data.sections || [])
       })
       .finally(() => setLoading(false))
@@ -80,9 +83,43 @@ export default function TemplateEdit() {
         const rect = range.getBoundingClientRect()
         const iframeRect = iframe.getBoundingClientRect()
 
+        // Figure out which occurrence (0-based) of the selected text the
+        // user chose in the visible document.  We count how many full matches
+        // start *before* this selection's start offset in the body text.
+        // This occurrence index is stable regardless of {{vl:…}} tokens in
+        // the raw HTML because those tokens don't contain normal prose.
+        let occurrenceIndex = 0
+        try {
+          const preRange = doc.createRange()
+          preRange.setStart(doc.body, 0)
+          preRange.setEnd(range.startContainer, range.startOffset)
+          const preText = preRange.toString()
+          const bodyText = doc.body.textContent || ''
+          const selText = selection.toString()
+          const norm = (s) => s.replace(/\s+/g, ' ')
+          const normBody = norm(bodyText)
+          const normSel = norm(selText)
+          const normPreLen = norm(preText).length
+          let pos = 0
+          while (true) {
+            const idx = normBody.indexOf(normSel, pos)
+            if (idx === -1 || idx >= normPreLen) break
+            occurrenceIndex++
+            pos = idx + 1
+          }
+        } catch (e) {
+          console.warn('[handleMouseUp] occurrence calc error:', e)
+        }
+
+        console.log('[handleMouseUp] selection:', {
+          selectedText: selection.toString(),
+          occurrenceIndex,
+        })
+
         setPopover({
           type: 'text',
           selectedText: selection.toString(),
+          occurrenceIndex,
           top: iframeRect.top + rect.bottom + 4,
           left: iframeRect.left + rect.left,
         })
@@ -144,17 +181,46 @@ export default function TemplateEdit() {
     setSaving(true)
     setError(null)
     try {
-      await apiFetch(`/api/projects/${projectId}/email_templates/${id}`, {
+      const payload = { name, raw_source_html: rawSourceHtml }
+      if (!originalRawSourceHtml && rawSourceHtml) {
+        payload.original_raw_source_html = rawSourceHtml
+      }
+      const data = await apiFetch(`/api/projects/${projectId}/email_templates/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({
-          email_template: { name, raw_source_html: rawSourceHtml },
-        }),
+        body: JSON.stringify({ email_template: payload }),
       })
       setTemplate((prev) => ({ ...prev, name, raw_source_html: rawSourceHtml }))
+      if (data.original_raw_source_html) {
+        setOriginalRawSourceHtml(data.original_raw_source_html)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleReset = async (mode) => {
+    const message = mode === 'blank'
+      ? 'Reset to blank? This will delete all HTML, variables, and sections.'
+      : 'Reset to original HTML? This will delete all variables and sections.'
+    if (!window.confirm(message)) return
+    setResetting(true)
+    setError(null)
+    try {
+      const data = await apiFetch(`/api/projects/${projectId}/email_templates/${id}/reset`, {
+        method: 'POST',
+        body: JSON.stringify({ mode }),
+      })
+      setRawSourceHtml(data.raw_source_html || '')
+      setOriginalRawSourceHtml(data.original_raw_source_html || null)
+      setSections(data.sections || [])
+      setExpandedSection(null)
+      setTemplate((prev) => ({ ...prev, raw_source_html: data.raw_source_html }))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -224,7 +290,7 @@ export default function TemplateEdit() {
           setPopover(null)
           return
         }
-        const result = insertTextPlaceholder(rawSourceHtml, selectedText, varId)
+        const result = insertTextPlaceholder(rawSourceHtml, selectedText, varId, popover.occurrenceIndex)
         console.log('[createVar] insertTextPlaceholder result:', result ? 'found match' : 'null (no match in raw HTML)')
         if (!result) {
           setPopover(null)
@@ -369,15 +435,43 @@ export default function TemplateEdit() {
               </div>
 
               <div className="mb-3">
-                <label className="form-label small fw-semibold">Raw Source HTML</label>
-                <textarea
-                  className="form-control form-control-sm font-monospace"
-                  rows={10}
-                  value={rawSourceHtml}
-                  onChange={(e) => setRawSourceHtml(e.target.value)}
-                  placeholder="Paste your email HTML here..."
-                />
+                <label className="form-label small fw-semibold">Source HTML</label>
+                {originalRawSourceHtml ? (
+                  <textarea
+                    className="form-control form-control-sm font-monospace bg-light"
+                    rows={10}
+                    value={originalRawSourceHtml}
+                    readOnly
+                  />
+                ) : (
+                  <textarea
+                    className="form-control form-control-sm font-monospace"
+                    rows={10}
+                    value={rawSourceHtml}
+                    onChange={(e) => setRawSourceHtml(e.target.value)}
+                    placeholder="Paste your email HTML here..."
+                  />
+                )}
               </div>
+
+              {originalRawSourceHtml && (
+                <div className="d-flex gap-2">
+                  <button
+                    className="btn btn-sm btn-outline-danger flex-fill"
+                    onClick={() => handleReset('original')}
+                    disabled={resetting}
+                  >
+                    {resetting ? 'Resetting...' : 'Reset to Original'}
+                  </button>
+                  <button
+                    className="btn btn-sm btn-outline-secondary flex-fill"
+                    onClick={() => handleReset('blank')}
+                    disabled={resetting}
+                  >
+                    {resetting ? 'Resetting...' : 'Reset to Blank'}
+                  </button>
+                </div>
+              )}
             </>
           )}
 
