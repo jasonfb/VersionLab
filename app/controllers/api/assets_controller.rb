@@ -11,14 +11,13 @@ class Api::AssetsController < Api::BaseController
     asset = @current_account.assets.new(name: params[:file].original_filename)
     asset.file.attach(params[:file])
 
-    if asset.file.attached? && asset.file.blob.image?
-      asset.file.blob.analyze
-      metadata = asset.file.blob.metadata
-      asset.width = metadata[:width]
-      asset.height = metadata[:height]
-    end
-
     if asset.save
+      if asset.file.blob.image?
+        asset.file.blob.analyze
+        metadata = asset.file.blob.metadata
+        asset.update(width: metadata[:width], height: metadata[:height])
+      end
+
       render json: asset_json(asset), status: :created
     else
       render json: { errors: asset.errors.full_messages }, status: :unprocessable_entity

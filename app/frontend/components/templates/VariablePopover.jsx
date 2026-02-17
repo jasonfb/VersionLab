@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function VariablePopover({ position, variableType, onConfirm, onCancel }) {
+export default function ({ position, variableType, onConfirm, onCancel }) {
   return (
     <div
       className="card shadow-sm position-fixed"

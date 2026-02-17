@@ -18,11 +18,14 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "devDependencies": {
-    "vite": "^5",
-    "vite-plugin-ruby": "5.1.1"
+  "engines": {
+    "node": "24.x",
+    "yarn": "1.x"
   },
+  "devDependencies": {},
   "dependencies": {
+    "vite": "^5",
+    "vite-plugin-ruby": "5.1.1",
     "@hotwired/turbo-rails": "^8.0.23",
     "@popperjs/core": "^2.11.8",
     "@rails/activestorage": "^8.1.200",
