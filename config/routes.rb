@@ -19,6 +19,8 @@ Rails.application.routes.draw do
   # API endpoints for React SPA
   namespace :api do
     resources :accounts, only: [:index]
+    resources :ai_services, only: [:index]
+    resources :ai_keys, only: [:index, :create, :update, :destroy]
     resources :projects, only: [:index, :create, :update] do
       resources :email_templates, only: [:index, :show, :create, :update, :destroy] do
         member do
@@ -29,7 +31,15 @@ Rails.application.routes.draw do
         end
       end
       resources :audiences, only: [:index, :create, :update, :destroy]
-      resources :merges, only: [:index, :create, :update, :destroy]
+      resources :merges, only: [:index, :create, :update, :destroy] do
+        member do
+          post :run
+          post :reject
+          get :results
+          get :preview
+          get :export
+        end
+      end
     end
     resources :assets, only: [:index, :create, :destroy]
     post "switch_account", to: "accounts#switch"

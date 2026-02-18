@@ -8,7 +8,8 @@ import TemplatesIndex from './templates/TemplatesIndex'
 import TemplateNew from './templates/TemplateNew'
 import TemplateEdit from './templates/TemplateEdit'
 import MergesIndex from './merges/MergesIndex'
-import SettingsPlaceholder from './SettingsPlaceholder'
+import MergeResultsPage from './merges/MergeResultsPage'
+import SettingsPage from './settings/SettingsPage'
 import AssetsIndex from './assets/AssetsIndex'
 import AudiencesIndex from './audiences/AudiencesIndex'
 
@@ -27,7 +28,8 @@ export default function App() {
           <Route path="audiences" element={<AudiencesIndex />} />
           <Route path="assets" element={<AssetsIndex />} />
           <Route path="merge" element={<MergesIndex />} />
-          <Route path="settings" element={<SettingsPlaceholder />} />
+          <Route path="projects/:projectId/merges/:mergeId/results" element={<MergeResultsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '~/lib/api'
+import { subscribeMergeChannel } from '~/lib/cable'
 
 export default function MergesIndex() {
+  const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [merges, setMerges] = useState([])
@@ -13,11 +16,17 @@ export default function MergesIndex() {
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({ audience_ids: [] })
   const [saving, setSaving] = useState(false)
+  const [runningIds, setRunningIds] = useState(new Set())
+  const [aiServices, setAiServices] = useState([])
 
   useEffect(() => {
-    apiFetch('/api/projects')
-      .then(setProjects)
-      .finally(() => setLoadingProjects(false))
+    Promise.all([
+      apiFetch('/api/projects'),
+      apiFetch('/api/ai_services'),
+    ]).then(([p, s]) => {
+      setProjects(p)
+      setAiServices(s)
+    }).finally(() => setLoadingProjects(false))
   }, [])
 
   useEffect(() => {
@@ -42,8 +51,48 @@ export default function MergesIndex() {
     }).finally(() => setLoadingMerges(false))
   }, [selectedProjectId])
 
+  // Track cable subscriptions by mergeId
+  const subscriptionsRef = useRef({})
+
+  // Subscribe to any pending/regenerating merges for real-time state updates
+  useEffect(() => {
+    const inProgress = merges.filter((m) => m.state === 'pending' || m.state === 'regenerating')
+    const inProgressIds = new Set(inProgress.map((m) => m.id))
+
+    // Subscribe to newly-active merges
+    inProgress.forEach((m) => {
+      if (subscriptionsRef.current[m.id]) return
+      subscriptionsRef.current[m.id] = subscribeMergeChannel(m.id, {
+        received(data) {
+          setMerges((prev) => prev.map((merge) =>
+            merge.id === data.merge_id ? { ...merge, state: data.state } : merge
+          ))
+          if (data.state !== 'pending' && data.state !== 'regenerating') {
+            subscriptionsRef.current[data.merge_id]?.()
+            delete subscriptionsRef.current[data.merge_id]
+          }
+        },
+      })
+    })
+
+    // Unsubscribe from merges that are no longer in-progress
+    Object.keys(subscriptionsRef.current).forEach((id) => {
+      if (!inProgressIds.has(id)) {
+        subscriptionsRef.current[id]?.()
+        delete subscriptionsRef.current[id]
+      }
+    })
+  }, [merges])
+
+  // Unsubscribe all on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(subscriptionsRef.current).forEach((unsub) => unsub?.())
+    }
+  }, [])
+
   const startNew = () => {
-    setNewForm({ email_template_id: '', audience_ids: [] })
+    setNewForm({ email_template_id: '', audience_ids: [], ai_service_id: '', ai_model_id: '' })
     setEditingId(null)
   }
 
@@ -65,7 +114,7 @@ export default function MergesIndex() {
 
   const startEditing = (merge) => {
     setEditingId(merge.id)
-    setEditForm({ audience_ids: merge.audience_ids || [] })
+    setEditForm({ audience_ids: merge.audience_ids || [], ai_service_id: merge.ai_service_id || '', ai_model_id: merge.ai_model_id || '' })
     setNewForm(null)
   }
 
@@ -95,6 +144,24 @@ export default function MergesIndex() {
     if (editingId === id) setEditingId(null)
   }
 
+  const runMerge = async (merge) => {
+    setRunningIds((prev) => new Set([...prev, merge.id]))
+    try {
+      const updated = await apiFetch(`/api/projects/${selectedProjectId}/merges/${merge.id}/run`, {
+        method: 'POST',
+      })
+      setMerges((prev) => prev.map((m) => (m.id === merge.id ? updated : m)))
+    } catch (e) {
+      alert(e.message || 'Failed to run merge')
+    } finally {
+      setRunningIds((prev) => {
+        const next = new Set(prev)
+        next.delete(merge.id)
+        return next
+      })
+    }
+  }
+
   const toggleAudience = (audienceId, form, setForm) => {
     const ids = form.audience_ids.includes(audienceId)
       ? form.audience_ids.filter((id) => id !== audienceId)
@@ -102,8 +169,50 @@ export default function MergesIndex() {
     setForm({ ...form, audience_ids: ids })
   }
 
+  const modelsForService = (serviceId) => {
+    if (!serviceId) return []
+    const service = aiServices.find((s) => s.id === serviceId)
+    return service ? service.models : []
+  }
+
+  const handleServiceChange = (serviceId, form, setForm) => {
+    setForm({ ...form, ai_service_id: serviceId, ai_model_id: '' })
+  }
+
+  const aiDropdowns = (form, setForm) => (
+    <div className="row mb-3">
+      <div className="col-6">
+        <label className="form-label fw-semibold">AI Service</label>
+        <select
+          className="form-select"
+          value={form.ai_service_id}
+          onChange={(e) => handleServiceChange(e.target.value, form, setForm)}
+        >
+          <option value="">None</option>
+          {aiServices.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="col-6">
+        <label className="form-label fw-semibold">AI Model</label>
+        <select
+          className="form-select"
+          value={form.ai_model_id}
+          onChange={(e) => setForm({ ...form, ai_model_id: e.target.value })}
+          disabled={!form.ai_service_id}
+        >
+          <option value="">Select a model...</option>
+          {modelsForService(form.ai_service_id).map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+
   const stateBadge = (state) => {
-    const colors = { setup: 'secondary', pending: 'warning', merged: 'success' }
+    const colors = { setup: 'secondary', pending: 'warning', merged: 'success', regenerating: 'warning' }
     return <span className={`badge bg-${colors[state] || 'secondary'}`}>{state}</span>
   }
 
@@ -192,6 +301,7 @@ export default function MergesIndex() {
                     ))
                   )}
                 </div>
+                {aiDropdowns(newForm, setNewForm)}
                 <div className="d-flex gap-2">
                   <button
                     className="btn btn-danger btn-sm"
@@ -239,6 +349,7 @@ export default function MergesIndex() {
                         </div>
                       ))}
                     </div>
+                    {aiDropdowns(editForm, setEditForm)}
                     <div className="d-flex gap-2">
                       <button className="btn btn-danger btn-sm" onClick={saveEdit} disabled={saving}>
                         {saving ? 'Saving...' : 'Save'}
@@ -265,6 +376,35 @@ export default function MergesIndex() {
                     </div>
                     <div className="d-flex align-items-center gap-2 ms-3">
                       <small className="text-muted">{new Date(m.updated_at).toLocaleDateString()}</small>
+                      {m.state === 'setup' && m.ai_service_id && m.ai_model_id && m.audience_ids?.length > 0 && (
+                        <button
+                          className="btn btn-success btn-sm"
+                          onClick={(e) => { e.stopPropagation(); runMerge(m) }}
+                          disabled={runningIds.has(m.id)}
+                          title="Run Merge"
+                        >
+                          {runningIds.has(m.id) ? (
+                            <span className="spinner-border spinner-border-sm" role="status" />
+                          ) : (
+                            <><i className="bi bi-play-fill me-1"></i>Run</>
+                          )}
+                        </button>
+                      )}
+                      {(m.state === 'pending' || m.state === 'regenerating') && (
+                        <span className="d-flex align-items-center gap-1 text-warning">
+                          <span className="spinner-border spinner-border-sm" role="status" />
+                          <small>{m.state === 'regenerating' ? 'Regenerating...' : 'Processing...'}</small>
+                        </span>
+                      )}
+                      {(m.state === 'merged' || m.state === 'regenerating') && (
+                        <button
+                          className="btn btn-outline-success btn-sm"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/projects/${selectedProjectId}/merges/${m.id}/results`) }}
+                          title="View Results"
+                        >
+                          <i className="bi bi-table me-1"></i>Results
+                        </button>
+                      )}
                       <button
                         className="btn btn-outline-danger btn-sm"
                         onClick={(e) => { e.stopPropagation(); deleteMerge(m.id) }}

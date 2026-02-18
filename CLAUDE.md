@@ -13,6 +13,7 @@ bin/dev                    # Start Vite + Rails together via Foreman (recommende
 bin/rails s                # Rails server only (port 3000)
 bin/vite dev               # Vite dev server only (port 3036)
 ```
+Note: Claude should not start the dev server. Let the operator start & stop the dev server directly, prompt me to do so when you need to test. 
 
 ### Testing
 
@@ -25,6 +26,8 @@ bin/rails test:system      # Run system tests (Capybara + Selenium)
 
 ### Database
 - don't use rails References. instead use uuids for foreign keys
+
+
 
 ### Linting & Security
 
@@ -44,6 +47,21 @@ bin/setup                  # Full setup: bundle install, db:prepare, etc.
 For local development, always use localhost:3100 to access the site (not 127.0.0.1)
 
 A good local username is jason@heliosdev.shop with password "password"
+
+## Testing Approach
+- RSpec for all testing with FactoryBot for test data
+- VCR cassettes for external API testing
+- Capybara for integration testing
+- SimpleCov for coverage reporting
+- Run specific tests: `bin/rspec spec/path/to/test_spec.rb`
+
+## Database Considerations
+- PostgreSQL with extensive use of indexes and foreign keys
+- Paranoia gem for soft deletes on critical models
+- Database-level constraints and validations
+- Migration files use nonschema_migrations for data-only changed, created these with `bin/rails g data_migration Xyz`
+- When creating Enums, always use a Postgres Enum-backed field in the database. do not define enums in models against string columns
+- Do not use seeds.db
 
 
 ## Architecture

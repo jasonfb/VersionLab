@@ -24,10 +24,9 @@
   },
   "devDependencies": {},
   "dependencies": {
-    "vite": "^5",
-    "vite-plugin-ruby": "5.1.1",
     "@hotwired/turbo-rails": "^8.0.23",
     "@popperjs/core": "^2.11.8",
+    "@rails/actioncable": "^8.1.200",
     "@rails/activestorage": "^8.1.200",
     "autoprefixer": "^10.4.24",
     "bootstrap": "^5.3.8",
@@ -39,7 +38,9 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.0",
-    "sass": "^1.97.3"
+    "sass": "^1.97.3",
+    "vite": "^5",
+    "vite-plugin-ruby": "5.1.1"
   },
   "browserslist": [
     "defaults"

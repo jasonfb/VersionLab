@@ -1,4 +1,9 @@
-#!/usr/bin/env sh
+#!/usr/bin/env zsh
+
+# Load nvm so foreman subprocesses inherit the correct Node version
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+nvm use
 
 if gem list --no-installed --exact --silent foreman; then
   echo "Installing foreman..."

@@ -21,8 +21,21 @@ default: &default
 
 
 development:
-  <<: *default
-  database: version_lab_development
+  primary:
+    <<: *default
+    database: version_lab_development
+  cache:
+    <<: *default
+    database: version_lab_development
+    migrations_paths: db/cache_migrate
+  queue:
+    <<: *default
+    database: version_lab_development
+    migrations_paths: db/queue_migrate
+  cable:
+    <<: *default
+    database: version_lab_development
+    migrations_paths: db/cable_migrate
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.

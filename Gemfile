@@ -94,3 +94,7 @@ gem "devise", "~> 5.0"
 gem "aws-sdk-s3", "~> 1.213"
 
 gem "pundit", "~> 2.5"
+
+gem "ruby-openai", "~> 7.4"
+
+gem "rubyzip", "~> 2.4"

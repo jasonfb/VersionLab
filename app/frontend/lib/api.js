@@ -13,7 +13,7 @@ export async function apiFetch(path, options = {}) {
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
-    throw new Error(body.errors?.join(', ') || `Request failed: ${response.status}`)
+    throw new Error(body.errors?.join(', ') || body.error || `Request failed: ${response.status}`)
   }
 
   if (response.status === 204) return null
@@ -29,7 +29,7 @@ export async function apiUpload(path, formData) {
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
-    throw new Error(body.errors?.join(', ') || `Upload failed: ${response.status}`)
+    throw new Error(body.errors?.join(', ') || body.error || `Upload failed: ${response.status}`)
   }
 
   return response.json()
