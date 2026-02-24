@@ -70,14 +70,49 @@ export default function TemplateEdit() {
       doc.write(preview)
       doc.close()
 
+      // Inject CSS so link text behaves like normal selectable text.
+      // The iframe is sandboxed so links can't navigate; the pointer cursor
+      // and drag behaviour are just confusing noise.
+      const injectedStyle = doc.createElement('style')
+      injectedStyle.textContent = [
+        'a { cursor: text !important; -webkit-user-drag: none; user-drag: none; }',
+        'a, a * { -webkit-user-select: text !important; user-select: text !important; }',
+      ].join('\n')
+      ;(doc.head || doc.body)?.appendChild(injectedStyle)
+
+      // Prevent the browser from treating a mousedown on a link as a
+      // link-drag start, which would eat the drag and prevent text selection.
+      doc.addEventListener('dragstart', (e) => {
+        if (e.target.closest('a')) e.preventDefault()
+      })
+
       const handleMouseUp = () => {
         const selection = doc.getSelection()
-        if (!selection || selection.isCollapsed || !selection.toString().trim()) return
-        if (!expandedSectionRef.current) return
+        const selStr = selection?.toString() ?? ''
+        console.log('[handleMouseUp] FIRED', {
+          hasSelection: !!selection,
+          isCollapsed: selection?.isCollapsed,
+          selectionText: JSON.stringify(selStr),
+          expandedSection: expandedSectionRef.current,
+        })
+
+        if (!selection || selection.isCollapsed || !selStr.trim()) {
+          console.log('[handleMouseUp] BAIL: no/collapsed/empty selection')
+          return
+        }
+        if (!expandedSectionRef.current) {
+          console.log('[handleMouseUp] BAIL: no expandedSection')
+          return
+        }
 
         // Don't allow selecting inside an existing variable span
         const anchor = selection.anchorNode?.parentElement
-        if (anchor?.closest('[data-vl-var]')) return
+        const anchorInVar = anchor?.closest('[data-vl-var]')
+        console.log('[handleMouseUp] anchor element:', anchor?.tagName, anchor?.className, 'inVar:', !!anchorInVar)
+        if (anchorInVar) {
+          console.log('[handleMouseUp] BAIL: anchor inside existing variable span')
+          return
+        }
 
         const range = selection.getRangeAt(0)
 
@@ -85,11 +120,25 @@ export default function TemplateEdit() {
         // because replacing them with a single token destroys HTML structure.
         const container = range.commonAncestorContainer
         const containerEl = container.nodeType === 3 ? container.parentElement : container
+        console.log('[handleMouseUp] commonAncestorContainer:', {
+          nodeType: container.nodeType,
+          tagName: containerEl?.tagName,
+          className: containerEl?.className,
+          id: containerEl?.id,
+        })
+
         if (containerEl) {
           const fragment = range.cloneContents()
-          const hasBlockOrLink = fragment.querySelector('a, p, h1, h2, h3, h4, h5, h6, div, td, tr, table, li, ul, ol')
-          if (hasBlockOrLink) return
+          const fragmentHtml = (() => { const d = doc.createElement('div'); d.appendChild(fragment.cloneNode(true)); return d.innerHTML })()
+          console.log('[handleMouseUp] fragment HTML:', fragmentHtml)
+          const blockMatch = fragment.querySelector('a, p, h1, h2, h3, h4, h5, h6, div, td, tr, table, li, ul, ol')
+          console.log('[handleMouseUp] hasBlockOrLink:', blockMatch ? blockMatch.tagName : 'none')
+          if (blockMatch) {
+            console.log('[handleMouseUp] BAIL: fragment contains block/link element:', blockMatch.tagName, blockMatch.outerHTML?.slice(0, 100))
+            return
+          }
         }
+
         const rect = range.getBoundingClientRect()
         const iframeRect = iframe.getBoundingClientRect()
 
@@ -121,7 +170,7 @@ export default function TemplateEdit() {
           console.warn('[handleMouseUp] occurrence calc error:', e)
         }
 
-        console.log('[handleMouseUp] selection:', {
+        console.log('[handleMouseUp] SHOWING POPOVER', {
           selectedText: selection.toString(),
           occurrenceIndex,
         })
