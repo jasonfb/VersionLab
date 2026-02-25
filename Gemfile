@@ -97,4 +97,4 @@ gem "pundit", "~> 2.5"
 
 gem "ruby-openai", "~> 7.4"
 
-gem "rubyzip", "~> 2.4"
+gem "rubyzip", "~> 3.2"
