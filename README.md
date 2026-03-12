@@ -6,14 +6,15 @@ Node + Ruby versions are in `.node-version` and `.ruby-version`, respectively.
 
 # Start Rails
 
-`bin/vite dev` + `bin/rails s` in two separate windows
+• `bin/vite dev` + `bin/rails s` in two separate windows
 
-or run `bin/dev` in single window and access site at http://127.0.0.1:5100
+• or run `bin/dev` in single window and access site at `http://localhost:3100`
+
+• You must run on localhost not 127.0.0.1 becasue the vite server runs on localhost and they must match
 
 # Run Specs
 
 run with `bin/rake`
-
 
 ## Annotate models
 

@@ -1,89 +1,832 @@
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #000;">
-  <div class="container">
-    <%= link_to "/", class: "navbar-brand fw-bold d-flex align-items-center gap-2" do %>
-      <%= image_tag "version-lab-icon.png", height: 28, alt: "Version Lab" %>
-      Version Lab
-    <% end %>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-      <ul class="navbar-nav align-items-center gap-2">
-        <% if user_signed_in? %>
-          <li class="nav-item">
-            <%= link_to "Go to App", "/app", class: "btn btn-primary btn-sm" %>
-          </li>
-          <li class="nav-item">
-            <%= link_to "Logout", destroy_user_session_path, data: { turbo_method: :delete }, class: "btn btn-outline-light btn-sm" %>
-          </li>
-        <% else %>
-          <li class="nav-item">
-            <%= link_to "Login", new_user_session_path, class: "btn btn-outline-light btn-sm" %>
-          </li>
-          <li class="nav-item">
-            <%= link_to "Sign Up Now", onboarding_path, class: "btn btn-primary btn-sm" %>
-          </li>
-        <% end %>
-      </ul>
+<style>
+  /* ─────────────────────────────────────────
+     SHARED MARKETING STYLES
+  ───────────────────────────────────────── */
+  body { background: #f5f6f8; }
+
+  .mkt-section {
+    padding: 5rem 0;
+  }
+  .mkt-section-white {
+    background: #fff;
+  }
+
+  .section-eyebrow {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #CD0000;
+    margin-bottom: 1rem;
+  }
+  .section-title {
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 900;
+    color: #1a1a1a;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+  }
+  .section-title-red {
+    color: #CD0000;
+  }
+  .section-sub {
+    font-size: 1.1rem;
+    color: #6b7280;
+    line-height: 1.7;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  /* feature cards */
+  .feat-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 2rem;
+    height: 100%;
+  }
+  .feat-card-icon {
+    font-size: 1.8rem;
+    color: #CD0000;
+    margin-bottom: 1rem;
+  }
+  .feat-card-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 0.5rem;
+  }
+  .feat-card-body {
+    font-size: 0.95rem;
+    color: #6b7280;
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  /* check-item cards */
+  .check-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.1rem 1.4rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+  .check-card .check-icon {
+    color: #CD0000;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .check-card p {
+    margin: 0;
+    font-size: 0.97rem;
+    color: #374151;
+    line-height: 1.55;
+  }
+
+  /* inline check list (no card border) */
+  .check-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+  }
+  .check-list-item .check-icon { color: #CD0000; font-size: 1.1rem; flex-shrink: 0; margin-top: 2px; }
+  .check-list-item p { margin: 0; font-size: 1rem; color: #374151; line-height: 1.55; }
+
+  /* step numbers */
+  .step-num {
+    font-size: 5rem;
+    font-weight: 900;
+    color: #f0c0c0;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+
+  /* strikethrough rows */
+  .strikethrough-row {
+    font-size: 1.05rem;
+    color: #b0b0b0;
+    text-decoration: line-through;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.9rem 0;
+    display: block;
+  }
+
+  /* ── Nav ── */
+  .nav-marketing {
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.85rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .nav-marketing .brand-text {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: #1a1a1a;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .nav-marketing .nav-lnk {
+    color: #555;
+    font-weight: 500;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .nav-marketing .nav-lnk:hover { color: #1a1a1a; }
+  .nav-marketing .nav-lnk.is-active { color: #CD0000; }
+
+  /* ── Hero ── */
+  .hero-section {
+    background: #f5f6f8;
+    min-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 5rem 0 3rem;
+  }
+  .hero-line-1 {
+    font-size: clamp(2.8rem, 5vw, 4.2rem);
+    font-weight: 900;
+    color: #1a1a1a;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+  .hero-line-2 {
+    font-size: clamp(2.8rem, 5vw, 4.2rem);
+    font-weight: 900;
+    color: #888;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+  .rotating-word-wrap {
+    display: inline-block;
+    padding-bottom: 6px;
+    border-bottom: 4px solid #CD0000;
+    transition: border-color 0.3s;
+    line-height: 1.1;
+  }
+  #rotating-word {
+    font-size: clamp(2.8rem, 5vw, 4.2rem);
+    font-weight: 900;
+    color: #CD0000;
+    letter-spacing: -0.03em;
+    display: block;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  #rotating-word.fading {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  .audience-pill {
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 0.4rem 1.1rem;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: #666;
+    cursor: pointer;
+    transition: background 0.25s, color 0.25s;
+  }
+  .audience-pill.active { background: #1a1a1a; color: #fff; }
+  .audience-pill:hover:not(.active) { color: #1a1a1a; }
+
+  /* ── Browser mockup ── */
+  .browser-mockup {
+    width: 100%;
+    max-width: 460px;
+    border-radius: 14px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.13);
+    overflow: hidden;
+  }
+  .browser-chrome {
+    background: #e2e2e2;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .browser-dots { display: flex; gap: 6px; }
+  .browser-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .browser-url {
+    flex: 1;
+    background: #fff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    color: #888;
+    text-align: center;
+  }
+  .browser-body-wrap {
+    background: #fff;
+    padding: 2rem 2rem 2.5rem;
+    min-height: 320px;
+    perspective: 800px;
+  }
+  #browser-card { transform-style: preserve-3d; will-change: transform; }
+  .feature-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    border: 2px solid;
+    margin-bottom: 1.4rem;
+  }
+  .browser-headline {
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: #1a1a1a;
+    line-height: 1.25;
+    margin-bottom: 0.65rem;
+  }
+  .browser-body-text {
+    font-size: 0.95rem;
+    color: #6b7280;
+    line-height: 1.65;
+    margin-bottom: 1.5rem;
+  }
+  .see-how-btn {
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 0.7rem 1.8rem;
+    border-radius: 10px;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+  }
+  .scroll-indicator { text-align: center; margin-top: 3rem; color: #aaa; font-size: 0.85rem; }
+
+  /* ── Contact form ── */
+  .contact-form-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 2rem 2.25rem;
+  }
+  .contact-form-card label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.35rem;
+    display: block;
+  }
+  .contact-form-card input,
+  .contact-form-card textarea {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    color: #374151;
+    background: #fafafa;
+    margin-bottom: 1.25rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .contact-form-card input:focus,
+  .contact-form-card textarea:focus { border-color: #CD0000; }
+  .contact-form-card textarea { min-height: 110px; resize: vertical; }
+
+  /* ── Footer ── */
+  .mkt-footer {
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    padding: 3rem 0 1.5rem;
+  }
+  .footer-logo-text {
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #1a1a1a;
+  }
+  .footer-logo-text span { color: #CD0000; }
+  .footer-desc { font-size: 0.95rem; color: #6b7280; max-width: 360px; line-height: 1.65; }
+  .footer-links a { color: #CD0000; text-decoration: none; font-size: 0.95rem; font-weight: 500; display: block; margin-bottom: 0.6rem; }
+  .footer-links a:hover { text-decoration: underline; }
+  .footer-copy { font-size: 0.85rem; color: #9ca3af; text-align: center; margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; }
+
+  @media (max-width: 991px) {
+    .hero-right { margin-top: 2.5rem; }
+    .step-num { font-size: 3.5rem; }
+  }
+</style>
+
+<!-- ══════════════════════════════════════
+     NAV
+══════════════════════════════════════ -->
+<nav class="nav-marketing">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a href="/" class="text-decoration-none d-flex align-items-center gap-2">
+      <%= image_tag "version-lab-icon.png", height: 30, alt: "Version Lab" %>
+      <span class="brand-text">Version Lab</span>
+    </a>
+    <div class="d-flex align-items-center gap-4">
+      <a href="/" class="nav-lnk is-active">Home</a>
+      <a href="/pricing" class="nav-lnk">Pricing</a>
+      <a href="/contact" class="nav-lnk">Contact</a>
+      <% if user_signed_in? %>
+        <%= link_to "Go to App", "/app", class: "nav-lnk" %>
+        <%= link_to "Logout", destroy_user_session_path, data: { turbo_method: :delete }, class: "btn btn-sm btn-outline-secondary ms-2" %>
+      <% else %>
+        <%= link_to "Login", new_user_session_path, class: "nav-lnk" %>
+        <%= link_to "Start a Free Trial", onboarding_path, class: "btn btn-danger fw-semibold px-4 ms-2" %>
+      <% end %>
     </div>
   </div>
 </nav>
 
-<!-- Hero -->
-<section class="text-white text-center" style="padding: 8rem 1rem 5rem; background-color: #000;">
+<!-- ══════════════════════════════════════
+     SECTION 1 — HERO
+══════════════════════════════════════ -->
+<section class="hero-section">
   <div class="container">
-    <h1 class="display-4 fw-bold mb-3">Smarter Audiences, Better Emails</h1>
-    <p class="lead mb-4 mx-auto" style="max-width: 600px;">
-      Version Lab uses Agentic AI to automatically segment your audience and craft email campaigns that convert.
-    </p>
-    <% if user_signed_in? %>
-      <%= link_to "Go to App", "/app", class: "btn btn-primary btn-lg px-5" %>
-    <% else %>
-      <%= link_to "Sign Up Now", onboarding_path, class: "btn btn-primary btn-lg px-5" %>
-    <% end %>
+    <div class="row align-items-center g-5">
+
+      <!-- Left -->
+      <div class="col-lg-6">
+        <div class="mb-4">
+          <p class="hero-line-1">Speed + Control.</p>
+          <p class="hero-line-2">No Tradeoff.</p>
+          <div class="rotating-word-wrap" id="rotating-word-wrap">
+            <span id="rotating-word">Agencies</span>
+          </div>
+        </div>
+
+        <p style="font-size:1.08rem;color:#555;line-height:1.78;max-width:480px;" class="mb-4">
+          Version Lab is <strong>creative versioning infrastructure</strong> that ingests your approved
+          designs and deploys governed, production-ready variants — without breaking a single
+          font, color, or layout rule.
+        </p>
+
+        <%= link_to onboarding_path, class: "btn btn-danger btn-lg fw-bold px-5 py-3 mb-4", style: "font-size:1.05rem;border-radius:10px;" do %>
+          Get Started &nbsp;→
+        <% end %>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span style="color:#888;font-size:0.92rem;margin-right:0.25rem;">Built for:</span>
+          <button class="audience-pill active" data-index="0">Agencies</button>
+          <button class="audience-pill"        data-index="1">In-House</button>
+          <button class="audience-pill"        data-index="2">CRM Teams</button>
+        </div>
+      </div>
+
+      <!-- Right — browser mockup -->
+      <div class="col-lg-6 d-flex justify-content-center hero-right">
+        <div class="browser-mockup">
+          <div class="browser-chrome">
+            <div class="browser-dots">
+              <div class="browser-dot" style="background:#ff5f57;"></div>
+              <div class="browser-dot" style="background:#febc2e;"></div>
+              <div class="browser-dot" style="background:#28c840;"></div>
+            </div>
+            <div class="browser-url">preview.versionlab.io</div>
+          </div>
+          <div class="browser-body-wrap">
+            <div id="browser-card">
+              <div class="feature-badge" id="b-badge" style="color:#CD0000;border-color:#CD0000;">GOVERNED</div>
+              <div class="browser-headline" id="b-headline">Segment Without Sprawl.</div>
+              <p class="browser-body-text" id="b-body">One master email. Every lifecycle stage. No template duplication.</p>
+              <button class="see-how-btn" id="b-btn" style="background:#CD0000;">See How</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="scroll-indicator">
+      <div style="font-size:1.3rem;line-height:1;">↓</div>
+      Scroll to explore
+    </div>
   </div>
 </section>
 
-<!-- Features -->
-<section class="py-5">
+<!-- ══════════════════════════════════════
+     SECTION 2 — VARIANT EXPLOSION
+══════════════════════════════════════ -->
+<section class="mkt-section">
   <div class="container">
-    <div class="row g-4 text-center">
-      <div class="col-md-4">
-        <div class="mb-3"><i class="bi bi-robot fs-1 text-primary"></i></div>
-        <h5>AI-Powered Segmentation</h5>
-        <p class="text-body-secondary">Our AI agents analyze subscriber behavior and automatically build high-performing audience segments.</p>
+    <div class="text-center mb-5">
+      <h2 class="section-title">The Variant Explosion is killing your team</h2>
+      <p class="section-sub mt-3">
+        Every campaign demands more segments, more channels, more versions. Your options?
+        <strong>Burn hours manually</strong> or <strong>let AI guess and pray.</strong><br>
+        Neither scales. Neither protects the brand.
+      </p>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-md-4" data-aos="fade-up" data-aos-delay="0">
+        <div class="feat-card text-center">
+          <div class="feat-card-icon"><i class="bi bi-clock"></i></div>
+          <div class="feat-card-title">The Manual Trap</div>
+          <p class="feat-card-body">Your team spends 8–12 hours per week copying templates, swapping headlines, and re-checking layouts. Every segment gets another file. Every channel gets another rebuild.</p>
+        </div>
       </div>
-      <div class="col-md-4">
-        <div class="mb-3"><i class="bi bi-graph-up-arrow fs-1 text-primary"></i></div>
-        <h5>Data-Driven Campaigns</h5>
-        <p class="text-body-secondary">Send the right message to the right people. Improve open rates, clicks, and conversions.</p>
+      <div class="col-md-4" data-aos="fade-up" data-aos-delay="100">
+        <div class="feat-card text-center">
+          <div class="feat-card-icon"><i class="bi bi-exclamation-triangle"></i></div>
+          <div class="feat-card-title">GenAI Chaos</div>
+          <p class="feat-card-body">AI copy tools promise speed but deliver hallucinations. Wrong fonts. Broken tables. Tone violations. You trade production hours for cleanup hours.</p>
+        </div>
       </div>
-      <div class="col-md-4">
-        <div class="mb-3"><i class="bi bi-lightning-charge fs-1 text-primary"></i></div>
-        <h5>Set Up in Minutes</h5>
-        <p class="text-body-secondary">Connect your email list and let Version Lab do the rest. No complex configuration required.</p>
+      <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
+        <div class="feat-card text-center">
+          <div class="feat-card-icon"><i class="bi bi-lightning-charge"></i></div>
+          <div class="feat-card-title">The Execution Gap</div>
+          <p class="feat-card-body">Strategy says "personalize everything." Production says "we don't have the bandwidth." The bottleneck isn't ideas — it's governed execution at scale.</p>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- CTA -->
-<section class="bg-primary text-white text-center py-5">
+<!-- ══════════════════════════════════════
+     SECTION 3 — INTENT ENGINE
+══════════════════════════════════════ -->
+<section class="mkt-section mkt-section-white">
   <div class="container">
-    <h2 class="fw-bold mb-3">Ready to level up your email marketing?</h2>
-    <p class="mb-4">Join Version Lab and let AI handle your audience segmentation.</p>
-    <% if user_signed_in? %>
-      <%= link_to "Go to App", "/app", class: "btn btn-light btn-lg px-5" %>
-    <% else %>
-      <%= link_to "Sign Up Now", onboarding_path, class: "btn btn-light btn-lg px-5" %>
-    <% end %>
+    <div class="text-center mb-5">
+      <h2 class="section-title">The Intent Engine</h2>
+      <p class="section-sub mt-3">Three steps from approved master to governed, production-ready variants.</p>
+    </div>
+
+    <div class="row g-5">
+      <div class="col-md-4" data-aos="fade-up" data-aos-delay="0">
+        <div class="step-num">01</div>
+        <h4 style="font-weight:800;color:#1a1a1a;margin-bottom:0.6rem;">Ingest — Don't Rebuild</h4>
+        <p style="color:#6b7280;line-height:1.7;">Upload your approved HTML email or ad layout. Version Lab maps every editable region, locked element, and structural boundary. Your design stays intact.</p>
+      </div>
+      <div class="col-md-4" data-aos="fade-up" data-aos-delay="120">
+        <div class="step-num">02</div>
+        <h4 style="font-weight:800;color:#1a1a1a;margin-bottom:0.6rem;">Define Intent with Semantic Groups</h4>
+        <p style="color:#6b7280;line-height:1.7;">Tag each section with its purpose — headline, proof point, CTA. Unlike ChatGPT, the AI doesn't guess what a block is for. You define the intent. The system enforces it.</p>
+      </div>
+      <div class="col-md-4" data-aos="fade-up" data-aos-delay="240">
+        <div class="step-num">03</div>
+        <h4 style="font-weight:800;color:#1a1a1a;margin-bottom:0.6rem;">Deploy Governed Variants</h4>
+        <p style="color:#6b7280;line-height:1.7;">Select your audience and channel. Version Lab generates production-ready variants that honor your word limits, tone rules, locked fonts, and layout constraints. Ship without a single cleanup pass.</p>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- Footer -->
-<footer class="text-white-50 text-center py-4" style="background-color: #000;">
+<!-- ══════════════════════════════════════
+     SECTION 4 — DESIGNER SOVEREIGNTY
+══════════════════════════════════════ -->
+<section class="mkt-section">
   <div class="container">
-    <small>&copy; <%= Date.today.year %> Version Lab. All rights reserved.</small>
+    <div class="text-center mb-5">
+      <h2 class="section-title">Designer Sovereignty.<br>Production-Ready Output.</h2>
+      <p class="section-sub mt-3">We respect the design. We don't break the layout. Every variant ships with the same structural integrity as your original — because governance isn't optional.</p>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="0">
+        <div class="check-card">
+          <span class="check-icon"><i class="bi bi-check-circle"></i></span>
+          <p>100% brand safe — fonts, colors, and spacing locked at generation time</p>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="80">
+        <div class="check-card">
+          <span class="check-icon"><i class="bi bi-check-circle"></i></span>
+          <p>Production-ready HTML output — no dev cleanup required</p>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="0">
+        <div class="check-card">
+          <span class="check-icon"><i class="bi bi-check-circle"></i></span>
+          <p>No template duplication per segment or channel</p>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="80">
+        <div class="check-card">
+          <span class="check-icon"><i class="bi bi-check-circle"></i></span>
+          <p>Full audit trail on every generated variant</p>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="0">
+        <div class="check-card">
+          <span class="check-icon"><i class="bi bi-check-circle"></i></span>
+          <p>Sits upstream of your ESP — no platform lock-in</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 5 — CREATIVE INFRASTRUCTURE
+══════════════════════════════════════ -->
+<section class="mkt-section mkt-section-white">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="section-title">Creative infrastructure,<br>not another AI wrapper</h2>
+      <p class="section-sub mt-3">The governance layer between your design tools and your deployment channels.</p>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="0">
+        <div class="feat-card">
+          <div class="feat-card-icon"><i class="bi bi-file-earmark-text"></i></div>
+          <div class="feat-card-title">Template Ingestion</div>
+          <p class="feat-card-body">Maps editable regions, locked elements, and structural constraints from your master layout. No rebuild required.</p>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="100">
+        <div class="feat-card">
+          <div class="feat-card-icon"><i class="bi bi-lock"></i></div>
+          <div class="feat-card-title">Governance Engine</div>
+          <p class="feat-card-body">Enforces word limits, approved vocabulary, tone rules, and compliance flags at generation time. Not after.</p>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="0">
+        <div class="feat-card">
+          <div class="feat-card-icon"><i class="bi bi-people"></i></div>
+          <div class="feat-card-title">Audience Intelligence</div>
+          <p class="feat-card-body">Variant generation driven by segment profile, lifecycle stage, and intent signals.</p>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="100">
+        <div class="feat-card">
+          <div class="feat-card-icon"><i class="bi bi-brush"></i></div>
+          <div class="feat-card-title">Brand Profiles</div>
+          <p class="feat-card-body">Per-client or per-brand rule sets where fonts, colors, tone, and spacing rules are enforced automatically — not suggested.</p>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="0">
+        <div class="feat-card">
+          <div class="feat-card-icon"><i class="bi bi-layers"></i></div>
+          <div class="feat-card-title">Asset Governance</div>
+          <p class="feat-card-body">Approved images and content components stored, tagged, and deployed by role and channel eligibility.</p>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="100">
+        <div class="feat-card">
+          <div class="feat-card-icon"><i class="bi bi-shield"></i></div>
+          <div class="feat-card-title">Full Audit Trail</div>
+          <p class="feat-card-body">Every generation, every edit, every deployment logged. Compliance teams get deterministic proof, not promises.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 6 — SPEED VS BRAND SAFETY
+══════════════════════════════════════ -->
+<section class="mkt-section">
+  <div class="container" style="max-width:780px;">
+    <div class="text-center mb-5">
+      <h2 class="section-title">You shouldn't have to choose<br><span class="section-title-red">between speed and brand safety.</span></h2>
+    </div>
+
+    <div data-aos="fade-up">
+      <span class="strikethrough-row">AI copy tools give you speed — and hallucinations.</span>
+      <span class="strikethrough-row">Enterprise suites give you control — and a six-figure contract.</span>
+      <span class="strikethrough-row">Manual production gives you accuracy — and burnout.</span>
+    </div>
+
+    <div class="mt-4 mb-4" data-aos="fade-up">
+      <p style="font-size:1.05rem;font-weight:700;color:#1a1a1a;margin-bottom:0.25rem;">Version Lab breaks the tradeoff.</p>
+      <p style="font-size:1.05rem;color:#CD0000;font-weight:600;">Speed + Control. That's the infrastructure layer.</p>
+    </div>
+
+    <p style="font-size:0.95rem;font-weight:700;color:#374151;" class="mb-3">What this means in practice:</p>
+    <div class="d-flex flex-column gap-3" data-aos="fade-up">
+      <div class="check-card">
+        <span class="check-icon"><i class="bi bi-check-circle"></i></span>
+        <p>Ingests designs from your existing tools — no rebuild</p>
+      </div>
+      <div class="check-card">
+        <span class="check-icon"><i class="bi bi-check-circle"></i></span>
+        <p>Semantic Grouping defines intent per section — the AI never guesses</p>
+      </div>
+      <div class="check-card">
+        <span class="check-icon"><i class="bi bi-check-circle"></i></span>
+        <p>Fonts, colors, and spacing locked at the infrastructure level</p>
+      </div>
+      <div class="check-card">
+        <span class="check-icon"><i class="bi bi-check-circle"></i></span>
+        <p>Variants deploy production-ready — no dev pass needed</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 7 — BUILT FOR OPERATORS WHO SHIP
+══════════════════════════════════════ -->
+<section class="mkt-section mkt-section-white">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="section-title">Built for operators who ship</h2>
+      <p class="section-sub mt-3">Whether you run an agency or an in-house team, Version Lab turns production into a force multiplier — not a bottleneck.</p>
+    </div>
+
+    <div class="row g-5">
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="0">
+        <p style="font-size:1.05rem;margin-bottom:1.25rem;"><strong>The Force Multiplier</strong> <span style="color:#6b7280;">— for agencies</span></p>
+        <div class="d-flex flex-column gap-3">
+          <div class="check-list-item"><span class="check-icon"><i class="bi bi-check-circle"></i></span><p>Deploy governed variants across every client account from one master</p></div>
+          <div class="check-list-item"><span class="check-icon"><i class="bi bi-check-circle"></i></span><p>Cut production hours per campaign by 60–80%</p></div>
+          <div class="check-list-item"><span class="check-icon"><i class="bi bi-check-circle"></i></span><p>Win more work with faster turnaround — without hiring</p></div>
+          <div class="check-list-item"><span class="check-icon"><i class="bi bi-check-circle"></i></span><p>Brand and compliance rules enforced automatically per client</p></div>
+        </div>
+      </div>
+      <div class="col-md-6" data-aos="fade-up" data-aos-delay="150">
+        <p style="font-size:1.05rem;margin-bottom:1.25rem;"><strong>The Capacity Engine</strong> <span style="color:#6b7280;">— for in-house teams</span></p>
+        <div class="d-flex flex-column gap-3">
+          <div class="check-list-item"><span class="check-icon"><i class="bi bi-check-circle"></i></span><p>Segment every campaign without duplicating a single template</p></div>
+          <div class="check-list-item"><span class="check-icon"><i class="bi bi-check-circle"></i></span><p>Ship to more channels without rebuilding layouts</p></div>
+          <div class="check-list-item"><span class="check-icon"><i class="bi bi-check-circle"></i></span><p>Reduce the gap between strategy approval and live deployment</p></div>
+          <div class="check-list-item"><span class="check-icon"><i class="bi bi-check-circle"></i></span><p>Keep brand governance locked down — even when moving fast</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 8 — BUILT BY OPERATORS
+══════════════════════════════════════ -->
+<section class="mkt-section" style="text-align:center;">
+  <div class="container" style="max-width:780px;">
+    <h2 class="section-title">Built by operators who lived the grind</h2>
+    <div data-aos="fade-up">
+      <p style="font-size:1.1rem;color:#6b7280;line-height:1.75;margin-top:1.5rem;">
+        We spent years managing hundreds of creative variants by hand — copying templates,
+        fixing broken layouts, re-checking fonts at 11 PM before launch.
+      </p>
+      <p style="font-size:1.1rem;color:#6b7280;line-height:1.75;margin-bottom:2rem;">
+        Version Lab is the infrastructure we wished existed. Governed speed. No cleanup.
+        No compromise.
+      </p>
+      <a href="/contact" style="color:#CD0000;font-weight:600;font-size:1.05rem;text-decoration:none;">
+        Talk to us &nbsp;→
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 9 — CONTACT
+══════════════════════════════════════ -->
+<section class="mkt-section mkt-section-white">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="section-title">Ready to deploy governed creative?</h2>
+      <p class="section-sub mt-3">Tell us about your production workflow. We'll show you how Version Lab fits upstream of your ESP and ad platforms.</p>
+    </div>
+
+    <div class="row g-5 align-items-start">
+      <!-- Left info -->
+      <div class="col-lg-5" data-aos="fade-up">
+        <div class="d-flex gap-3 mb-4">
+          <div style="color:#CD0000;font-size:1.4rem;flex-shrink:0;margin-top:2px;"><i class="bi bi-envelope"></i></div>
+          <div>
+            <p style="font-weight:700;color:#1a1a1a;margin-bottom:0.2rem;font-size:1rem;">Email</p>
+            <a href="mailto:hello@versionlab.io" style="color:#CD0000;text-decoration:none;font-size:0.97rem;">hello@versionlab.io</a>
+          </div>
+        </div>
+        <div class="d-flex gap-3">
+          <div style="color:#CD0000;font-size:1.4rem;flex-shrink:0;margin-top:2px;"><i class="bi bi-chat-square"></i></div>
+          <div>
+            <p style="font-weight:700;color:#1a1a1a;margin-bottom:0.2rem;font-size:1rem;">Response Time</p>
+            <p style="color:#6b7280;font-size:0.97rem;margin:0;">We typically reply within one business day.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right form -->
+      <div class="col-lg-7" data-aos="fade-up" data-aos-delay="100">
+        <div class="contact-form-card">
+          <label>Name</label>
+          <input type="text" placeholder="Your name">
+          <label>Email</label>
+          <input type="email" placeholder="you@company.com">
+          <label>Message</label>
+          <textarea placeholder="Tell us how we can help..."></textarea>
+          <button class="btn btn-danger w-100 fw-bold py-3" style="border-radius:10px;font-size:1rem;">Send Message</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     FOOTER
+══════════════════════════════════════ -->
+<footer class="mkt-footer">
+  <div class="container">
+    <div class="row align-items-start g-4">
+      <div class="col-lg-7">
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <%= image_tag "version-lab-icon.png", height: 36, alt: "Version Lab" %>
+          <span class="footer-logo-text"><span>Version</span> Lab</span>
+        </div>
+        <p class="footer-desc">Version Lab turns a single approved email or ad into channel-ready, audience-specific versions without duplicating templates or breaking layout rules.</p>
+      </div>
+      <div class="col-lg-5 text-lg-end footer-links">
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="/cookies">Cookie Policy</a>
+      </div>
+    </div>
+    <p class="footer-copy">&copy; <%= Date.today.year %> Version Lab. All rights reserved.</p>
   </div>
 </footer>
+
+<script>
+(function () {
+  const AUDIENCES = [
+    {
+      word: 'Agencies', wordColor: '#CD0000', lineColor: '#CD0000',
+      badge: 'GOVERNED', badgeColor: '#CD0000',
+      headline: 'Segment Without Sprawl.',
+      body: 'One master email. Every lifecycle stage. No template duplication.',
+      btnColor: '#CD0000'
+    },
+    {
+      word: 'In-House', wordColor: '#1a1a1a', lineColor: '#1a1a1a',
+      badge: 'BRAND SAFE', badgeColor: '#1a1a1a',
+      headline: 'Your Brand. Locked Down.',
+      body: 'Fonts, colors, and tone rules enforced at generation time. Zero cleanup.',
+      btnColor: '#555'
+    },
+    {
+      word: 'CRM Teams', wordColor: '#CD0000', lineColor: '#CD0000',
+      badge: 'PRODUCTION-READY', badgeColor: '#CD0000',
+      headline: '47 Variants. One Source File.',
+      body: 'Deploy governed creative across every client segment without rebuilding a single layout.',
+      btnColor: '#CD0000'
+    }
+  ];
+
+  let current = 0;
+  let timer   = null;
+
+  const wordEl  = document.getElementById('rotating-word');
+  const wrapEl  = document.getElementById('rotating-word-wrap');
+  const cardEl  = document.getElementById('browser-card');
+  const badgeEl = document.getElementById('b-badge');
+  const headEl  = document.getElementById('b-headline');
+  const bodyEl  = document.getElementById('b-body');
+  const btnEl   = document.getElementById('b-btn');
+  const pills   = document.querySelectorAll('.audience-pill');
+
+  function goTo(index) {
+    if (index === current) return;
+    const a = AUDIENCES[index];
+
+    wordEl.classList.add('fading');
+    cardEl.style.transition = 'transform 0.2s ease-in';
+    cardEl.style.transform  = 'rotateY(-90deg)';
+
+    setTimeout(function () {
+      wordEl.textContent       = a.word;
+      wordEl.style.color       = a.wordColor;
+      wrapEl.style.borderColor = a.lineColor;
+      wordEl.classList.remove('fading');
+
+      badgeEl.textContent         = a.badge;
+      badgeEl.style.color         = a.badgeColor;
+      badgeEl.style.borderColor   = a.badgeColor;
+      headEl.textContent          = a.headline;
+      bodyEl.textContent          = a.body;
+      btnEl.style.backgroundColor = a.btnColor;
+
+      cardEl.style.transition = 'transform 0.2s ease-out';
+      cardEl.style.transform  = 'rotateY(0deg)';
+    }, 210);
+
+    pills.forEach(function (p, i) { p.classList.toggle('active', i === index); });
+    current = index;
+  }
+
+  function advance() { goTo((current + 1) % AUDIENCES.length); }
+  function resetTimer() { clearInterval(timer); timer = setInterval(advance, 4000); }
+
+  pills.forEach(function (p) {
+    p.addEventListener('click', function () {
+      goTo(parseInt(p.dataset.index, 10));
+      resetTimer();
+    });
+  });
+
+  resetTimer();
+}());
+</script>

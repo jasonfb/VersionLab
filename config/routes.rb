@@ -7,6 +7,8 @@ Rails.application.routes.draw do
 
   # Marketing at root
   root to: "marketing/pages#home"
+  get "/pricing", to: "marketing/pages#pricing"
+  get "/contact", to: "marketing/pages#contact"
 
   # Onboarding flow
   scope :start do

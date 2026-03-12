@@ -18,9 +18,12 @@
     <%= stylesheet_link_tag :app %>
     <%= vite_client_tag %>
     <%= vite_javascript_tag 'marketing' %>
+    <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css" />
   </head>
 
   <body>
     <%= yield %>
+    <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+    <script>AOS.init({ duration: 600, once: true, offset: 60 });</script>
   </body>
 </html>
