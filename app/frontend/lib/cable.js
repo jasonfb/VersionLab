@@ -16,3 +16,13 @@ export function subscribeMergeChannel(mergeId, { received }) {
   )
   return () => subscription.unsubscribe()
 }
+
+// Subscribe to TemplateImportChannel for a given importId.
+// Returns an unsubscribe function.
+export function subscribeTemplateImportChannel(importId, { received }) {
+  const subscription = getConsumer().subscriptions.create(
+    { channel: 'TemplateImportChannel', import_id: importId },
+    { received }
+  )
+  return () => subscription.unsubscribe()
+}

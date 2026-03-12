@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_18_173703) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_12_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -19,6 +19,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_18_173703) do
   # Note that some types may not work with other database engines. Be careful if changing database.
   create_enum "merge_state", ["setup", "pending", "merged", "regenerating"]
   create_enum "merge_version_state", ["generating", "active", "rejected"]
+  create_enum "template_import_state", ["pending", "processing", "completed", "failed"]
+  create_enum "template_import_type", ["bundled", "external"]
 
   create_table "account_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "account_id"
@@ -94,6 +96,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_18_173703) do
   create_table "assets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "account_id", null: false
     t.datetime "created_at", null: false
+    t.string "folder"
     t.integer "height"
     t.string "name"
     t.datetime "updated_at", null: false
@@ -181,6 +184,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_18_173703) do
     t.string "label"
     t.string "name"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "solid_cable_messages", force: :cascade do |t|
+    t.binary "channel", null: false
+    t.bigint "channel_hash", null: false
+    t.datetime "created_at", null: false
+    t.binary "payload", null: false
+    t.index ["channel"], name: "index_solid_cable_messages_on_channel"
+    t.index ["channel_hash"], name: "index_solid_cable_messages_on_channel_hash"
+    t.index ["created_at"], name: "index_solid_cable_messages_on_created_at"
   end
 
   create_table "solid_queue_blocked_executions", force: :cascade do |t|
@@ -304,6 +317,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_18_173703) do
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
   end
 
+  create_table "template_imports", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "email_template_id", null: false
+    t.text "error_message"
+    t.enum "import_type", null: false, enum_type: "template_import_type"
+    t.enum "state", default: "pending", null: false, enum_type: "template_import_state"
+    t.datetime "updated_at", null: false
+    t.text "warnings"
+    t.index ["email_template_id"], name: "index_template_imports_on_email_template_id"
+  end
+
   create_table "template_variables", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "default_value", null: false
@@ -317,9 +341,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_18_173703) do
 
   create_table "user_roles", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.integer "role_id"
+    t.uuid "role_id"
     t.datetime "updated_at", null: false
-    t.integer "user_id"
+    t.uuid "user_id"
   end
 
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -343,4 +367,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_18_173703) do
   add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "template_imports", "email_templates"
 end

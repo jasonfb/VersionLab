@@ -4,30 +4,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-VersionLab is a Rails 8.1 + React 19 full-stack application using Vite 5 for frontend bundling and PostgreSQL for the database. The React frontend lives inside the Rails app at `app/frontend/` and mounts into the Rails view at a `#VersionLabApp` div.
+VersionLab is a Rails 8.1 + React 19 full-stack application for AI-powered email template versioning and A/B testing. It uses Vite 5 for frontend bundling and PostgreSQL. The React SPA lives inside the Rails app at `app/frontend/` and mounts into the Rails view at a `#VersionLabApp` div.
 
 ## Development Commands
 
 ```bash
-bin/dev                    # Start Vite + Rails together via Foreman (recommended)
+bin/dev                    # Start Vite + Rails together via Foreman (recommended, port 3100)
 bin/rails s                # Rails server only (port 3000)
 bin/vite dev               # Vite dev server only (port 3036)
 ```
-Note: Claude should not start the dev server. Let the operator start & stop the dev server directly, prompt me to do so when you need to test. 
+
+Note: Do not start the dev server. Let the operator start & stop it directly; prompt them to do so when testing is needed.
+
+### CSS
+
+```bash
+yarn build:css             # Compile and prefix Sass stylesheets
+yarn watch:css             # Watch SCSS changes and rebuild
+```
 
 ### Testing
 
+RSpec is the primary test framework. `bin/rails test` runs Minitest (legacy).
+
 ```bash
-bin/rails test             # Run all unit/integration tests (Minitest)
-bin/rails test test/models/foo_test.rb        # Run a single test file
-bin/rails test test/models/foo_test.rb:42     # Run a single test by line number
-bin/rails test:system      # Run system tests (Capybara + Selenium)
+bin/rspec                              # Run all RSpec tests
+bin/rspec spec/path/to/test_spec.rb   # Run a single test file
+bin/rails test:system                 # Run system tests (Capybara + Selenium)
 ```
-
-### Database
-- don't use rails References. instead use uuids for foreign keys
-
-
 
 ### Linting & Security
 
@@ -43,48 +47,56 @@ bin/ci                     # Full CI suite locally
 ```bash
 bin/setup                  # Full setup: bundle install, db:prepare, etc.
 ```
-### Local
-For local development, always use localhost:3100 to access the site (not 127.0.0.1)
 
-A good local username is jason@heliosdev.shop with password "password"
+### Local
+
+For local development, always use `localhost:3100` (not `127.0.0.1`).
+
+Local test account: `jason@heliosdev.shop` / `password`
 
 ## Testing Approach
-- RSpec for all testing with FactoryBot for test data
-- VCR cassettes for external API testing
-- Capybara for integration testing
+
+- RSpec with FactoryBot for test data
+- VCR cassettes for external API (OpenAI) testing
+- Capybara + Selenium for system/integration tests
 - SimpleCov for coverage reporting
-- Run specific tests: `bin/rspec spec/path/to/test_spec.rb`
 
 ## Database Considerations
-- PostgreSQL with extensive use of indexes and foreign keys
-- Paranoia gem for soft deletes on critical models
-- Database-level constraints and validations
-- Migration files use nonschema_migrations for data-only changed, created these with `bin/rails g data_migration Xyz`
-- When creating Enums, always use a Postgres Enum-backed field in the database. do not define enums in models against string columns
-- Do not use seeds.db
 
+- PostgreSQL with UUID primary keys — do not use Rails `references`; use UUIDs for foreign keys
+- Paranoia gem for soft deletes on critical models
+- When creating enums, always use a Postgres Enum-backed field; do not define enums against string columns in models
+- Data-only migrations: `bin/rails g data_migration XyzName` (not schema migrations)
+- Do not use `seeds.rb`
 
 ## Architecture
 
-- **Rails backend**: Standard Rails MVC. Routes in `config/routes.rb`, root points to `WelcomeController#index`.
-- **React frontend**: Lives in `app/frontend/`. Entry point is `app/frontend/entrypoints/application.js` which renders `App.jsx` into the DOM. Vite config is split between `vite.config.mts` (bundler) and `config/vite.json` (Rails integration, source dir, ports).
-- **Asset pipeline**: Propshaft for Rails assets, Vite for JS/React bundling. Layout uses `vite_javascript_tag` and `vite_stylesheet_tag` helpers.
-- **Database**: PostgreSQL. Uses Rails 8 Solid stack — Solid Cache, Solid Queue, and Solid Cable — each with their own schema files in `db/`.
-- **Background jobs**: Solid Queue via Puma plugin (configured in `config/puma.rb`).
-- **Package manager**: Yarn for Node dependencies.
-- **Ruby version**: 3.4.7 (.ruby-version), Node version: 24.8.0 (.node-version).
+### Route Zones
 
+- `/app/*` — React SPA (client-facing). Once on `/app`, React Router handles all navigation. No links back into the Rails routing layer except via full page navigations.
+- `/admin/*` — Administrator dashboard; Turbo Rails
+- `/` — Marketing pages; Turbo Rails
+- `/api/*` — JSON API endpoints consumed by the React frontend
 
-/app 
-    the client facing frontend app implemented fully in React. once the client lands on `/app` we will use React routing for all page navigations.
+### Frontend
 
+React entry point is `app/frontend/entrypoints/client_app.js`, which renders `App.jsx`. Vite config is split: `vite.config.mts` (bundler) and `config/vite.json` (Rails integration, source dir, ports). Layout uses `vite_javascript_tag` / `vite_stylesheet_tag` helpers. Propshaft handles Rails assets; Vite handles JS/React.
 
-/admin
-    administrator dashboard; uses Turbo Rails
+### Backend
 
-/ (homepage)
-    marketing pages; uses Turbo rails
+Standard Rails MVC. API controllers live under `app/controllers/api/` and return JSON. Authorization uses Pundit policies in `app/policies/`.
 
+### Multi-Tenancy
 
-Except for links from the Rails app into the app, the client app will not really have links from itself back into the rails app. 
-if it does, those links will work outside of the React routing. 
+`Account` is the top-level tenant. Users belong to accounts through `AccountUsers`. Projects belong to Accounts; EmailTemplates belong to Projects. All API controllers scope data to the current account.
+
+### Core Feature: AI Merges
+
+`AiMergeService` (`app/services/ai_merge_service.rb`) calls the OpenAI API to generate email copy variants. A `Merge` job runs against an `EmailTemplate`, targeting one or more `Audience` segments, and produces `MergeVersion` records with AI-generated `MergeVersionVariable` values. Merge state: `setup → pending → merged` (also `regenerating`). MergeVersion state: `generating → active` (or `rejected`).
+
+### Infrastructure
+
+- **Database**: PostgreSQL. Rails 8 Solid stack — Solid Cache, Solid Queue, Solid Cable — each with their own schema files in `db/`.
+- **Background jobs**: Solid Queue via Puma plugin (`config/puma.rb`)
+- **Package manager**: Yarn
+- **Ruby**: 3.4.7 (`.ruby-version`), **Node**: 24.8.0 (`.node-version`)

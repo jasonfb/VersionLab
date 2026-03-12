@@ -9,4 +9,8 @@ class User < ApplicationRecord
 
   has_many :account_users
   has_many :accounts, through: :account_users
+
+  def admin?
+    roles.exists?(name: "admin")
+  end
 end

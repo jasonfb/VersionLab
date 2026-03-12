@@ -16,6 +16,7 @@ class Api::EmailTemplatesController < Api::BaseController
       raw_source_html: @email_template.raw_source_html,
       original_raw_source_html: @email_template.original_raw_source_html,
       updated_at: @email_template.updated_at,
+      asset_urls: resolve_asset_urls(@email_template.raw_source_html),
       sections: @email_template.sections.order(:position).includes(:template_variables).map { |s|
         {
           id: s.id,
@@ -83,5 +84,16 @@ class Api::EmailTemplatesController < Api::BaseController
 
   def email_template_params
     params.require(:email_template).permit(:name, :raw_source_html, :original_raw_source_html)
+  end
+
+  def resolve_asset_urls(html)
+    return {} if html.blank?
+
+    asset_ids = html.scan(/\{\{vl-asset:([^}]+)\}\}/).flatten.uniq
+    return {} if asset_ids.empty?
+
+    Asset.where(id: asset_ids).each_with_object({}) do |asset, map|
+      map[asset.id] = rails_blob_url(asset.file, disposition: "inline") if asset.file.attached?
+    end
   end
 end

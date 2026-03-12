@@ -3,6 +3,7 @@ class EmailTemplate < ApplicationRecord
   has_many :sections, class_name: "EmailTemplateSection", dependent: :destroy
   has_many :template_variables, through: :sections
   has_many :merges, dependent: :destroy
+  has_one :template_import, dependent: :destroy
 
   before_create :snapshot_original_html
 
@@ -26,8 +27,20 @@ class EmailTemplate < ApplicationRecord
   def render_html(overrides = {})
     return "" if raw_source_html.blank?
 
+    html = raw_source_html.dup
+
+    # Resolve imported asset references: {{vl-asset:uuid}}
+    asset_ids = html.scan(/\{\{vl-asset:([^}]+)\}\}/).flatten.uniq
+    if asset_ids.any?
+      asset_url_map = Asset.where(id: asset_ids).each_with_object({}) do |asset, map|
+        url = asset.file_url
+        map[asset.id] = url if url
+      end
+      html.gsub!(/\{\{vl-asset:([^}]+)\}\}/) { asset_url_map[$1] || "" }
+    end
+
     # Replace text variable placeholders: {{vl:uuid}}
-    html = raw_source_html.gsub(/\{\{vl:([^}]+)\}\}/) do
+    html = html.gsub(/\{\{vl:([^}]+)\}\}/) do
       var_id = $1
       if overrides.key?(var_id)
         overrides[var_id]

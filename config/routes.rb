@@ -3,6 +3,7 @@ Rails.application.routes.draw do
   # Admin namespace
   namespace :admin do
     root to: "dashboard#index"
+    mount MissionControl::Jobs::Engine, at: "/jobs"
   end
 
   # Marketing at root
@@ -24,6 +25,7 @@ Rails.application.routes.draw do
     resources :ai_services, only: [:index]
     resources :ai_keys, only: [:index, :create, :update, :destroy]
     resources :projects, only: [:index, :create, :update] do
+      resources :template_imports, only: [:create]
       resources :email_templates, only: [:index, :show, :create, :update, :destroy] do
         member do
           post :reset

@@ -27,6 +27,7 @@ export default function TemplateEdit() {
   const [popover, setPopover] = useState(null)
   const [hoveredVarId, setHoveredVarId] = useState(null)
   const [resetting, setResetting] = useState(false)
+  const [assetUrls, setAssetUrls] = useState({})
   const expandedSectionRef = useRef(null)
 
   // Flat list of every variable across all sections (for preview builder)
@@ -43,6 +44,7 @@ export default function TemplateEdit() {
         setRawSourceHtml(data.raw_source_html || '')
         setOriginalRawSourceHtml(data.original_raw_source_html || null)
         setSections(data.sections || [])
+        setAssetUrls(data.asset_urls || {})
       })
       .finally(() => setLoading(false))
   }, [id])
@@ -59,7 +61,7 @@ export default function TemplateEdit() {
     const iframe = iframeRef.current
     if (!iframe || !rawSourceHtml) return
 
-    const preview = buildPreviewHtml(rawSourceHtml, allVariables)
+    const preview = buildPreviewHtml(rawSourceHtml, allVariables, assetUrls)
     let removeListeners = null
 
     const writeAndAttach = () => {

@@ -231,13 +231,19 @@ export function removeImageMarker(html, varId) {
 // ── Preview ─────────────────────────────────────────────────────────────────
 
 /**
- * Converts stored HTML (with {{vl:uuid}} tokens) into preview HTML by
- * replacing each token with a visible <span data-vl-var="uuid"> wrapper.
- * Image markers are left as-is (already in the markup).
+ * Converts stored HTML (with {{vl:uuid}} and {{vl-asset:uuid}} tokens) into
+ * preview HTML. Text placeholders become <span data-vl-var> wrappers; asset
+ * references are replaced with the resolved URL from assetUrls.
  */
-export function buildPreviewHtml(html, allVariables) {
+export function buildPreviewHtml(html, allVariables, assetUrls = {}) {
   if (!html) return html
   let result = html
+
+  // Resolve imported asset image references: {{vl-asset:uuid}}
+  result = result.replace(/\{\{vl-asset:([^}]+)\}\}/g, (match, assetId) => {
+    return assetUrls[assetId] || match
+  })
+
   for (const v of allVariables) {
     if (v.variable_type !== 'text') continue
     const placeholder = `{{vl:${v.id}}}`
