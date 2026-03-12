@@ -1,5 +1,5 @@
 class Asset < ApplicationRecord
-  belongs_to :account
+  belongs_to :project
 
   has_one_attached :file
 

@@ -35,6 +35,7 @@ class OnboardingController < ApplicationController
 
       account = Account.create!(name: onboarding_params[:account_name])
       AccountUser.create!(user: @user, account: account, is_owner: true)
+      account.projects.create!(name: account.name, hidden: true)
     end
 
     sign_in(@user)

@@ -1,6 +1,6 @@
 class Api::ProjectsController < Api::BaseController
   def index
-    projects = @current_account.projects.order(:name)
+    projects = @current_account.projects.visible.order(:name)
     render json: projects.map { |p|
       { id: p.id, name: p.name, updated_at: p.updated_at }
     }
@@ -16,7 +16,7 @@ class Api::ProjectsController < Api::BaseController
   end
 
   def update
-    project = @current_account.projects.find(params[:id])
+    project = @current_account.projects.visible.find(params[:id])
     if project.update(project_params)
       render json: { id: project.id, name: project.name, updated_at: project.updated_at }
     else

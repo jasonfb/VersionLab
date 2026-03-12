@@ -1,17 +1,21 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
 import logoIcon from '../../../assets/images/version-lab-icon.png'
-
-const navItems = [
-  { to: '/projects', icon: 'bi-folder', label: 'Projects' },
-  { to: '/templates', icon: 'bi-file-earmark-code', label: 'Templates' },
-  { to: '/audiences', icon: 'bi-people', label: 'Audiences' },
-  { to: '/assets', icon: 'bi-images', label: 'Assets' },
-  { to: '/merge', icon: 'bi-intersect', label: 'Merge' },
-  { to: '/settings', icon: 'bi-gear', label: 'Settings' },
-]
+import { useAccount } from './AccountContext'
 
 export default function Sidebar() {
+  const ctx = useAccount()
+  const isAgency = ctx?.is_agency
+
+  const navItems = [
+    isAgency && { to: '/projects', icon: 'bi-person-vcard', label: 'Clients' },
+    { to: '/templates', icon: 'bi-file-earmark-code', label: 'Templates' },
+    { to: '/audiences', icon: 'bi-people', label: 'Audiences' },
+    { to: '/assets', icon: 'bi-images', label: 'Assets' },
+    { to: '/merge', icon: 'bi-intersect', label: 'Merge' },
+    { to: '/settings', icon: 'bi-gear', label: 'Settings' },
+  ].filter(Boolean)
+
   return (
     <div className="app-sidebar d-flex flex-column align-items-center py-3">
       <div className="sidebar-logo mb-4">

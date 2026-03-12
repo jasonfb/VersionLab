@@ -47,6 +47,7 @@ Rails.application.routes.draw do
     end
     resources :assets, only: [:index, :create, :destroy]
     post "switch_account", to: "accounts#switch"
+    post "switch_project", to: "accounts#switch_project"
   end
 
   # Health check

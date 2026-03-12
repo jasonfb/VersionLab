@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { apiFetch } from '~/lib/api'
+import { useAccount } from '../layout/AccountContext'
 
 export default function ProjectsIndex() {
+  const ctx = useAccount()
+  const label = ctx?.is_agency ? 'Client' : 'Project'
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
@@ -81,7 +84,7 @@ export default function ProjectsIndex() {
   return (
     <div className="p-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h4 className="mb-0">Projects</h4>
+        <h4 className="mb-0">{label}s</h4>
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -91,13 +94,13 @@ export default function ProjectsIndex() {
           <input
             type="text"
             className="form-control"
-            placeholder="New project name..."
+            placeholder={`New ${label.toLowerCase()} name...`}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             required
           />
           <button className="btn btn-danger" type="submit" disabled={creating}>
-            {creating ? 'Creating...' : 'Create Project'}
+            {creating ? 'Creating...' : `Create ${label}`}
           </button>
         </div>
       </form>
@@ -105,7 +108,7 @@ export default function ProjectsIndex() {
       {projects.length === 0 ? (
         <div className="text-center text-muted py-5">
           <i className="bi bi-folder fs-1 d-block mb-3"></i>
-          <p>No projects yet. Create your first project to get started.</p>
+          <p>No {label.toLowerCase()}s yet. Create your first {label.toLowerCase()} to get started.</p>
         </div>
       ) : (
         <div className="list-group">
