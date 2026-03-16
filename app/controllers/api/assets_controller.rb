@@ -15,7 +15,12 @@ class Api::AssetsController < Api::BaseController
       if asset.file.blob.image?
         asset.file.blob.analyze
         metadata = asset.file.blob.metadata
-        asset.update(width: metadata[:width], height: metadata[:height])
+        w, h = metadata[:width], metadata[:height]
+        asset.update(
+          width: w,
+          height: h,
+          standardized_ratio: Asset.snap_to_standard_ratio(w, h)
+        )
       end
 
       render json: asset_json(asset), status: :created
@@ -38,6 +43,7 @@ class Api::AssetsController < Api::BaseController
       name: asset.name,
       width: asset.width,
       height: asset.height,
+      standardized_ratio: asset.standardized_ratio,
       url: asset.file.attached? ? rails_blob_url(asset.file, disposition: "inline") : nil,
       created_at: asset.created_at
     }

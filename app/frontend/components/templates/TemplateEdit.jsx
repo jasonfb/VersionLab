@@ -7,8 +7,9 @@ import {
   insertImageMarker,
   removeImageMarker,
   buildPreviewHtml,
+  snapToStandardRatio,
 } from '~/lib/variableSelection'
-import VariablePopover from './VariablePopover'
+import VariablePopover, { SLOT_ROLES } from './VariablePopover'
 
 export default function TemplateEdit() {
   const { projectId, id } = useParams()
@@ -26,6 +27,7 @@ export default function TemplateEdit() {
   const [error, setError] = useState(null)
   const [popover, setPopover] = useState(null)
   const [hoveredVarId, setHoveredVarId] = useState(null)
+  const [editingVar, setEditingVar] = useState(null) // { sectionId, varId, slotRole, wordCount, defaultValue }
   const [resetting, setResetting] = useState(false)
   const [assetUrls, setAssetUrls] = useState({})
   const expandedSectionRef = useRef(null)
@@ -141,8 +143,6 @@ export default function TemplateEdit() {
           }
         }
 
-        const rect = range.getBoundingClientRect()
-        const iframeRect = iframe.getBoundingClientRect()
 
         // Figure out which occurrence (0-based) of the selected text the
         // user chose in the visible document.  We count how many full matches
@@ -172,17 +172,20 @@ export default function TemplateEdit() {
           console.warn('[handleMouseUp] occurrence calc error:', e)
         }
 
+        const selText = selection.toString()
+        const wordCount = selText.trim().split(/\s+/).filter(Boolean).length
+
         console.log('[handleMouseUp] SHOWING POPOVER', {
-          selectedText: selection.toString(),
+          selectedText: selText,
           occurrenceIndex,
+          wordCount,
         })
 
         setPopover({
           type: 'text',
-          selectedText: selection.toString(),
+          selectedText: selText,
           occurrenceIndex,
-          top: iframeRect.top + rect.bottom + 4,
-          left: iframeRect.left + rect.left,
+          wordCount,
         })
       }
 
@@ -192,14 +195,17 @@ export default function TemplateEdit() {
         if (!expandedSectionRef.current) return
 
         e.preventDefault()
-        const rect = img.getBoundingClientRect()
-        const iframeRect = iframe.getBoundingClientRect()
+
+        const assetId = img.getAttribute('data-vl-asset-id') || null
+        const ratioEntry = assetId
+          ? snapToStandardRatio(img.naturalWidth, img.naturalHeight)
+          : null
 
         setPopover({
           type: 'image',
           imgSrc: img.getAttribute('src') || '',
-          top: iframeRect.top + rect.bottom + 4,
-          left: iframeRect.left + rect.left,
+          assetId,
+          standardizedRatio: ratioEntry?.key || null,
         })
       }
 
@@ -328,8 +334,8 @@ export default function TemplateEdit() {
   }
 
   const handleCreateVariable = useCallback(
-    async () => {
-      console.log('[createVar] called', { expandedSection, popover, rawSourceHtmlLen: rawSourceHtml?.length })
+    async ({ slotRole, wordCount } = {}) => {
+      console.log('[createVar] called', { expandedSection, popover, rawSourceHtmlLen: rawSourceHtml?.length, slotRole, wordCount })
       if (!expandedSection) {
         console.log('[createVar] BAIL: no expanded section')
         return
@@ -339,8 +345,8 @@ export default function TemplateEdit() {
       let defaultValue, updatedHtml
 
       if (popover.type === 'image') {
-        console.log('[createVar] image type, imgSrc:', popover.imgSrc)
-        const result = insertImageMarker(rawSourceHtml, popover.imgSrc, varId)
+        console.log('[createVar] image type, imgSrc:', popover.imgSrc, 'assetId:', popover.assetId, 'ratio:', popover.standardizedRatio)
+        const result = insertImageMarker(rawSourceHtml, popover.imgSrc, varId, popover.standardizedRatio)
         defaultValue = result.defaultValue
         updatedHtml = result.updatedHtml
       } else {
@@ -373,6 +379,10 @@ export default function TemplateEdit() {
                 name: defaultValue,
                 variable_type: popover.type,
                 default_value: defaultValue,
+                slot_role: slotRole || undefined,
+                word_count: wordCount || undefined,
+                asset_id: popover.assetId || undefined,
+                standardized_ratio: popover.standardizedRatio || undefined,
               },
               raw_source_html: updatedHtml,
             }),
@@ -433,6 +443,35 @@ export default function TemplateEdit() {
       }
     },
     [projectId, id, rawSourceHtml, sections]
+  )
+
+  const handleUpdateVariable = useCallback(
+    async () => {
+      if (!editingVar) return
+      const { sectionId, varId, slotRole, wordCount, defaultValue } = editingVar
+      try {
+        const data = await apiFetch(
+          `/api/projects/${projectId}/email_templates/${id}/sections/${sectionId}/variables/${varId}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({
+              variable: { slot_role: slotRole || null, word_count: wordCount || null, default_value: defaultValue },
+            }),
+          }
+        )
+        setSections((prev) =>
+          prev.map((s) =>
+            s.id === sectionId
+              ? { ...s, variables: (s.variables || []).map((v) => (v.id === varId ? { ...v, ...data } : v)) }
+              : s
+          )
+        )
+        setEditingVar(null)
+      } catch (err) {
+        setError(err.message)
+      }
+    },
+    [projectId, id, editingVar]
   )
 
   const cancelPopover = useCallback(() => setPopover(null), [])
@@ -584,30 +623,139 @@ export default function TemplateEdit() {
                   </div>
                   {expandedSection === section.id && (
                     <div className="px-3 pb-3 pt-1 border-top">
+                      {/* Inline create-variable form when a selection is pending */}
+                      {popover && (
+                        <div className="mb-3 pb-3 border-bottom">
+                          <VariablePopover
+                            variableType={popover.type}
+                            selectedText={popover.selectedText}
+                            initialWordCount={popover.wordCount ?? null}
+                            onConfirm={handleCreateVariable}
+                            onCancel={cancelPopover}
+                          />
+                        </div>
+                      )}
                       {(!section.variables || section.variables.length === 0) ? (
                         <p className="text-muted small mb-0">
-                          Select text or click an image in the preview to create a variable.
+                          {popover ? null : 'Select text or click an image in the preview to create a variable.'}
                         </p>
                       ) : (
                         <ul className="list-unstyled mb-0">
-                          {section.variables.map((v) => (
-                            <li
-                              key={v.id}
-                              className="d-flex align-items-center gap-2 py-1 small"
-                              onMouseEnter={() => setHoveredVarId(v.id)}
-                              onMouseLeave={() => setHoveredVarId(null)}
-                            >
-                              <i className={`bi ${v.variable_type === 'image' ? 'bi-image' : 'bi-type'} text-muted`}></i>
-                              <span className="flex-grow-1 text-truncate">{v.default_value}</span>
-                              <button
-                                className="btn btn-sm btn-link text-danger p-0"
-                                onClick={() => handleDeleteVariable(section.id, v.id)}
-                                title="Delete variable"
+                          {section.variables.map((v) => {
+                            const isEditing = editingVar?.varId === v.id
+                            const roleObj = SLOT_ROLES.find((r) => r.value === v.slot_role)
+                            return (
+                              <li
+                                key={v.id}
+                                className="mb-2"
+                                onMouseEnter={() => setHoveredVarId(v.id)}
+                                onMouseLeave={() => setHoveredVarId(null)}
                               >
-                                <i className="bi bi-x-lg small"></i>
-                              </button>
-                            </li>
-                          ))}
+                                {isEditing ? (
+                                  <div className="border rounded p-2 bg-white">
+                                    <p className="small fw-semibold mb-2">Edit Variable</p>
+                                    <div className="mb-2">
+                                      <label className="form-label small fw-semibold mb-1">
+                                        Slot Role <span className="text-danger">*</span>
+                                      </label>
+                                      <select
+                                        className="form-select form-select-sm"
+                                        value={editingVar.slotRole || ''}
+                                        onChange={(e) => setEditingVar((prev) => ({ ...prev, slotRole: e.target.value }))}
+                                      >
+                                        <option value="">Select role</option>
+                                        {SLOT_ROLES.map((r) => (
+                                          <option key={r.value} value={r.value}>{r.label} — {r.description.slice(0, 30)}…</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    {v.variable_type !== 'image' && (
+                                      <div className="mb-2">
+                                        <label className="form-label small fw-semibold mb-1">
+                                          Word Count <span className="text-danger">*</span>
+                                        </label>
+                                        <input
+                                          type="number"
+                                          className="form-control form-control-sm"
+                                          value={editingVar.wordCount ?? ''}
+                                          min={1}
+                                          onChange={(e) => setEditingVar((prev) => ({ ...prev, wordCount: e.target.value }))}
+                                          style={{ width: 90 }}
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="mb-2">
+                                      <label className="form-label small fw-semibold mb-1">Original Text</label>
+                                      <input
+                                        type="text"
+                                        className="form-control form-control-sm"
+                                        value={editingVar.defaultValue ?? ''}
+                                        onChange={(e) => setEditingVar((prev) => ({ ...prev, defaultValue: e.target.value }))}
+                                      />
+                                    </div>
+                                    <div className="d-flex gap-2">
+                                      <button
+                                        className="btn btn-sm btn-danger"
+                                        onClick={handleUpdateVariable}
+                                        disabled={!editingVar.slotRole}
+                                      >
+                                        <i className="bi bi-check me-1"></i>Save
+                                      </button>
+                                      <button
+                                        className="btn btn-sm btn-outline-secondary"
+                                        onClick={() => setEditingVar(null)}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="border rounded p-2 bg-white"
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => setEditingVar({
+                                      sectionId: section.id,
+                                      varId: v.id,
+                                      slotRole: v.slot_role || '',
+                                      wordCount: v.word_count ?? '',
+                                      defaultValue: v.default_value,
+                                    })}
+                                  >
+                                    <div className="d-flex align-items-center gap-2 mb-1">
+                                      {roleObj ? (
+                                        <span className="badge rounded-pill bg-light text-dark border small fw-normal">
+                                          {roleObj.label}
+                                        </span>
+                                      ) : (
+                                        <span className="badge rounded-pill bg-light text-muted border small fw-normal">
+                                          <i className={`bi ${v.variable_type === 'image' ? 'bi-image' : 'bi-type'} me-1`}></i>
+                                          No role
+                                        </span>
+                                      )}
+                                      <span className="ms-auto text-muted small">
+                                        {v.variable_type === 'image' ? (
+                                          <i className="bi bi-image"></i>
+                                        ) : (
+                                          v.word_count != null ? `${v.word_count} Words` : null
+                                        )}
+                                      </span>
+                                      <button
+                                        className="btn btn-link text-danger p-0"
+                                        style={{ fontSize: '0.75rem' }}
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteVariable(section.id, v.id) }}
+                                        title="Delete variable"
+                                      >
+                                        <i className="bi bi-trash"></i>
+                                      </button>
+                                    </div>
+                                    <div className="text-muted small text-truncate">
+                                      &ldquo;{v.default_value}&rdquo;
+                                    </div>
+                                  </div>
+                                )}
+                              </li>
+                            )
+                          })}
                         </ul>
                       )}
                     </div>
@@ -660,17 +808,8 @@ export default function TemplateEdit() {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Variable creation popover */}
-      {popover && (
-        <VariablePopover
-          position={{ top: popover.top, left: popover.left }}
-          variableType={popover.type}
-          onConfirm={handleCreateVariable}
-          onCancel={cancelPopover}
-        />
-      )}
+      </div>
     </div>
   )
 }

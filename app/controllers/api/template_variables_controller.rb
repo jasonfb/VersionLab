@@ -16,10 +16,19 @@ class Api::TemplateVariablesController < Api::BaseController
         name: params[:variable][:name],
         variable_type: params[:variable][:variable_type] || "text",
         default_value: params[:variable][:default_value],
+        slot_role: params[:variable][:slot_role].presence,
+        word_count: params[:variable][:word_count].presence,
         position: next_position
       )
       @variable.save!
       @section.email_template.update!(raw_source_html: params[:raw_source_html]) if params[:raw_source_html].present?
+
+      if params[:variable][:variable_type] == "image" &&
+          params[:variable][:asset_id].present? &&
+          params[:variable][:standardized_ratio].present?
+        asset = @section.email_template.project.assets.find_by(id: params[:variable][:asset_id])
+        asset&.update!(standardized_ratio: params[:variable][:standardized_ratio])
+      end
     end
 
     render json: variable_json(@variable), status: :created
@@ -56,10 +65,18 @@ class Api::TemplateVariablesController < Api::BaseController
   end
 
   def variable_params
-    params.require(:variable).permit(:name)
+    params.require(:variable).permit(:name, :slot_role, :word_count, :default_value)
   end
 
   def variable_json(v)
-    { id: v.id, name: v.name, variable_type: v.variable_type, default_value: v.default_value, position: v.position }
+    {
+      id: v.id,
+      name: v.name,
+      variable_type: v.variable_type,
+      default_value: v.default_value,
+      slot_role: v.slot_role,
+      word_count: v.word_count,
+      position: v.position,
+    }
   end
 end

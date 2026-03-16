@@ -8,6 +8,32 @@
  * wrappers so hovering / highlighting still works visually.
  */
 
+// ── Aspect ratio standardization ────────────────────────────────────────────
+
+export const STANDARD_RATIOS = [
+  { key: 'hero_3_1',        label: '3:1',  value: 3 / 1 },
+  { key: 'banner_2_1',      label: '2:1',  value: 2 / 1 },
+  { key: 'widescreen_16_9', label: '16:9', value: 16 / 9 },
+  { key: 'square_1_1',      label: '1:1',  value: 1 / 1 },
+  { key: 'portrait_4_5',    label: '4:5',  value: 4 / 5 },
+]
+
+/**
+ * Given an image's natural pixel dimensions, returns the closest canonical
+ * ratio entry from STANDARD_RATIOS. Uses log-ratio distance so that e.g.
+ * 2:1 and 1:2 are equidistant from 1:1.
+ * Returns null if dimensions are missing or zero.
+ */
+export function snapToStandardRatio(width, height) {
+  if (!width || !height) return null
+  const native = width / height
+  return STANDARD_RATIOS.reduce((best, r) => {
+    const diff = Math.abs(Math.log(native) - Math.log(r.value))
+    const bestDiff = Math.abs(Math.log(native) - Math.log(best.value))
+    return diff < bestDiff ? r : best
+  })
+}
+
 // ── Text variables ──────────────────────────────────────────────────────────
 
 /**
@@ -208,16 +234,23 @@ export function removeTextPlaceholder(html, varId, defaultValue) {
 // ── Image variables ─────────────────────────────────────────────────────────
 
 /**
- * Adds  data-vl-var="varId"  to the <img> tag whose src matches `imgSrc`
- * inside the raw HTML string.  Returns { defaultValue, updatedHtml }.
+ * Adds  data-vl-var="varId"  (and optionally  data-vl-ratio="key") to the
+ * <img> tag whose src matches `imgSrc` inside the raw HTML string.
+ * Returns { defaultValue, updatedHtml }.
+ *
+ * @param {string} rawHtml
+ * @param {string} imgSrc
+ * @param {string} varId
+ * @param {string|null} standardizedRatio  e.g. 'square_1_1' — from snapToStandardRatio
  */
-export function insertImageMarker(rawHtml, imgSrc, varId) {
+export function insertImageMarker(rawHtml, imgSrc, varId, standardizedRatio = null) {
   const escapedSrc = imgSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const re = new RegExp(
     `(<img\\b[^>]*?src=["']${escapedSrc}["'][^>]*?)(\\s*/?>)`,
     'i',
   )
-  const updatedHtml = rawHtml.replace(re, `$1 data-vl-var="${varId}"$2`)
+  const ratioAttr = standardizedRatio ? ` data-vl-ratio="${standardizedRatio}"` : ''
+  const updatedHtml = rawHtml.replace(re, `$1 data-vl-var="${varId}"${ratioAttr}$2`)
   return { defaultValue: imgSrc, updatedHtml }
 }
 
@@ -239,7 +272,16 @@ export function buildPreviewHtml(html, allVariables, assetUrls = {}) {
   if (!html) return html
   let result = html
 
-  // Resolve imported asset image references: {{vl-asset:uuid}}
+  // Resolve imported asset image references on <img src="{{vl-asset:uuid}}"> tags.
+  // Also annotate with data-vl-asset-id so the editor can identify the asset on click.
+  result = result.replace(
+    /(<img\b[^>]*?)\bsrc=(["'])\{\{vl-asset:([^}]+)\}\}\2/gi,
+    (match, prefix, quote, assetId) => {
+      const url = assetUrls[assetId] || ''
+      return `${prefix}src=${quote}${url}${quote} data-vl-asset-id="${assetId}"`
+    },
+  )
+  // Resolve any remaining {{vl-asset:uuid}} tokens outside of img src attributes
   result = result.replace(/\{\{vl-asset:([^}]+)\}\}/g, (match, assetId) => {
     return assetUrls[assetId] || match
   })

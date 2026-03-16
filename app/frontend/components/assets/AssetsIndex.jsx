@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch, apiUpload } from '~/lib/api'
 
+const RATIO_LABELS = {
+  hero_3_1:        '3:1 Hero',
+  banner_2_1:      '2:1 Banner',
+  widescreen_16_9: '16:9 Widescreen',
+  square_1_1:      '1:1 Square',
+  portrait_4_5:    '4:5 Portrait',
+}
+
 const SIZE_OPTIONS = [
   { label: 'Full', value: 1 },
   { label: '75%', value: 0.75 },
@@ -208,11 +216,14 @@ export default function AssetsIndex() {
                       {asset.name}
                     </p>
                     <div className="d-flex justify-content-between align-items-center">
-                      {asset.width && asset.height ? (
-                        <small className="text-muted">{asset.width} × {asset.height}</small>
-                      ) : (
-                        <small className="text-muted"></small>
-                      )}
+                      <div>
+                        {asset.width && asset.height && (
+                          <small className="text-muted d-block">{asset.width} × {asset.height}</small>
+                        )}
+                        {asset.standardized_ratio && (
+                          <small className="text-muted">{RATIO_LABELS[asset.standardized_ratio] ?? asset.standardized_ratio}</small>
+                        )}
+                      </div>
                       <button
                         className="btn btn-sm btn-outline-danger"
                         onClick={(e) => { e.stopPropagation(); handleDelete(asset.id) }}

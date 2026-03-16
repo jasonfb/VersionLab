@@ -31,7 +31,7 @@ class TemplateImportJob < ApplicationJob
   def process_bundled(import)
     template = import.email_template
     folder = folder_name(template)
-    account = template.project.account
+    project = template.project
     warnings = []
     asset_map = {} # "images/foo.png" => asset_id
 
@@ -51,7 +51,7 @@ class TemplateImportJob < ApplicationJob
           data = entry.get_input_stream.read
           content_type = Marcel::MimeType.for(StringIO.new(data), name: filename)
 
-          asset = create_asset(account, data, filename, content_type, folder)
+          asset = create_asset(project, data, filename, content_type, folder)
           asset_map[entry.name] = asset.id
         end
 
@@ -109,8 +109,8 @@ class TemplateImportJob < ApplicationJob
     "templates/#{template.name.parameterize}"
   end
 
-  def create_asset(account, data, filename, content_type, folder)
-    asset = Asset.new(account: account, name: filename, folder: folder)
+  def create_asset(project, data, filename, content_type, folder)
+    asset = Asset.new(project: project, name: filename, folder: folder)
     blob = ActiveStorage::Blob.create_and_upload!(
       io: StringIO.new(data),
       filename: filename,
@@ -122,6 +122,7 @@ class TemplateImportJob < ApplicationJob
       metadata = blob.metadata
       asset.width = metadata[:width]
       asset.height = metadata[:height]
+      asset.standardized_ratio = Asset.snap_to_standard_ratio(asset.width, asset.height)
     end
     asset.save!
     asset

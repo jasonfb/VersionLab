@@ -10,17 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_12_100003) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_16_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
 
   # Custom types defined in this database.
   # Note that some types may not work with other database engines. Be careful if changing database.
+  create_enum "asset_standardized_ratio", ["hero_3_1", "banner_2_1", "widescreen_16_9", "square_1_1", "portrait_4_5"]
   create_enum "merge_state", ["setup", "pending", "merged", "regenerating"]
   create_enum "merge_version_state", ["generating", "active", "rejected"]
   create_enum "template_import_state", ["pending", "processing", "completed", "failed"]
   create_enum "template_import_type", ["bundled", "external"]
+  create_enum "template_variable_slot_role", ["teaser_text", "eyebrow", "headline", "subheadline", "body", "cta_text", "image"]
 
   create_table "account_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "account_id"
@@ -100,6 +102,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_12_100003) do
     t.integer "height"
     t.string "name"
     t.uuid "project_id", null: false
+    t.enum "standardized_ratio", enum_type: "asset_standardized_ratio"
     t.datetime "updated_at", null: false
     t.integer "width"
     t.index ["project_id"], name: "index_assets_on_project_id"
@@ -336,8 +339,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_12_100003) do
     t.uuid "email_template_section_id", null: false
     t.string "name", null: false
     t.integer "position", null: false
+    t.enum "slot_role", enum_type: "template_variable_slot_role"
     t.datetime "updated_at", null: false
     t.string "variable_type", default: "text", null: false
+    t.integer "word_count"
     t.index ["email_template_section_id", "position"], name: "idx_on_email_template_section_id_position_ec7798dbd9"
   end
 
