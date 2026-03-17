@@ -1,5 +1,5 @@
 class Audience < ApplicationRecord
-  belongs_to :project
+  belongs_to :client
 
   validates :name, presence: true
 end

@@ -31,7 +31,7 @@ class TemplateImportJob < ApplicationJob
   def process_bundled(import)
     template = import.email_template
     folder = folder_name(template)
-    project = template.project
+    client = template.client
     warnings = []
     asset_map = {} # "images/foo.png" => asset_id
 
@@ -51,7 +51,7 @@ class TemplateImportJob < ApplicationJob
           data = entry.get_input_stream.read
           content_type = Marcel::MimeType.for(StringIO.new(data), name: filename)
 
-          asset = create_asset(project, data, filename, content_type, folder)
+          asset = create_asset(client, data, filename, content_type, folder)
           asset_map[entry.name] = asset.id
         end
 
@@ -67,7 +67,7 @@ class TemplateImportJob < ApplicationJob
   def process_external(import)
     template = import.email_template
     folder = folder_name(template)
-    account = template.project.account
+    account = template.client.account
     warnings = []
     asset_map = {} # "https://..." => asset_id
 
@@ -109,8 +109,8 @@ class TemplateImportJob < ApplicationJob
     "templates/#{template.name.parameterize}"
   end
 
-  def create_asset(project, data, filename, content_type, folder)
-    asset = Asset.new(project: project, name: filename, folder: folder)
+  def create_asset(client, data, filename, content_type, folder)
+    asset = Asset.new(client: client, name: filename, folder: folder)
     blob = ActiveStorage::Blob.create_and_upload!(
       io: StringIO.new(data),
       filename: filename,

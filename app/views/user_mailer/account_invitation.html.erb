@@ -1,0 +1,19 @@
+<p>Hi,</p>
+
+<p>
+  <strong><%= @invited_by.email %></strong> has added you to the
+  <strong><%= @account.name %></strong> account on VersionLab.
+</p>
+
+<p>
+  To get started, set a password for your account by clicking the link below.
+  This link expires in <%= Devise.reset_password_within / 1.hour %> hours.
+</p>
+
+<p>
+  <%= link_to "Set Your Password", @reset_url %>
+</p>
+
+<p style="color:#888;font-size:0.875em;">
+  If you weren't expecting this invitation, you can ignore this email.
+</p>

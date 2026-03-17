@@ -22,9 +22,23 @@ Rails.application.routes.draw do
   # API endpoints for React SPA
   namespace :api do
     resources :accounts, only: [:index]
+    resources :account_users, only: [:index, :create, :update, :destroy]
+    post "upgrade_to_agency", to: "accounts#upgrade_to_agency"
     resources :ai_services, only: [:index]
     resources :ai_keys, only: [:index, :create, :update, :destroy]
-    resources :projects, only: [:index, :create, :update] do
+    get "lookups", to: "lookups#index"
+    resources :clients, only: [:index, :create, :update] do
+      resources :campaigns, only: [:index, :show, :create, :update, :destroy] do
+        member do
+          post :summarize
+        end
+        resources :campaign_documents, only: [:index, :create, :destroy]
+        resources :campaign_links, only: [:index, :create, :destroy]
+      end
+      resources :client_users, only: [:index, :create, :destroy]
+      resource :brand_profile, only: [:show] do
+        post :upsert, on: :collection
+      end
       resources :template_imports, only: [:create]
       resources :email_templates, only: [:index, :show, :create, :update, :destroy] do
         member do
@@ -47,7 +61,7 @@ Rails.application.routes.draw do
     end
     resources :assets, only: [:index, :create, :destroy]
     post "switch_account", to: "accounts#switch"
-    post "switch_project", to: "accounts#switch_project"
+    post "switch_client", to: "accounts#switch_client"
   end
 
   # Health check

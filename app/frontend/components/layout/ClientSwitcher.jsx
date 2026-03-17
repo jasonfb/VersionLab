@@ -16,7 +16,7 @@ export default function ClientSwitcher() {
 
   if (!ctx || !ctx.is_agency) return null
 
-  const currentProject = ctx.projects?.find((p) => p.id === ctx.current_project_id)
+  const currentClient = ctx.clients?.find((c) => c.id === ctx.current_client_id)
 
   return (
     <div className="position-relative me-2" ref={ref}>
@@ -25,7 +25,7 @@ export default function ClientSwitcher() {
         onClick={() => setOpen(!open)}
       >
         <i className="bi bi-person-vcard"></i>
-        {currentProject?.name || 'Select Client'}
+        {currentClient?.name || 'Select Client'}
         <i className="bi bi-chevron-down" style={{ fontSize: '0.7rem' }}></i>
       </button>
       {open && (
@@ -33,13 +33,13 @@ export default function ClientSwitcher() {
           className="position-absolute bg-white border rounded shadow-sm mt-1"
           style={{ zIndex: 1000, minWidth: 180 }}
         >
-          {ctx.projects?.map((p) => (
+          {ctx.clients?.map((c) => (
             <button
-              key={p.id}
-              className={`dropdown-item px-3 py-2 ${p.id === ctx.current_project_id ? 'active' : ''}`}
-              onClick={() => { ctx.switchProject(p.id); setOpen(false) }}
+              key={c.id}
+              className={`dropdown-item px-3 py-2 ${c.id === ctx.current_client_id ? 'active' : ''}`}
+              onClick={() => { ctx.switchClient(c.id); setOpen(false) }}
             >
-              {p.name}
+              {c.name}
             </button>
           ))}
         </div>

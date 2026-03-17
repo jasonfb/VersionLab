@@ -2,7 +2,9 @@ import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
 import AppLayout from './layout/AppLayout'
-import ProjectsIndex from './projects/ProjectsIndex'
+import ClientsIndex from './clients/ClientsIndex'
+import ClientDetail from './clients/ClientDetail'
+import CampaignDetail from './clients/CampaignDetail'
 import EmailTemplatesIndex from './templates/EmailTemplatesIndex'
 import TemplatesIndex from './templates/TemplatesIndex'
 import TemplateNew from './templates/TemplateNew'
@@ -12,6 +14,20 @@ import MergeResultsPage from './merges/MergeResultsPage'
 import SettingsPage from './settings/SettingsPage'
 import AssetsIndex from './assets/AssetsIndex'
 import AudiencesIndex from './audiences/AudiencesIndex'
+import { useAccount } from './layout/AccountContext'
+
+function HomeRedirect() {
+  const ctx = useAccount()
+  if (!ctx) return null
+  return <Navigate to={ctx.is_agency ? '/clients' : '/templates'} replace />
+}
+
+function AgencyRoute({ children }) {
+  const ctx = useAccount()
+  if (!ctx) return null
+  if (!ctx.is_agency) return <Navigate to="/templates" replace />
+  return children
+}
 
 export default function App() {
   return (
@@ -19,16 +35,18 @@ export default function App() {
     <BrowserRouter basename="/app">
       <Routes>
         <Route element={<AppLayout />}>
-          <Route index element={<Navigate to="/projects" replace />} />
-          <Route path="projects" element={<ProjectsIndex />} />
+          <Route index element={<HomeRedirect />} />
+          <Route path="clients" element={<AgencyRoute><ClientsIndex /></AgencyRoute>} />
+          <Route path="clients/:clientId" element={<AgencyRoute><ClientDetail /></AgencyRoute>} />
+          <Route path="clients/:clientId/campaigns/:campaignId" element={<AgencyRoute><CampaignDetail /></AgencyRoute>} />
           <Route path="templates" element={<EmailTemplatesIndex />} />
-          <Route path="projects/:projectId/templates" element={<TemplatesIndex />} />
-          <Route path="projects/:projectId/templates/new" element={<TemplateNew />} />
-          <Route path="projects/:projectId/templates/:id" element={<TemplateEdit />} />
+          <Route path="clients/:clientId/templates" element={<TemplatesIndex />} />
+          <Route path="clients/:clientId/templates/new" element={<TemplateNew />} />
+          <Route path="clients/:clientId/templates/:id" element={<TemplateEdit />} />
           <Route path="audiences" element={<AudiencesIndex />} />
           <Route path="assets" element={<AssetsIndex />} />
           <Route path="merge" element={<MergesIndex />} />
-          <Route path="projects/:projectId/merges/:mergeId/results" element={<MergeResultsPage />} />
+          <Route path="clients/:clientId/merges/:mergeId/results" element={<MergeResultsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

@@ -1,5 +1,5 @@
 class EmailTemplate < ApplicationRecord
-  belongs_to :project
+  belongs_to :client
   has_many :sections, class_name: "EmailTemplateSection", dependent: :destroy
   has_many :template_variables, through: :sections
   has_many :merges, dependent: :destroy

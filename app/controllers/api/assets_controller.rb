@@ -1,6 +1,6 @@
 class Api::AssetsController < Api::BaseController
   def index
-    assets = @current_project.assets.order(created_at: :desc).map do |asset|
+    assets = @current_client.assets.order(created_at: :desc).map do |asset|
       asset_json(asset)
     end
 
@@ -8,7 +8,7 @@ class Api::AssetsController < Api::BaseController
   end
 
   def create
-    asset = @current_project.assets.new(name: params[:file].original_filename)
+    asset = @current_client.assets.new(name: params[:file].original_filename)
     asset.file.attach(params[:file])
 
     if asset.save
@@ -30,7 +30,7 @@ class Api::AssetsController < Api::BaseController
   end
 
   def destroy
-    asset = @current_project.assets.find(params[:id])
+    asset = @current_client.assets.find(params[:id])
     asset.destroy!
     head :no_content
   end

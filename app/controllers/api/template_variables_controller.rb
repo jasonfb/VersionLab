@@ -26,7 +26,7 @@ class Api::TemplateVariablesController < Api::BaseController
       if params[:variable][:variable_type] == "image" &&
           params[:variable][:asset_id].present? &&
           params[:variable][:standardized_ratio].present?
-        asset = @section.email_template.project.assets.find_by(id: params[:variable][:asset_id])
+        asset = @section.email_template.client.assets.find_by(id: params[:variable][:asset_id])
         asset&.update!(standardized_ratio: params[:variable][:standardized_ratio])
       end
     end
@@ -55,8 +55,8 @@ class Api::TemplateVariablesController < Api::BaseController
   private
 
   def set_section
-    project = @current_account.projects.find(params[:project_id])
-    template = project.email_templates.find(params[:email_template_id])
+    client = @current_account.clients.find(params[:client_id])
+    template = client.email_templates.find(params[:email_template_id])
     @section = template.sections.find(params[:section_id])
   end
 

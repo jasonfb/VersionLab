@@ -8,7 +8,7 @@ export default function Sidebar() {
   const isAgency = ctx?.is_agency
 
   const navItems = [
-    isAgency && { to: '/projects', icon: 'bi-person-vcard', label: 'Clients' },
+    isAgency && { to: '/clients', icon: 'bi-person-vcard', label: 'Clients' },
     { to: '/templates', icon: 'bi-file-earmark-code', label: 'Templates' },
     { to: '/audiences', icon: 'bi-people', label: 'Audiences' },
     { to: '/assets', icon: 'bi-images', label: 'Assets' },

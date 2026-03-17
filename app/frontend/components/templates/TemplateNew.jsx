@@ -19,7 +19,7 @@ const IMPORT_TYPES = {
 }
 
 export default function TemplateNew() {
-  const { projectId } = useParams()
+  const { clientId } = useParams()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
 
@@ -85,7 +85,7 @@ export default function TemplateNew() {
     formData.append('file', file)
 
     try {
-      const result = await apiUpload(`/api/projects/${projectId}/template_imports`, formData)
+      const result = await apiUpload(`/api/clients/${clientId}/template_imports`, formData)
       setEmailTemplateId(result.email_template_id)
       setImportState(result.state)
 
@@ -100,7 +100,7 @@ export default function TemplateNew() {
             unsubscribe()
             // Brief pause so the user sees the completed state
             setTimeout(() => {
-              navigate(`/projects/${projectId}/templates/${data.email_template_id}`)
+              navigate(`/clients/${clientId}/templates/${data.email_template_id}`)
             }, 800)
           } else if (data.state === 'failed') {
             unsubscribe()
@@ -192,7 +192,7 @@ export default function TemplateNew() {
             <button
               type="button"
               className="btn btn-outline-secondary"
-              onClick={() => navigate(`/projects/${projectId}/templates`)}
+              onClick={() => navigate(`/clients/${clientId}/templates`)}
             >
               Cancel
             </button>
@@ -209,7 +209,7 @@ export default function TemplateNew() {
             setImportError(null)
           }}
           onGoToTemplate={() =>
-            navigate(`/projects/${projectId}/templates/${emailTemplateId}`)
+            navigate(`/clients/${clientId}/templates/${emailTemplateId}`)
           }
         />
       )}

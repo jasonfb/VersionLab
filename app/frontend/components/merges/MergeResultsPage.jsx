@@ -4,7 +4,7 @@ import { apiFetch, csrfToken } from '~/lib/api'
 import { subscribeMergeChannel } from '~/lib/cable'
 
 export default function MergeResultsPage() {
-  const { projectId, mergeId } = useParams()
+  const { clientId, mergeId } = useParams()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -12,10 +12,10 @@ export default function MergeResultsPage() {
   const [activeTab, setActiveTab] = useState('table')
 
   const fetchResults = useCallback(() => {
-    return apiFetch(`/api/projects/${projectId}/merges/${mergeId}/results`)
+    return apiFetch(`/api/clients/${clientId}/merges/${mergeId}/results`)
       .then(setData)
       .catch((e) => setError(e.message))
-  }, [projectId, mergeId])
+  }, [clientId, mergeId])
 
   useEffect(() => {
     fetchResults().finally(() => setLoading(false))
@@ -85,14 +85,14 @@ export default function MergeResultsPage() {
       )}
       {activeTab === 'preview' && (
         <MergePreview
-          projectId={projectId}
+          clientId={clientId}
           mergeId={mergeId}
           audiences={audiences}
           onRejected={fetchResults}
         />
       )}
       {activeTab === 'export' && (
-        <ExportTab projectId={projectId} mergeId={mergeId} audiences={audiences} />
+        <ExportTab clientId={clientId} mergeId={mergeId} audiences={audiences} />
       )}
     </div>
   )
@@ -193,7 +193,7 @@ function VersionSelector({ versions, selectedId, onChange }) {
 
 // ─── Export ─────────────────────────────────────────────────────────────────
 
-function ExportTab({ projectId, mergeId, audiences }) {
+function ExportTab({ clientId, mergeId, audiences }) {
   const activeCount = audiences.filter((a) =>
     a.versions.some((v) => v.state === 'active')
   ).length
@@ -212,7 +212,7 @@ function ExportTab({ projectId, mergeId, audiences }) {
         )}
       </p>
       <a
-        href={`/api/projects/${projectId}/merges/${mergeId}/export`}
+        href={`/api/clients/${clientId}/merges/${mergeId}/export`}
         className="btn btn-primary"
         download
       >
@@ -224,7 +224,7 @@ function ExportTab({ projectId, mergeId, audiences }) {
 
 // ─── Preview ────────────────────────────────────────────────────────────────
 
-function MergePreview({ projectId, mergeId, audiences, onRejected }) {
+function MergePreview({ clientId, mergeId, audiences, onRejected }) {
   const [selectedAudienceId, setSelectedAudienceId] = useState(audiences[0]?.id ?? null)
   const [html, setHtml] = useState(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
@@ -241,13 +241,13 @@ function MergePreview({ projectId, mergeId, audiences, onRejected }) {
     if (!activeVersion) { setHtml(null); return }
 
     setLoadingPreview(true)
-    fetch(`/api/projects/${projectId}/merges/${mergeId}/preview?audience_id=${selectedAudienceId}`, {
+    fetch(`/api/clients/${clientId}/merges/${mergeId}/preview?audience_id=${selectedAudienceId}`, {
       headers: { 'X-CSRF-Token': csrfToken() },
     })
       .then((r) => r.text())
       .then(setHtml)
       .finally(() => setLoadingPreview(false))
-  }, [projectId, mergeId, selectedAudienceId, audiences])
+  }, [clientId, mergeId, selectedAudienceId, audiences])
 
   useEffect(() => {
     const iframe = iframeRef.current
@@ -267,7 +267,7 @@ function MergePreview({ projectId, mergeId, audiences, onRejected }) {
     setRejecting(true)
     setRejectError(null)
     try {
-      await apiFetch(`/api/projects/${projectId}/merges/${mergeId}/reject`, {
+      await apiFetch(`/api/clients/${clientId}/merges/${mergeId}/reject`, {
         method: 'POST',
         body: JSON.stringify({ audience_id: rejectModal.id, rejection_comment: rejectionComment }),
       })

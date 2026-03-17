@@ -1,7 +1,7 @@
 class Api::BaseController < ApplicationController
   before_action :authenticate_user!
   before_action :set_current_account
-  before_action :set_current_project
+  before_action :set_current_client
 
   private
 
@@ -12,14 +12,33 @@ class Api::BaseController < ApplicationController
     @current_account ||= current_user.accounts.first
   end
 
-  def set_current_project
+  def set_current_client
     if @current_account.is_agency?
-      @current_project = if session[:current_project_id]
-        @current_account.projects.visible.find_by(id: session[:current_project_id])
+      @current_client = if session[:current_client_id]
+        accessible_clients.find_by(id: session[:current_client_id])
       end
-      @current_project ||= @current_account.projects.visible.first
+      @current_client ||= accessible_clients.first
     else
-      @current_project = @current_account.default_project
+      @current_client = @current_account.default_client
     end
+  end
+
+  # Returns the scope of clients the current user may access.
+  # Owners and admins see all visible clients; members see only explicitly assigned ones.
+  def accessible_clients
+    @accessible_clients ||= begin
+      au = current_account_user
+      if au&.is_owner? || au&.is_admin?
+        @current_account.clients.visible
+      else
+        @current_account.clients.visible
+          .joins(:client_users)
+          .where(client_users: { user_id: current_user.id })
+      end
+    end
+  end
+
+  def current_account_user
+    @current_account_user ||= @current_account.account_users.find_by(user: current_user)
   end
 end

@@ -18,16 +18,18 @@ export function AccountProvider({ children }) {
     window.location.reload()
   }
 
-  const switchProject = async (projectId) => {
-    await apiFetch('/api/switch_project', {
+  const switchClient = async (clientId) => {
+    await apiFetch('/api/switch_client', {
       method: 'POST',
-      body: JSON.stringify({ project_id: projectId }),
+      body: JSON.stringify({ client_id: clientId }),
     })
     window.location.reload()
   }
 
+  const refresh = () => apiFetch('/api/accounts').then(setState)
+
   return (
-    <AccountContext.Provider value={state ? { ...state, switchAccount, switchProject } : null}>
+    <AccountContext.Provider value={state ? { ...state, switchAccount, switchClient, refresh } : null}>
       {children}
     </AccountContext.Provider>
   )

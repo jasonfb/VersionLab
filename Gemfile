@@ -99,3 +99,4 @@ gem "pundit", "~> 2.5"
 gem "ruby-openai", "~> 7.4"
 
 gem "rubyzip", "~> 2.4"
+gem "pdf-reader", "~> 2.0"

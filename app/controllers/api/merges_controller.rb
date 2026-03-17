@@ -1,24 +1,30 @@
 class Api::MergesController < Api::BaseController
-  before_action :set_project
+  before_action :set_client
   before_action :set_merge, only: [:update, :destroy, :run, :results, :preview, :reject, :export]
 
   def index
     merges = Merge.joins(:email_template)
-                  .where(email_templates: { project_id: @project.id })
-                  .includes(:email_template, :audiences)
+                  .where(email_templates: { client_id: @client.id })
+                  .includes(:email_template, :audiences, :campaign)
                   .order(updated_at: :desc)
 
     render json: merges.map { |m| merge_json(m) }
   end
 
   def create
-    template = @project.email_templates.find(params[:merge][:email_template_id])
+    template = @client.email_templates.find(params[:merge][:email_template_id])
     merge = template.merges.build(state: "setup")
+    merge.client = @client
     merge.ai_service_id = params[:merge][:ai_service_id]
     merge.ai_model_id = params[:merge][:ai_model_id]
+    merge.context = params[:merge][:context].presence
+
+    if params[:merge][:campaign_id].present?
+      merge.campaign = @client.campaigns.find_by(id: params[:merge][:campaign_id])
+    end
 
     if params[:merge][:audience_ids].present?
-      audiences = @project.audiences.where(id: params[:merge][:audience_ids])
+      audiences = @client.audiences.where(id: params[:merge][:audience_ids])
       merge.audiences = audiences
     end
 
@@ -32,9 +38,14 @@ class Api::MergesController < Api::BaseController
   def update
     @merge.ai_service_id = params[:merge][:ai_service_id] if params[:merge].key?(:ai_service_id)
     @merge.ai_model_id = params[:merge][:ai_model_id] if params[:merge].key?(:ai_model_id)
+    @merge.context = params[:merge][:context].presence if params[:merge].key?(:context)
+
+    if params[:merge].key?(:campaign_id)
+      @merge.campaign = params[:merge][:campaign_id].present? ? @client.campaigns.find_by(id: params[:merge][:campaign_id]) : nil
+    end
 
     if params[:merge][:audience_ids]
-      audiences = @project.audiences.where(id: params[:merge][:audience_ids])
+      audiences = @client.audiences.where(id: params[:merge][:audience_ids])
       @merge.audiences = audiences
     end
 
@@ -192,13 +203,13 @@ class Api::MergesController < Api::BaseController
 
   private
 
-  def set_project
-    @project = @current_account.projects.find(params[:project_id])
+  def set_client
+    @client = @current_account.clients.find(params[:client_id])
   end
 
   def set_merge
     @merge = Merge.joins(:email_template)
-                  .where(email_templates: { project_id: @project.id })
+                  .where(email_templates: { client_id: @client.id })
                   .find(params[:id])
   end
 
@@ -217,8 +228,12 @@ class Api::MergesController < Api::BaseController
   def merge_json(merge)
     {
       id: merge.id,
+      client_id: merge.client_id,
       email_template_id: merge.email_template_id,
       email_template_name: merge.email_template.name,
+      campaign_id: merge.campaign_id,
+      campaign_name: merge.campaign&.name,
+      context: merge.context,
       state: merge.state,
       audience_ids: merge.audiences.map(&:id),
       audience_names: merge.audiences.map(&:name),

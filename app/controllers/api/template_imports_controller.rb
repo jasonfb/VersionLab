@@ -1,5 +1,5 @@
 class Api::TemplateImportsController < Api::BaseController
-  before_action :set_project
+  before_action :set_client
 
   def create
     return render_error("Name is required") if params[:name].blank?
@@ -28,7 +28,7 @@ class Api::TemplateImportsController < Api::BaseController
 
     import = nil
     ActiveRecord::Base.transaction do
-      template = @project.email_templates.create!(name: params[:name])
+      template = @client.email_templates.create!(name: params[:name])
       import = TemplateImport.create!(
         email_template: template,
         import_type: params[:import_type]
@@ -49,8 +49,8 @@ class Api::TemplateImportsController < Api::BaseController
 
   private
 
-  def set_project
-    @project = @current_account.projects.find(params[:project_id])
+  def set_client
+    @client = @current_account.clients.find(params[:client_id])
   end
 
   def render_error(message)

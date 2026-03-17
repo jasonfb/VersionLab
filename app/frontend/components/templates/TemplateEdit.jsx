@@ -12,7 +12,7 @@ import {
 import VariablePopover, { SLOT_ROLES } from './VariablePopover'
 
 export default function TemplateEdit() {
-  const { projectId, id } = useParams()
+  const { clientId, id } = useParams()
   const navigate = useNavigate()
   const iframeRef = useRef(null)
   const [template, setTemplate] = useState(null)
@@ -39,7 +39,7 @@ export default function TemplateEdit() {
   )
 
   useEffect(() => {
-    apiFetch(`/api/projects/${projectId}/email_templates/${id}`)
+    apiFetch(`/api/clients/${clientId}/email_templates/${id}`)
       .then((data) => {
         setTemplate(data)
         setName(data.name)
@@ -252,7 +252,7 @@ export default function TemplateEdit() {
       if (!originalRawSourceHtml && rawSourceHtml) {
         payload.original_raw_source_html = rawSourceHtml
       }
-      const data = await apiFetch(`/api/projects/${projectId}/email_templates/${id}`, {
+      const data = await apiFetch(`/api/clients/${clientId}/email_templates/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ email_template: payload }),
       })
@@ -275,7 +275,7 @@ export default function TemplateEdit() {
     setResetting(true)
     setError(null)
     try {
-      const data = await apiFetch(`/api/projects/${projectId}/email_templates/${id}/reset`, {
+      const data = await apiFetch(`/api/clients/${clientId}/email_templates/${id}/reset`, {
         method: 'POST',
         body: JSON.stringify({ mode }),
       })
@@ -293,7 +293,7 @@ export default function TemplateEdit() {
 
   const handleAddSection = async () => {
     try {
-      const data = await apiFetch(`/api/projects/${projectId}/email_templates/${id}/sections`, {
+      const data = await apiFetch(`/api/clients/${clientId}/email_templates/${id}/sections`, {
         method: 'POST',
       })
       setSections((prev) => [...prev, { ...data, variables: [] }])
@@ -318,7 +318,7 @@ export default function TemplateEdit() {
     }
 
     try {
-      await apiFetch(`/api/projects/${projectId}/email_templates/${id}/sections/${sectionId}`, {
+      await apiFetch(`/api/clients/${clientId}/email_templates/${id}/sections/${sectionId}`, {
         method: 'DELETE',
         body: JSON.stringify({ raw_source_html: updatedHtml }),
       })
@@ -370,7 +370,7 @@ export default function TemplateEdit() {
       console.log('[createVar] sending API request, varId:', varId, 'defaultValue:', defaultValue)
       try {
         const data = await apiFetch(
-          `/api/projects/${projectId}/email_templates/${id}/sections/${expandedSection}/variables`,
+          `/api/clients/${clientId}/email_templates/${id}/sections/${expandedSection}/variables`,
           {
             method: 'POST',
             body: JSON.stringify({
@@ -405,7 +405,7 @@ export default function TemplateEdit() {
 
       setPopover(null)
     },
-    [projectId, id, expandedSection, popover, rawSourceHtml]
+    [clientId, id, expandedSection, popover, rawSourceHtml]
   )
 
   const handleDeleteVariable = useCallback(
@@ -423,7 +423,7 @@ export default function TemplateEdit() {
 
       try {
         await apiFetch(
-          `/api/projects/${projectId}/email_templates/${id}/sections/${sectionId}/variables/${varId}`,
+          `/api/clients/${clientId}/email_templates/${id}/sections/${sectionId}/variables/${varId}`,
           {
             method: 'DELETE',
             body: JSON.stringify({ raw_source_html: updatedHtml }),
@@ -442,7 +442,7 @@ export default function TemplateEdit() {
         setError(err.message)
       }
     },
-    [projectId, id, rawSourceHtml, sections]
+    [clientId, id, rawSourceHtml, sections]
   )
 
   const handleUpdateVariable = useCallback(
@@ -451,7 +451,7 @@ export default function TemplateEdit() {
       const { sectionId, varId, slotRole, wordCount, defaultValue } = editingVar
       try {
         const data = await apiFetch(
-          `/api/projects/${projectId}/email_templates/${id}/sections/${sectionId}/variables/${varId}`,
+          `/api/clients/${clientId}/email_templates/${id}/sections/${sectionId}/variables/${varId}`,
           {
             method: 'PATCH',
             body: JSON.stringify({
@@ -471,7 +471,7 @@ export default function TemplateEdit() {
         setError(err.message)
       }
     },
-    [projectId, id, editingVar]
+    [clientId, id, editingVar]
   )
 
   const cancelPopover = useCallback(() => setPopover(null), [])
@@ -498,7 +498,7 @@ export default function TemplateEdit() {
         <div className="p-3 border-bottom d-flex align-items-center gap-2">
           <button
             className="btn btn-sm btn-link text-dark p-0"
-            onClick={() => navigate(`/projects/${projectId}/templates`)}
+            onClick={() => navigate(`/clients/${clientId}/templates`)}
           >
             <i className="bi bi-arrow-left"></i>
           </button>

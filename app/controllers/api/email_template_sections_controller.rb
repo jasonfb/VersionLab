@@ -32,8 +32,8 @@ class Api::EmailTemplateSectionsController < Api::BaseController
   private
 
   def set_email_template
-    project = @current_account.projects.find(params[:project_id])
-    @email_template = project.email_templates.find(params[:email_template_id])
+    client = @current_account.clients.find(params[:client_id])
+    @email_template = client.email_templates.find(params[:email_template_id])
   end
 
   def reorder_sections

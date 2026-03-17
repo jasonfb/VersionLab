@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_16_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_17_000010) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -18,6 +18,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_160000) do
   # Custom types defined in this database.
   # Note that some types may not work with other database engines. Be careful if changing database.
   create_enum "asset_standardized_ratio", ["hero_3_1", "banner_2_1", "widescreen_16_9", "square_1_1", "portrait_4_5"]
+  create_enum "campaign_ai_summary_state", ["idle", "generating", "generated", "failed"]
+  create_enum "campaign_status", ["draft", "active", "completed", "archived"]
   create_enum "merge_state", ["setup", "pending", "merged", "regenerating"]
   create_enum "merge_version_state", ["generating", "active", "rejected"]
   create_enum "template_import_state", ["pending", "processing", "completed", "failed"]
@@ -27,6 +29,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_160000) do
   create_table "account_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "account_id"
     t.datetime "created_at", null: false
+    t.boolean "is_admin", default: false, null: false
+    t.boolean "is_billing_admin", default: false, null: false
     t.boolean "is_owner"
     t.datetime "updated_at", null: false
     t.uuid "user_id"
@@ -97,22 +101,115 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_160000) do
   end
 
   create_table "assets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "client_id", null: false
     t.datetime "created_at", null: false
     t.string "folder"
     t.integer "height"
     t.string "name"
-    t.uuid "project_id", null: false
     t.enum "standardized_ratio", enum_type: "asset_standardized_ratio"
     t.datetime "updated_at", null: false
     t.integer "width"
-    t.index ["project_id"], name: "index_assets_on_project_id"
+    t.index ["client_id"], name: "index_assets_on_client_id"
   end
 
   create_table "audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "client_id", null: false
     t.datetime "created_at", null: false
     t.text "details"
     t.string "name", null: false
-    t.uuid "project_id", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "brand_profile_geographies", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "brand_profile_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "geography_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["brand_profile_id", "geography_id"], name: "idx_bp_geographies", unique: true
+  end
+
+  create_table "brand_profile_primary_audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "brand_profile_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "primary_audience_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["brand_profile_id", "primary_audience_id"], name: "idx_bp_primary_audiences", unique: true
+  end
+
+  create_table "brand_profile_tone_rules", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "brand_profile_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "tone_rule_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["brand_profile_id", "tone_rule_id"], name: "idx_bp_tone_rules", unique: true
+  end
+
+  create_table "brand_profiles", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "approved_vocabulary", default: [], array: true
+    t.text "blocked_vocabulary", default: [], array: true
+    t.uuid "client_id", null: false
+    t.text "color_palette", default: [], array: true
+    t.text "core_programs", default: [], array: true
+    t.datetime "created_at", null: false
+    t.uuid "industry_id"
+    t.text "mission_statement"
+    t.string "organization_name"
+    t.uuid "organization_type_id"
+    t.string "primary_domain"
+    t.datetime "updated_at", null: false
+    t.index ["client_id"], name: "index_brand_profiles_on_client_id", unique: true
+  end
+
+  create_table "campaign_documents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "campaign_id", null: false
+    t.text "content_text"
+    t.datetime "created_at", null: false
+    t.string "display_name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["campaign_id"], name: "index_campaign_documents_on_campaign_id"
+  end
+
+  create_table "campaign_links", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "campaign_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "fetched_at"
+    t.text "image_url"
+    t.text "link_description"
+    t.string "title"
+    t.datetime "updated_at", null: false
+    t.text "url", null: false
+    t.index ["campaign_id"], name: "index_campaign_links_on_campaign_id"
+  end
+
+  create_table "campaigns", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "ai_summary"
+    t.datetime "ai_summary_generated_at"
+    t.enum "ai_summary_state", default: "idle", null: false, enum_type: "campaign_ai_summary_state"
+    t.uuid "client_id", null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.date "end_date"
+    t.text "goals"
+    t.string "name", null: false
+    t.date "start_date"
+    t.enum "status", default: "draft", null: false, enum_type: "campaign_status"
+    t.datetime "updated_at", null: false
+    t.index ["client_id"], name: "index_campaigns_on_client_id"
+  end
+
+  create_table "client_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "client_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["client_id", "user_id"], name: "index_client_users_on_client_id_and_user_id", unique: true
+  end
+
+  create_table "clients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "account_id", null: false
+    t.datetime "created_at", null: false
+    t.boolean "hidden", default: false, null: false
+    t.string "name", null: false
     t.datetime "updated_at", null: false
   end
 
@@ -129,11 +226,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_160000) do
   end
 
   create_table "email_templates", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "client_id", null: false
     t.datetime "created_at", null: false
     t.string "name"
     t.text "original_raw_source_html"
-    t.uuid "project_id", null: false
     t.text "raw_source_html"
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "geographies", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "industries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
     t.datetime "updated_at", null: false
   end
 
@@ -170,17 +281,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_160000) do
   create_table "merges", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "ai_model_id"
     t.uuid "ai_service_id"
+    t.uuid "campaign_id"
+    t.uuid "client_id", null: false
+    t.text "context"
     t.datetime "created_at", null: false
     t.uuid "email_template_id", null: false
     t.enum "state", default: "setup", null: false, enum_type: "merge_state"
     t.datetime "updated_at", null: false
+    t.index ["campaign_id"], name: "index_merges_on_campaign_id"
+    t.index ["client_id"], name: "index_merges_on_client_id"
   end
 
-  create_table "projects", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "account_id", null: false
+  create_table "organization_types", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.boolean "hidden", default: false, null: false
     t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "primary_audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
     t.datetime "updated_at", null: false
   end
 
@@ -346,6 +468,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_160000) do
     t.index ["email_template_section_id", "position"], name: "idx_on_email_template_section_id_position_ec7798dbd9"
   end
 
+  create_table "tone_rules", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "user_roles", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "role_id"
@@ -368,7 +497,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_160000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
-  add_foreign_key "assets", "projects"
+  add_foreign_key "assets", "clients"
+  add_foreign_key "brand_profile_geographies", "brand_profiles"
+  add_foreign_key "brand_profile_geographies", "geographies"
+  add_foreign_key "brand_profile_primary_audiences", "brand_profiles"
+  add_foreign_key "brand_profile_primary_audiences", "primary_audiences"
+  add_foreign_key "brand_profile_tone_rules", "brand_profiles"
+  add_foreign_key "brand_profile_tone_rules", "tone_rules"
+  add_foreign_key "brand_profiles", "clients"
+  add_foreign_key "brand_profiles", "industries"
+  add_foreign_key "brand_profiles", "organization_types"
+  add_foreign_key "campaign_documents", "campaigns"
+  add_foreign_key "campaign_links", "campaigns"
+  add_foreign_key "campaigns", "clients"
+  add_foreign_key "merges", "campaigns"
+  add_foreign_key "merges", "clients"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
