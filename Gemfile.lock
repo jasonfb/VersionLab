@@ -519,7 +519,7 @@ GEM
       simplecov (>= 0.22.0)
       tty-which (~> 0.5.0)
       virtus (~> 2.0)
-    rubyzip (2.4.1)
+    rubyzip (3.2.2)
     securerandom (0.4.1)
     selenium-webdriver (4.40.0)
       base64 (~> 0.2)
@@ -664,7 +664,7 @@ DEPENDENCIES
   rubocop-rails-omakase
   ruby-openai (~> 7.4)
   rubycritic (~> 5.0)
-  rubyzip (~> 2.4)
+  rubyzip (~> 3.2)
   selenium-webdriver
   simplecov (~> 0.22.0)
   simplecov-rcov (~> 0.3.7)
