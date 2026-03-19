@@ -31,14 +31,16 @@ class CampaignSummaryService
 
     prompt = build_user_prompt(document_texts, link_summaries)
 
+    messages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: prompt }
+    ]
+
     client = OpenAI::Client.new(access_token: ai_key.api_key)
     response = client.chat(
       parameters: {
         model: ai_model.api_identifier,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: prompt }
-        ],
+        messages: messages,
         temperature: 0.3
       }
     )
@@ -46,10 +48,30 @@ class CampaignSummaryService
     summary = response.dig("choices", 0, "message", "content")
     raise Error, "Empty response from AI" if summary.blank?
 
+    log_ai_call(account, ai_key, ai_model, messages, response, summary)
+
     summary
   end
 
   private
+
+  def log_ai_call(account, ai_key, ai_model, messages, raw_response, summary)
+    usage = raw_response["usage"] || {}
+    AiLog.create!(
+      account: account,
+      call_type: :campaign_summary,
+      ai_service_id: ai_key.ai_service_id,
+      ai_model: ai_model,
+      loggable: @campaign,
+      prompt: messages.to_json,
+      response: summary,
+      prompt_tokens: usage["prompt_tokens"],
+      completion_tokens: usage["completion_tokens"],
+      total_tokens: usage["total_tokens"]
+    )
+  rescue StandardError => e
+    Rails.logger.error("AiLog failed to save for campaign #{@campaign.id}: #{e.message}")
+  end
 
   def find_ai_credentials(account)
     account.ai_keys.includes(ai_service: :ai_models).each do |key|

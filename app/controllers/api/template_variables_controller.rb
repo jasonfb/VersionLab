@@ -18,6 +18,7 @@ class Api::TemplateVariablesController < Api::BaseController
         default_value: params[:variable][:default_value],
         slot_role: params[:variable][:slot_role].presence,
         word_count: params[:variable][:word_count].presence,
+        image_location: params[:variable][:image_location].presence,
         position: next_position
       )
       @variable.save!
@@ -65,7 +66,7 @@ class Api::TemplateVariablesController < Api::BaseController
   end
 
   def variable_params
-    params.require(:variable).permit(:name, :slot_role, :word_count, :default_value)
+    params.require(:variable).permit(:name, :slot_role, :word_count, :default_value, :image_location)
   end
 
   def variable_json(v)
@@ -76,6 +77,7 @@ class Api::TemplateVariablesController < Api::BaseController
       default_value: v.default_value,
       slot_role: v.slot_role,
       word_count: v.word_count,
+      image_location: v.image_location,
       position: v.position,
     }
   end

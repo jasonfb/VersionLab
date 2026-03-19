@@ -17,12 +17,24 @@ class Api::EmailTemplatesController < Api::BaseController
       original_raw_source_html: @email_template.original_raw_source_html,
       updated_at: @email_template.updated_at,
       asset_urls: resolve_asset_urls(@email_template.raw_source_html),
-      sections: @email_template.sections.order(:position).includes(:template_variables).map { |s|
+      sections: @email_template.sections.where(parent_id: nil).order(:position)
+        .includes(:template_variables, subsections: :template_variables).map { |s|
         {
           id: s.id,
           position: s.position,
-          variables: s.template_variables.order(:position).map { |v|
-            { id: v.id, name: v.name, variable_type: v.variable_type, default_value: v.default_value, position: v.position }
+          parent_id: s.parent_id,
+          element_selector: s.element_selector,
+          name: s.name,
+          variables: s.template_variables.order(:position).map { |v| serialize_variable(v) },
+          subsections: s.subsections.order(:position).map { |sub|
+            {
+              id: sub.id,
+              position: sub.position,
+              parent_id: sub.parent_id,
+              element_selector: sub.element_selector,
+              name: sub.name,
+              variables: sub.template_variables.order(:position).map { |v| serialize_variable(v) },
+            }
           }
         }
       }
@@ -84,6 +96,19 @@ class Api::EmailTemplatesController < Api::BaseController
 
   def email_template_params
     params.require(:email_template).permit(:name, :raw_source_html, :original_raw_source_html)
+  end
+
+  def serialize_variable(v)
+    {
+      id: v.id,
+      name: v.name,
+      variable_type: v.variable_type,
+      default_value: v.default_value,
+      slot_role: v.slot_role,
+      word_count: v.word_count,
+      image_location: v.image_location,
+      position: v.position,
+    }
   end
 
   def resolve_asset_urls(html)

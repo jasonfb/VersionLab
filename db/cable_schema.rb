@@ -10,13 +10,14 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_17_000010) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_19_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
 
   # Custom types defined in this database.
   # Note that some types may not work with other database engines. Be careful if changing database.
+  create_enum "ai_log_call_type", ["merge", "campaign_summary"]
   create_enum "asset_standardized_ratio", ["hero_3_1", "banner_2_1", "widescreen_16_9", "square_1_1", "portrait_4_5"]
   create_enum "campaign_ai_summary_state", ["idle", "generating", "generated", "failed"]
   create_enum "campaign_status", ["draft", "active", "completed", "archived"]
@@ -24,6 +25,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_17_000010) do
   create_enum "merge_version_state", ["generating", "active", "rejected"]
   create_enum "template_import_state", ["pending", "processing", "completed", "failed"]
   create_enum "template_import_type", ["bundled", "external"]
+  create_enum "template_variable_image_location", ["hero", "banner", "sidebar", "inline", "footer"]
   create_enum "template_variable_slot_role", ["teaser_text", "eyebrow", "headline", "subheadline", "body", "cta_text", "image"]
 
   create_table "account_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -79,6 +81,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_17_000010) do
     t.string "label"
     t.datetime "updated_at", null: false
     t.index ["account_id", "ai_service_id"], name: "index_ai_keys_on_account_id_and_ai_service_id", unique: true
+  end
+
+  create_table "ai_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "account_id", null: false
+    t.uuid "ai_model_id"
+    t.uuid "ai_service_id"
+    t.enum "call_type", null: false, enum_type: "ai_log_call_type"
+    t.integer "completion_tokens"
+    t.datetime "created_at", null: false
+    t.uuid "loggable_id"
+    t.string "loggable_type"
+    t.text "prompt"
+    t.integer "prompt_tokens"
+    t.text "response"
+    t.integer "total_tokens"
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_ai_logs_on_account_id"
+    t.index ["created_at"], name: "index_ai_logs_on_created_at"
+    t.index ["loggable_type", "loggable_id"], name: "idx_ai_logs_on_loggable"
   end
 
   create_table "ai_models", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -219,7 +240,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_17_000010) do
 
   create_table "email_template_sections", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "element_selector"
     t.uuid "email_template_id", null: false
+    t.string "name"
+    t.uuid "parent_id"
     t.integer "position", null: false
     t.datetime "updated_at", null: false
     t.index ["email_template_id", "position"], name: "idx_on_email_template_id_position_c662290fc5"
@@ -459,6 +483,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_17_000010) do
     t.datetime "created_at", null: false
     t.text "default_value", null: false
     t.uuid "email_template_section_id", null: false
+    t.enum "image_location", enum_type: "template_variable_image_location"
     t.string "name", null: false
     t.integer "position", null: false
     t.enum "slot_role", enum_type: "template_variable_slot_role"
@@ -497,6 +522,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_17_000010) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "ai_logs", "accounts"
   add_foreign_key "assets", "clients"
   add_foreign_key "brand_profile_geographies", "brand_profiles"
   add_foreign_key "brand_profile_geographies", "geographies"

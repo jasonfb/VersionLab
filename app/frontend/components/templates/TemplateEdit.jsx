@@ -9,11 +9,181 @@ import {
   buildPreviewHtml,
   snapToStandardRatio,
 } from '~/lib/variableSelection'
-import VariablePopover, { SLOT_ROLES } from './VariablePopover'
+import VariablePopover, { SLOT_ROLES, IMAGE_LOCATION_TYPES } from './VariablePopover'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const IFRAME_NATURAL_WIDTH = 680
+
+// ─── Section editor helpers (module-level, pure DOM) ─────────────────────────
+
+/**
+ * Find the "section candidate" elements in an email document —
+ * the full-width rows that represent logical email sections.
+ *
+ * Strategy: find <tr> elements at the shallowest table-nesting depth,
+ * preferring a depth that yields more than one candidate (skips single
+ * wrapper rows). Falls back to direct <body> children for div-based emails.
+ */
+function getSectionCandidates(doc) {
+  const allTrs = Array.from(doc.querySelectorAll('tr'))
+
+  if (allTrs.length === 0) {
+    // Div-based email: top-level body children
+    return Array.from(doc.body?.children || []).filter(
+      (el) => !['SCRIPT', 'STYLE', 'META', 'HEAD'].includes(el.tagName),
+    )
+  }
+
+  // Compute table-nesting depth for each <tr>
+  const depths = new Map()
+  for (const tr of allTrs) {
+    let depth = 0
+    let el = tr.parentElement
+    while (el && el !== doc.body) {
+      if (el.tagName === 'TABLE') depth++
+      el = el.parentElement
+    }
+    depths.set(tr, depth)
+  }
+
+  // Walk from shallowest depth upward; pick first depth with >1 candidate
+  const sortedDepths = [...new Set([...depths.values()])].sort((a, b) => a - b)
+  for (const depth of sortedDepths) {
+    const candidates = allTrs.filter((tr) => depths.get(tr) === depth)
+    if (candidates.length > 1) return candidates
+  }
+
+  // Fallback: shallowest depth even if just one
+  const minDepth = sortedDepths[0] ?? 0
+  return allTrs.filter((tr) => depths.get(tr) === minDepth)
+}
+
+/** Mark candidate elements that correspond to saved sections (green outline). */
+function markDefinedSections(sections, candidates) {
+  if (!candidates?.length) return
+  candidates.forEach((c) => c.removeAttribute('data-vl-section-defined'))
+  sections.filter((s) => s.parent_id == null).forEach((s) => {
+    if (s.element_selector != null) {
+      const idx = parseInt(s.element_selector, 10)
+      if (!isNaN(idx) && candidates[idx]) {
+        candidates[idx].setAttribute('data-vl-section-defined', s.id)
+      }
+    }
+  })
+}
+
+/** Highlight the active section (selected from left panel) with a red outline. */
+function applyActiveHighlight(sections, candidates, activeSectionId) {
+  if (!candidates?.length) return
+  candidates.forEach((c) => c.removeAttribute('data-vl-section-active'))
+  if (!activeSectionId) return
+  const s = sections.find((sec) => sec.id === activeSectionId)
+  if (!s?.element_selector || s.parent_id != null) return
+  const idx = parseInt(s.element_selector, 10)
+  if (!isNaN(idx) && candidates[idx]) {
+    candidates[idx].setAttribute('data-vl-section-active', '1')
+  }
+}
+
+/** Extract a short preview string from a section candidate element. */
+function extractSectionPreview(element) {
+  const text = (element.textContent || '').replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  return text.length > 55 ? `${text.slice(0, 55)}…` : text
+}
+
+/** Generate a CSS selector path (body > ... > el) for any element. */
+function getCssSelector(el, doc) {
+  const segments = []
+  let current = el
+  const body = doc.body
+  while (current && current !== body) {
+    const tag = current.tagName?.toLowerCase()
+    if (!tag) break
+    const parent = current.parentElement
+    if (!parent) break
+    const sameTags = Array.from(parent.children).filter((c) => c.tagName === current.tagName)
+    let seg = tag
+    if (sameTags.length > 1) {
+      const idx = sameTags.indexOf(current) + 1
+      seg += `:nth-of-type(${idx})`
+    }
+    segments.unshift(seg)
+    current = parent
+  }
+  return segments.join(' > ')
+}
+
+const BLOCK_TAGS = new Set([
+  'TD', 'TH', 'TR', 'TABLE', 'DIV', 'SECTION', 'ARTICLE', 'ASIDE',
+  'HEADER', 'FOOTER', 'FIGURE', 'BLOCKQUOTE', 'LI', 'UL', 'OL',
+  'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+])
+
+/**
+ * Walk up from el to find the nearest block-level element that is
+ * inside sectionCandidate (but not the candidate itself).
+ */
+function findSubsectionTarget(el, sectionCandidate) {
+  let current = el
+  while (current && current !== sectionCandidate) {
+    if (current.nodeType === 1 && BLOCK_TAGS.has(current.tagName)) {
+      return current
+    }
+    current = current.parentElement
+  }
+  return null
+}
+
+/** Apply active highlight to the selected subsection element. */
+function applySubsectionHighlight(sections, doc, activeSubsectionId) {
+  if (!doc) return
+  doc.querySelectorAll('[data-vl-subsection-active]').forEach((el) =>
+    el.removeAttribute('data-vl-subsection-active')
+  )
+  if (!activeSubsectionId) return
+  const sub = sections.find((s) => s.id === activeSubsectionId)
+  if (!sub?.element_selector) return
+  try {
+    const el = doc.querySelector(sub.element_selector)
+    if (el) el.setAttribute('data-vl-subsection-active', '1')
+  } catch (_) {}
+}
+
+/** Mark defined subsections in the iframe using their stored CSS selectors. */
+function markDefinedSubsections(sections, doc) {
+  if (!doc) return
+  doc.querySelectorAll('[data-vl-subsection-defined]').forEach((el) =>
+    el.removeAttribute('data-vl-subsection-defined')
+  )
+  sections.filter((s) => s.parent_id != null).forEach((sub) => {
+    if (!sub.element_selector) return
+    try {
+      const el = doc.querySelector(sub.element_selector)
+      if (el) el.setAttribute('data-vl-subsection-defined', sub.id)
+    } catch (_) {}
+  })
+}
+
+/** Flatten nested sections from the API response into a flat array for state. */
+function flattenSections(nestedSections) {
+  return (nestedSections || []).flatMap((s) => {
+    const { subsections, ...section } = s
+    return [
+      { ...section, variables: section.variables || [] },
+      ...(subsections || []).map((sub) => ({ ...sub, variables: sub.variables || [] })),
+    ]
+  })
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TemplateEdit() {
   const { clientId, id } = useParams()
   const navigate = useNavigate()
+
+  // ── Core template state ──────────────────────────────────────────────────
   const iframeRef = useRef(null)
   const [template, setTemplate] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -27,17 +197,59 @@ export default function TemplateEdit() {
   const [error, setError] = useState(null)
   const [popover, setPopover] = useState(null)
   const [hoveredVarId, setHoveredVarId] = useState(null)
-  const [editingVar, setEditingVar] = useState(null) // { sectionId, varId, slotRole, wordCount, defaultValue }
+  const [editingVar, setEditingVar] = useState(null)
   const [resetting, setResetting] = useState(false)
   const [assetUrls, setAssetUrls] = useState({})
-  const expandedSectionRef = useRef(null)
 
-  // Flat list of every variable across all sections (for preview builder)
+  // ── Editor mode state ────────────────────────────────────────────────────
+  // 'section' = section-definition mode (miniaturized email, hover/dblclick)
+  // 'variable' = variable-creation mode (full-size, text selection)
+  const [editorMode, setEditorMode] = useState('section')
+  const [highlightedSectionId, setHighlightedSectionId] = useState(null)
+  const [sectionScale, setSectionScale] = useState(0.5)
+  const [previewNaturalHeight, setPreviewNaturalHeight] = useState(3000)
+  const [hoveredCandidateIndex, setHoveredCandidateIndex] = useState(null)
+  const [candidatePreviewTexts, setCandidatePreviewTexts] = useState([]) // indexed by candidate index
+  const [editingSectionName, setEditingSectionName] = useState(null) // { sectionId, value }
+  const [subsectionPreviewTexts, setSubsectionPreviewTexts] = useState({}) // keyed by subsection id
+  const [hoveredSubSelector, setHoveredSubSelector] = useState(null) // CSS selector of sub-hover target
+  const [highlightedSubsectionId, setHighlightedSubsectionId] = useState(null)
+  const [varZoom, setVarZoom] = useState(null) // { scale, naturalHeight } when zoomed in variable mode
+
+  // ── Refs ─────────────────────────────────────────────────────────────────
+  const expandedSectionRef = useRef(null)
+  const overlayRef = useRef(null)
+  const previewPanelRef = useRef(null)
+  const scrollablePanelRef = useRef(null) // inner scrollable div (for zoom scroll)
+  const sectionCandidatesRef = useRef([])
+  const fitScaleRef = useRef(0.5) // baseline "fit whole email" scale
+  // Always-current sections snapshot for use inside effects without adding
+  // sections to their dependency arrays (avoids spurious iframe re-writes).
+  const sectionsRef = useRef(sections)
+  const hoveredSubElRef = useRef(null) // DOM element ref for subsection hover
+  const hoveredSubSelectorRef = useRef(null) // CSS selector of hovered sub-element
+
+  // ── Derived ──────────────────────────────────────────────────────────────
   const allVariables = useMemo(
     () => sections.flatMap((s) => s.variables || []),
     [sections],
   )
 
+  const topLevelSections = useMemo(
+    () => sections.filter((s) => !s.parent_id),
+    [sections],
+  )
+
+  // ── Keep refs in sync ────────────────────────────────────────────────────
+  useEffect(() => { expandedSectionRef.current = expandedSection }, [expandedSection])
+  useEffect(() => { sectionsRef.current = sections }, [sections])
+
+  // Clear subsection selection when parent section changes (either mode)
+  useEffect(() => { setHighlightedSubsectionId(null) }, [highlightedSectionId])
+  useEffect(() => { setHighlightedSubsectionId(null); setVarZoom(null) }, [expandedSection])
+  useEffect(() => { if (editorMode !== 'variable') setVarZoom(null) }, [editorMode])
+
+  // ── Load template ────────────────────────────────────────────────────────
   useEffect(() => {
     apiFetch(`/api/clients/${clientId}/email_templates/${id}`)
       .then((data) => {
@@ -45,20 +257,13 @@ export default function TemplateEdit() {
         setName(data.name)
         setRawSourceHtml(data.raw_source_html || '')
         setOriginalRawSourceHtml(data.original_raw_source_html || null)
-        setSections(data.sections || [])
+        setSections(flattenSections(data.sections))
         setAssetUrls(data.asset_urls || {})
       })
       .finally(() => setLoading(false))
   }, [id])
 
-  // Keep ref in sync so iframe handlers always read the latest value
-  // without needing to re-run the effect (which rewrites the document).
-  useEffect(() => {
-    expandedSectionRef.current = expandedSection
-  }, [expandedSection])
-
-  // Write preview HTML into iframe and attach event listeners.
-  // Uses expandedSectionRef so we only rewrite when content changes.
+  // ── Write iframe & attach mode-specific handlers ─────────────────────────
   useEffect(() => {
     const iframe = iframeRef.current
     if (!iframe || !rawSourceHtml) return
@@ -74,147 +279,237 @@ export default function TemplateEdit() {
       doc.write(preview)
       doc.close()
 
-      // Inject CSS so link text behaves like normal selectable text.
-      // The iframe is sandboxed so links can't navigate; the pointer cursor
-      // and drag behaviour are just confusing noise.
-      const injectedStyle = doc.createElement('style')
-      injectedStyle.textContent = [
-        'a { cursor: text !important; -webkit-user-drag: none; user-drag: none; }',
-        'a, a * { -webkit-user-select: text !important; user-select: text !important; }',
-      ].join('\n')
-      ;(doc.head || doc.body)?.appendChild(injectedStyle)
+      if (editorMode === 'section') {
+        // ── Section editor mode ──────────────────────────────────────────
+        const style = doc.createElement('style')
+        style.textContent = `
+          [data-vl-hover], [data-vl-hover] td {
+            outline: 2px solid rgba(59, 130, 246, 0.65) !important;
+            background-color: rgba(59, 130, 246, 0.07) !important;
+          }
+          [data-vl-section-defined], [data-vl-section-defined] td {
+            outline: 2px solid #198754 !important;
+            background-color: rgba(25, 135, 84, 0.05) !important;
+          }
+          [data-vl-section-active], [data-vl-section-active] td {
+            outline: 3px solid #dc3545 !important;
+            background-color: rgba(220, 53, 69, 0.07) !important;
+          }
+          [data-vl-sub-hover] {
+            outline: 2px solid rgba(234, 88, 12, 0.65) !important;
+            background-color: rgba(234, 88, 12, 0.07) !important;
+          }
+          [data-vl-subsection-defined] {
+            outline: 2px dashed #6f42c1 !important;
+            background-color: rgba(111, 66, 193, 0.05) !important;
+          }
+          [data-vl-section-active] [data-vl-subsection-active],
+          [data-vl-section-active] [data-vl-subsection-active] td {
+            outline: 15px solid #cc8800 !important;
+            background-color: transparent !important;
+          }
+        `
+        ;(doc.head || doc.body)?.appendChild(style)
 
-      // Prevent the browser from treating a mousedown on a link as a
-      // link-drag start, which would eat the drag and prevent text selection.
-      doc.addEventListener('dragstart', (e) => {
-        if (e.target.closest('a')) e.preventDefault()
-      })
+        // Measure natural height then compute scale
+        requestAnimationFrame(() => {
+          const naturalH = Math.max(doc.body.scrollHeight, 400)
+          const panelH = previewPanelRef.current?.clientHeight ?? window.innerHeight
+          const newScale = Math.min(1, Math.max(0.15, (panelH - 56) / naturalH))
 
-      const handleMouseUp = () => {
-        const selection = doc.getSelection()
-        const selStr = selection?.toString() ?? ''
-        console.log('[handleMouseUp] FIRED', {
-          hasSelection: !!selection,
-          isCollapsed: selection?.isCollapsed,
-          selectionText: JSON.stringify(selStr),
-          expandedSection: expandedSectionRef.current,
+          fitScaleRef.current = newScale
+          setSectionScale(newScale)
+          setPreviewNaturalHeight(naturalH)
+
+          const candidates = getSectionCandidates(doc)
+          sectionCandidatesRef.current = candidates
+          setCandidatePreviewTexts(candidates.map(extractSectionPreview))
+
+          // Build subsection preview texts from CSS selectors
+          const subPreviews = {}
+          sectionsRef.current.filter((s) => s.parent_id != null).forEach((sub) => {
+            if (!sub.element_selector) return
+            try {
+              const el = doc.querySelector(sub.element_selector)
+              if (el) subPreviews[sub.id] = extractSectionPreview(el)
+            } catch (_) {}
+          })
+          setSubsectionPreviewTexts(subPreviews)
+
+          // Restore section indicators with latest sections
+          markDefinedSections(sectionsRef.current, candidates)
+          markDefinedSubsections(sectionsRef.current, doc)
+          applyActiveHighlight(sectionsRef.current, candidates, highlightedSectionId)
+          applySubsectionHighlight(sectionsRef.current, doc, highlightedSubsectionId)
+        })
+      } else {
+        // ── Variable editor mode ─────────────────────────────────────────
+        const injectedStyle = doc.createElement('style')
+        injectedStyle.textContent = [
+          'a { cursor: text !important; -webkit-user-drag: none; user-drag: none; }',
+          'a, a * { -webkit-user-select: text !important; user-select: text !important; }',
+        ].join('\n')
+        ;(doc.head || doc.body)?.appendChild(injectedStyle)
+
+        doc.addEventListener('dragstart', (e) => {
+          if (e.target.closest('a')) e.preventDefault()
         })
 
-        if (!selection || selection.isCollapsed || !selStr.trim()) {
-          console.log('[handleMouseUp] BAIL: no/collapsed/empty selection')
-          return
-        }
-        if (!expandedSectionRef.current) {
-          console.log('[handleMouseUp] BAIL: no expandedSection')
-          return
-        }
-
-        // Don't allow selecting inside an existing variable span
-        const anchor = selection.anchorNode?.parentElement
-        const anchorInVar = anchor?.closest('[data-vl-var]')
-        console.log('[handleMouseUp] anchor element:', anchor?.tagName, anchor?.className, 'inVar:', !!anchorInVar)
-        if (anchorInVar) {
-          console.log('[handleMouseUp] BAIL: anchor inside existing variable span')
-          return
-        }
-
-        const range = selection.getRangeAt(0)
-
-        // Prevent cross-tag selections that span block elements or links,
-        // because replacing them with a single token destroys HTML structure.
-        const container = range.commonAncestorContainer
-        const containerEl = container.nodeType === 3 ? container.parentElement : container
-        console.log('[handleMouseUp] commonAncestorContainer:', {
-          nodeType: container.nodeType,
-          tagName: containerEl?.tagName,
-          className: containerEl?.className,
-          id: containerEl?.id,
+        // Find candidates so we can auto-detect which section a selection belongs to
+        requestAnimationFrame(() => {
+          const candidates = getSectionCandidates(doc)
+          sectionCandidatesRef.current = candidates
+          setCandidatePreviewTexts(candidates.map(extractSectionPreview))
         })
 
-        if (containerEl) {
-          const fragment = range.cloneContents()
-          const fragmentHtml = (() => { const d = doc.createElement('div'); d.appendChild(fragment.cloneNode(true)); return d.innerHTML })()
-          console.log('[handleMouseUp] fragment HTML:', fragmentHtml)
-          const blockMatch = fragment.querySelector('a, p, h1, h2, h3, h4, h5, h6, div, td, tr, table, li, ul, ol')
-          console.log('[handleMouseUp] hasBlockOrLink:', blockMatch ? blockMatch.tagName : 'none')
-          if (blockMatch) {
-            console.log('[handleMouseUp] BAIL: fragment contains block/link element:', blockMatch.tagName, blockMatch.outerHTML?.slice(0, 100))
+        // Given a DOM element inside the iframe, return the section id whose
+        // element_selector candidate contains that element (or null).
+        const detectSectionForElement = (el) => {
+          const candidates = sectionCandidatesRef.current
+          const idx = candidates.findIndex((c) => c === el || c.contains(el))
+          if (idx < 0) return null
+          const matched = sectionsRef.current.find((s) => !s.parent_id && s.element_selector === String(idx))
+          return matched?.id ?? null
+        }
+
+        // Auto-expand the section that owns the given element, falling back to
+        // whatever is already expanded. Returns the target section id (or null).
+        const autoExpandSection = (el) => {
+          const autoId = detectSectionForElement(el)
+          const targetId = autoId || expandedSectionRef.current
+          if (autoId && autoId !== expandedSectionRef.current) {
+            // Update both state (for UI) and ref (for synchronous use below)
+            setExpandedSection(autoId)
+            expandedSectionRef.current = autoId
+            console.log('[autoExpand] auto-expanding section:', autoId)
+          }
+          return targetId
+        }
+
+        const handleMouseUp = () => {
+          const selection = doc.getSelection()
+          const selStr = selection?.toString() ?? ''
+          console.log('[handleMouseUp] FIRED', {
+            hasSelection: !!selection,
+            isCollapsed: selection?.isCollapsed,
+            selectionText: JSON.stringify(selStr),
+            expandedSection: expandedSectionRef.current,
+          })
+
+          if (!selection || selection.isCollapsed || !selStr.trim()) {
+            console.log('[handleMouseUp] BAIL: no/collapsed/empty selection')
             return
           }
-        }
 
-
-        // Figure out which occurrence (0-based) of the selected text the
-        // user chose in the visible document.  We count how many full matches
-        // start *before* this selection's start offset in the body text.
-        // This occurrence index is stable regardless of {{vl:…}} tokens in
-        // the raw HTML because those tokens don't contain normal prose.
-        let occurrenceIndex = 0
-        try {
-          const preRange = doc.createRange()
-          preRange.setStart(doc.body, 0)
-          preRange.setEnd(range.startContainer, range.startOffset)
-          const preText = preRange.toString()
-          const bodyText = doc.body.textContent || ''
-          const selText = selection.toString()
-          const norm = (s) => s.replace(/\s+/g, ' ')
-          const normBody = norm(bodyText)
-          const normSel = norm(selText)
-          const normPreLen = norm(preText).length
-          let pos = 0
-          while (true) {
-            const idx = normBody.indexOf(normSel, pos)
-            if (idx === -1 || idx >= normPreLen) break
-            occurrenceIndex++
-            pos = idx + 1
+          const anchor = selection.anchorNode?.parentElement
+          const anchorInVar = anchor?.closest('[data-vl-var]')
+          console.log('[handleMouseUp] anchor element:', anchor?.tagName, anchor?.className, 'inVar:', !!anchorInVar)
+          if (anchorInVar) {
+            console.log('[handleMouseUp] BAIL: anchor inside existing variable span')
+            return
           }
-        } catch (e) {
-          console.warn('[handleMouseUp] occurrence calc error:', e)
+
+          // Auto-detect section from where the selection lives
+          const targetSectionId = autoExpandSection(anchor)
+          if (!targetSectionId) {
+            console.log('[handleMouseUp] BAIL: no section covers this area')
+            return
+          }
+
+          const range = selection.getRangeAt(0)
+          const container = range.commonAncestorContainer
+          const containerEl = container.nodeType === 3 ? container.parentElement : container
+          console.log('[handleMouseUp] commonAncestorContainer:', {
+            nodeType: container.nodeType,
+            tagName: containerEl?.tagName,
+            className: containerEl?.className,
+            id: containerEl?.id,
+          })
+
+          if (containerEl) {
+            const fragment = range.cloneContents()
+            const fragmentHtml = (() => { const d = doc.createElement('div'); d.appendChild(fragment.cloneNode(true)); return d.innerHTML })()
+            console.log('[handleMouseUp] fragment HTML:', fragmentHtml)
+            const blockMatch = fragment.querySelector('a, p, h1, h2, h3, h4, h5, h6, div, td, tr, table, li, ul, ol')
+            console.log('[handleMouseUp] hasBlockOrLink:', blockMatch ? blockMatch.tagName : 'none')
+            if (blockMatch) {
+              console.log('[handleMouseUp] BAIL: fragment contains block/link element:', blockMatch.tagName, blockMatch.outerHTML?.slice(0, 100))
+              return
+            }
+          }
+
+          let occurrenceIndex = 0
+          try {
+            const preRange = doc.createRange()
+            preRange.setStart(doc.body, 0)
+            preRange.setEnd(range.startContainer, range.startOffset)
+            const preText = preRange.toString()
+            const bodyText = doc.body.textContent || ''
+            const selText = selection.toString()
+            const norm = (s) => s.replace(/\s+/g, ' ')
+            const normBody = norm(bodyText)
+            const normSel = norm(selText)
+            const normPreLen = norm(preText).length
+            let pos = 0
+            while (true) {
+              const idx = normBody.indexOf(normSel, pos)
+              if (idx === -1 || idx >= normPreLen) break
+              occurrenceIndex++
+              pos = idx + 1
+            }
+          } catch (e) {
+            console.warn('[handleMouseUp] occurrence calc error:', e)
+          }
+
+          const selText = selection.toString()
+          const wordCount = selText.trim().split(/\s+/).filter(Boolean).length
+
+          console.log('[handleMouseUp] SHOWING POPOVER', {
+            selectedText: selText,
+            occurrenceIndex,
+            wordCount,
+          })
+
+          setPopover({
+            type: 'text',
+            selectedText: selText,
+            occurrenceIndex,
+            wordCount,
+          })
         }
 
-        const selText = selection.toString()
-        const wordCount = selText.trim().split(/\s+/).filter(Boolean).length
+        const handleClick = (e) => {
+          const img = e.target.closest('img')
+          if (!img || img.hasAttribute('data-vl-var')) return
 
-        console.log('[handleMouseUp] SHOWING POPOVER', {
-          selectedText: selText,
-          occurrenceIndex,
-          wordCount,
-        })
+          e.preventDefault()
 
-        setPopover({
-          type: 'text',
-          selectedText: selText,
-          occurrenceIndex,
-          wordCount,
-        })
-      }
+          const targetSectionId = autoExpandSection(img)
+          if (!targetSectionId) {
+            console.log('[handleClick] BAIL: no section covers this image')
+            return
+          }
 
-      const handleClick = (e) => {
-        const img = e.target.closest('img')
-        if (!img || img.hasAttribute('data-vl-var')) return
-        if (!expandedSectionRef.current) return
+          const assetId = img.getAttribute('data-vl-asset-id') || null
+          const ratioEntry = assetId
+            ? snapToStandardRatio(img.naturalWidth, img.naturalHeight)
+            : null
 
-        e.preventDefault()
+          setPopover({
+            type: 'image',
+            imgSrc: img.getAttribute('src') || '',
+            assetId,
+            standardizedRatio: ratioEntry?.key || null,
+          })
+        }
 
-        const assetId = img.getAttribute('data-vl-asset-id') || null
-        const ratioEntry = assetId
-          ? snapToStandardRatio(img.naturalWidth, img.naturalHeight)
-          : null
+        doc.addEventListener('mouseup', handleMouseUp)
+        doc.addEventListener('click', handleClick)
 
-        setPopover({
-          type: 'image',
-          imgSrc: img.getAttribute('src') || '',
-          assetId,
-          standardizedRatio: ratioEntry?.key || null,
-        })
-      }
-
-      doc.addEventListener('mouseup', handleMouseUp)
-      doc.addEventListener('click', handleClick)
-
-      removeListeners = () => {
-        doc.removeEventListener('mouseup', handleMouseUp)
-        doc.removeEventListener('click', handleClick)
+        removeListeners = () => {
+          doc.removeEventListener('mouseup', handleMouseUp)
+          doc.removeEventListener('click', handleClick)
+        }
       }
     }
 
@@ -227,10 +522,161 @@ export default function TemplateEdit() {
     return () => {
       if (removeListeners) removeListeners()
     }
-  }, [rawSourceHtml, allVariables])
+  }, [rawSourceHtml, allVariables, editorMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Highlight hovered variable in iframe
+  // ── Refresh section indicators when sections list changes ────────────────
   useEffect(() => {
+    if (editorMode !== 'section') return
+    markDefinedSections(sections, sectionCandidatesRef.current)
+    const doc = iframeRef.current?.contentDocument
+    if (doc) markDefinedSubsections(sections, doc)
+  }, [sections, editorMode])
+
+  // ── Apply subsection active highlight ────────────────────────────────────
+  useEffect(() => {
+    if (editorMode !== 'section') return
+    const doc = iframeRef.current?.contentDocument
+    applySubsectionHighlight(sections, doc, highlightedSubsectionId)
+  }, [highlightedSubsectionId, sections, editorMode])
+
+  // ── Refresh active highlight + zoom when selection changes ───────────────
+  useEffect(() => {
+    if (editorMode !== 'section') return
+
+    applyActiveHighlight(sections, sectionCandidatesRef.current, highlightedSectionId)
+
+    const scrollable = scrollablePanelRef.current
+
+    if (!highlightedSectionId) {
+      // Zoom back out to fit-all scale
+      setSectionScale(fitScaleRef.current)
+      scrollable?.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    const section = sections.find((s) => s.id === highlightedSectionId)
+    if (!section?.element_selector) return
+
+    const idx = parseInt(section.element_selector, 10)
+    const candidate = sectionCandidatesRef.current[idx]
+    if (!candidate) return
+
+    // getBoundingClientRect() inside the iframe is at the iframe's natural
+    // scale (scale-1), so these are the element's true pixel dimensions.
+    const rect = candidate.getBoundingClientRect()
+    if (!rect.height) return
+
+    const panelW = scrollable ? scrollable.clientWidth : window.innerWidth
+    const panelH = scrollable ? scrollable.clientHeight : window.innerHeight
+    const padding = 32 // p-3 on each side
+
+    // Largest scale that makes the section fill 85% of panel height
+    // without the email becoming wider than the panel.
+    const scaleByH = (panelH * 0.85) / rect.height
+    const scaleByW = (panelW - padding) / IFRAME_NATURAL_WIDTH
+    const newScale = Math.min(scaleByH, scaleByW)
+
+    setSectionScale(newScale)
+
+    // After React re-renders with the new scale, scroll to center the section.
+    requestAnimationFrame(() => {
+      if (!scrollable) return
+      const sectionTopScaled = rect.top * newScale
+      const sectionHScaled = rect.height * newScale
+      const scrollY = sectionTopScaled - (panelH - sectionHScaled) / 2
+      scrollable.scrollTo({ top: Math.max(0, scrollY), behavior: 'smooth' })
+    })
+  }, [highlightedSectionId, sections, editorMode, candidatePreviewTexts]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Scroll preview to expanded section in variable editor mode ─────────
+  useEffect(() => {
+    if (editorMode !== 'variable' || !expandedSection) return
+    const section = sections.find((s) => s.id === expandedSection)
+    if (!section?.element_selector) return
+    const idx = parseInt(section.element_selector, 10)
+    if (isNaN(idx)) return
+    const candidate = sectionCandidatesRef.current[idx]
+    if (!candidate) return
+    const iframe = iframeRef.current
+    const scrollable = scrollablePanelRef.current
+    if (!iframe || !scrollable) return
+    requestAnimationFrame(() => {
+      const iframeRect = iframe.getBoundingClientRect()
+      const scrollableRect = scrollable.getBoundingClientRect()
+      const rect = candidate.getBoundingClientRect()
+      const candidateTopRelToScrollable = iframeRect.top - scrollableRect.top + rect.top
+      const targetScrollTop = scrollable.scrollTop + candidateTopRelToScrollable - 16
+      scrollable.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' })
+    })
+  }, [expandedSection, editorMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Zoom to parent + highlight subsection in variable editor mode ────────
+  useEffect(() => {
+    if (editorMode !== 'variable') return
+    const doc = iframeRef.current?.contentDocument
+    if (!doc) return
+
+    // Clear previous subsection highlight
+    doc.querySelectorAll('[data-vl-subsection-active]').forEach((el) => {
+      el.style.outline = ''
+      el.style.outlineOffset = ''
+      el.removeAttribute('data-vl-subsection-active')
+    })
+
+    if (!highlightedSubsectionId) {
+      setVarZoom(null)
+      return
+    }
+
+    const sub = sectionsRef.current.find((s) => s.id === highlightedSubsectionId)
+    if (!sub?.element_selector) return
+
+    // Zoom to the parent section
+    const parent = sectionsRef.current.find((s) => s.id === sub.parent_id)
+    const candidates = sectionCandidatesRef.current
+    const parentCandidate = parent?.element_selector != null
+      ? candidates[parseInt(parent.element_selector, 10)]
+      : null
+
+    const scrollable = scrollablePanelRef.current
+    const iframe = iframeRef.current
+
+    if (parentCandidate && scrollable && iframe) {
+      const naturalH = Math.max(doc.body.scrollHeight, 400)
+      const panelW = scrollable.clientWidth
+      const panelH = scrollable.clientHeight
+      const padding = 32
+      const rect = parentCandidate.getBoundingClientRect()
+      const scaleByH = (panelH * 0.85) / rect.height
+      const scaleByW = (panelW - padding) / IFRAME_NATURAL_WIDTH
+      const scale = Math.min(scaleByH, scaleByW)
+      setVarZoom({ scale, naturalHeight: naturalH })
+
+      // Scroll to center the parent section after React re-renders with new scale
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const sectionTopScaled = rect.top * scale
+          const sectionHScaled = rect.height * scale
+          const scrollY = sectionTopScaled - (panelH - sectionHScaled) / 2
+          scrollable.scrollTo({ top: Math.max(0, scrollY), behavior: 'smooth' })
+        })
+      })
+    }
+
+    // Apply yellow highlight to subsection element
+    try {
+      const el = doc.querySelector(sub.element_selector)
+      if (el) {
+        el.setAttribute('data-vl-subsection-active', '1')
+        el.style.outline = '3px solid #cc8800'
+        el.style.outlineOffset = '-2px'
+      }
+    } catch (_) {}
+  }, [highlightedSubsectionId, editorMode])
+
+  // ── Highlight hovered variable in variable editor mode ───────────────────
+  useEffect(() => {
+    if (editorMode !== 'variable') return
     const doc = iframeRef.current?.contentDocument
     if (!doc) return
 
@@ -242,7 +688,11 @@ export default function TemplateEdit() {
       const el = doc.querySelector(`[data-vl-var="${hoveredVarId}"]`)
       if (el) el.style.outline = '2px solid #dc3545'
     }
-  }, [hoveredVarId])
+  }, [hoveredVarId, editorMode])
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Handlers
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
     setSaving(true)
@@ -283,6 +733,7 @@ export default function TemplateEdit() {
       setOriginalRawSourceHtml(data.original_raw_source_html || null)
       setSections(data.sections || [])
       setExpandedSection(null)
+      setHighlightedSectionId(null)
       setTemplate((prev) => ({ ...prev, raw_source_html: data.raw_source_html }))
     } catch (err) {
       setError(err.message)
@@ -291,29 +742,43 @@ export default function TemplateEdit() {
     }
   }
 
-  const handleAddSection = async () => {
+  const handleAddSection = async ({ elementSelector = null, parentId = null } = {}) => {
     try {
       const data = await apiFetch(`/api/clients/${clientId}/email_templates/${id}/sections`, {
         method: 'POST',
+        body: JSON.stringify({ section: { element_selector: elementSelector, parent_id: parentId } }),
       })
       setSections((prev) => [...prev, { ...data, variables: [] }])
-      setExpandedSection(data.id)
+      if (!parentId) {
+        if (editorMode === 'section') {
+          setHighlightedSectionId(data.id)
+        } else {
+          setExpandedSection(data.id)
+        }
+      }
     } catch (err) {
       setError(err.message)
     }
   }
 
   const handleDeleteSection = async (sectionId) => {
-    // Remove any variable tokens/markers from the HTML before deleting
     const section = sections.find((s) => s.id === sectionId)
+    const subsections = sections.filter((s) => s.parent_id === sectionId)
     let updatedHtml = rawSourceHtml
-    if (section?.variables?.length) {
-      for (const v of section.variables) {
-        if (v.variable_type === 'image') {
-          updatedHtml = removeImageMarker(updatedHtml, v.id)
-        } else {
-          updatedHtml = removeTextPlaceholder(updatedHtml, v.id, v.default_value)
-        }
+
+    // Clean up variables from this section
+    for (const v of (section?.variables || [])) {
+      updatedHtml = v.variable_type === 'image'
+        ? removeImageMarker(updatedHtml, v.id)
+        : removeTextPlaceholder(updatedHtml, v.id, v.default_value)
+    }
+
+    // Clean up variables from subsections (server cascades delete, but HTML needs cleanup)
+    for (const sub of subsections) {
+      for (const v of (sub.variables || [])) {
+        updatedHtml = v.variable_type === 'image'
+          ? removeImageMarker(updatedHtml, v.id)
+          : removeTextPlaceholder(updatedHtml, v.id, v.default_value)
       }
     }
 
@@ -324,17 +789,24 @@ export default function TemplateEdit() {
       })
       setRawSourceHtml(updatedHtml)
       setSections((prev) => {
-        const updated = prev.filter((s) => s.id !== sectionId)
-        return updated.map((s, i) => ({ ...s, position: i + 1 }))
+        const subsectionIds = subsections.map((s) => s.id)
+        const filtered = prev.filter((s) => s.id !== sectionId && !subsectionIds.includes(s.id))
+        // Re-number top-level sections only
+        let pos = 0
+        return filtered.map((s) => (!s.parent_id ? { ...s, position: ++pos } : s))
       })
       if (expandedSection === sectionId) setExpandedSection(null)
+      if (highlightedSectionId === sectionId) setHighlightedSectionId(null)
+      if (highlightedSubsectionId === sectionId || subsections.some((s) => s.id === highlightedSubsectionId)) {
+        setHighlightedSubsectionId(null)
+      }
     } catch (err) {
       setError(err.message)
     }
   }
 
   const handleCreateVariable = useCallback(
-    async ({ slotRole, wordCount } = {}) => {
+    async ({ slotRole, wordCount, imageLocation } = {}) => {
       console.log('[createVar] called', { expandedSection, popover, rawSourceHtmlLen: rawSourceHtml?.length, slotRole, wordCount })
       if (!expandedSection) {
         console.log('[createVar] BAIL: no expanded section')
@@ -381,6 +853,7 @@ export default function TemplateEdit() {
                 default_value: defaultValue,
                 slot_role: slotRole || undefined,
                 word_count: wordCount || undefined,
+                image_location: imageLocation || undefined,
                 asset_id: popover.assetId || undefined,
                 standardized_ratio: popover.standardizedRatio || undefined,
               },
@@ -448,14 +921,19 @@ export default function TemplateEdit() {
   const handleUpdateVariable = useCallback(
     async () => {
       if (!editingVar) return
-      const { sectionId, varId, slotRole, wordCount, defaultValue } = editingVar
+      const { sectionId, varId, slotRole, wordCount, defaultValue, imageLocation } = editingVar
       try {
         const data = await apiFetch(
           `/api/clients/${clientId}/email_templates/${id}/sections/${sectionId}/variables/${varId}`,
           {
             method: 'PATCH',
             body: JSON.stringify({
-              variable: { slot_role: slotRole || null, word_count: wordCount || null, default_value: defaultValue },
+              variable: {
+                slot_role: slotRole || null,
+                word_count: wordCount || null,
+                default_value: defaultValue,
+                image_location: imageLocation || null,
+              },
             }),
           }
         )
@@ -476,6 +954,152 @@ export default function TemplateEdit() {
 
   const cancelPopover = useCallback(() => setPopover(null), [])
 
+  // ── Section name editing ─────────────────────────────────────────────────
+
+  const handleSaveSectionName = async () => {
+    if (!editingSectionName) return
+    const { sectionId, value } = editingSectionName
+    setEditingSectionName(null)
+    const trimmed = value.trim()
+    if (!trimmed) return
+    try {
+      const data = await apiFetch(
+        `/api/clients/${clientId}/email_templates/${id}/sections/${sectionId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ section: { name: trimmed } }),
+        }
+      )
+      setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, ...data } : s)))
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  // ── Section editor overlay handlers ──────────────────────────────────────
+
+  const handleOverlayMove = (e) => {
+    const overlay = overlayRef.current
+    const iframe = iframeRef.current
+    if (!overlay || !iframe) return
+
+    const rect = overlay.getBoundingClientRect()
+    const iframeX = (e.clientX - rect.left) / sectionScale
+    const iframeY = (e.clientY - rect.top) / sectionScale
+
+    const doc = iframe.contentDocument
+    if (!doc) return
+
+    const el = doc.elementFromPoint(iframeX, iframeY)
+    const candidates = sectionCandidatesRef.current
+
+    if (highlightedSectionId) {
+      // ── Subsection hover mode ──────────────────────────────────────────
+      candidates.forEach((c) => c.removeAttribute('data-vl-hover'))
+      setHoveredCandidateIndex(null)
+
+      // Clear previous sub-hover
+      if (hoveredSubElRef.current) {
+        hoveredSubElRef.current.removeAttribute('data-vl-sub-hover')
+      }
+
+      const activeSection = sectionsRef.current.find((s) => s.id === highlightedSectionId)
+      const sectionIdx = activeSection?.element_selector != null ? parseInt(activeSection.element_selector, 10) : -1
+      const sectionCandidate = sectionIdx >= 0 ? candidates[sectionIdx] : null
+
+      if (sectionCandidate && el && (sectionCandidate === el || sectionCandidate.contains(el))) {
+        const subEl = findSubsectionTarget(el, sectionCandidate)
+        if (subEl && subEl !== sectionCandidate) {
+          subEl.setAttribute('data-vl-sub-hover', '1')
+          hoveredSubElRef.current = subEl
+          const selector = getCssSelector(subEl, doc)
+          hoveredSubSelectorRef.current = selector
+          setHoveredSubSelector(selector)
+        } else {
+          hoveredSubElRef.current = null
+          hoveredSubSelectorRef.current = null
+          setHoveredSubSelector(null)
+        }
+      } else {
+        hoveredSubElRef.current = null
+        hoveredSubSelectorRef.current = null
+        setHoveredSubSelector(null)
+      }
+    } else {
+      // ── Top-level section hover mode ───────────────────────────────────
+      if (hoveredSubElRef.current) {
+        hoveredSubElRef.current.removeAttribute('data-vl-sub-hover')
+        hoveredSubElRef.current = null
+        hoveredSubSelectorRef.current = null
+        setHoveredSubSelector(null)
+      }
+
+      candidates.forEach((c) => c.removeAttribute('data-vl-hover'))
+
+      if (!el) {
+        setHoveredCandidateIndex(null)
+        return
+      }
+
+      const idx = candidates.findIndex((c) => c === el || c.contains(el))
+      if (idx >= 0) {
+        candidates[idx].setAttribute('data-vl-hover', '1')
+        setHoveredCandidateIndex(idx)
+      } else {
+        setHoveredCandidateIndex(null)
+      }
+    }
+  }
+
+  const handleOverlayLeave = () => {
+    sectionCandidatesRef.current.forEach((c) => c.removeAttribute('data-vl-hover'))
+    setHoveredCandidateIndex(null)
+    if (hoveredSubElRef.current) {
+      hoveredSubElRef.current.removeAttribute('data-vl-sub-hover')
+      hoveredSubElRef.current = null
+      hoveredSubSelectorRef.current = null
+      setHoveredSubSelector(null)
+    }
+  }
+
+  // Single-click: if hovering a defined section, select it in left panel
+  const handleOverlayClick = () => {
+    if (highlightedSectionId) return // single-click does nothing in subsection mode
+    if (hoveredCandidateIndex === null) return
+    const section = sections.find((s) => !s.parent_id && s.element_selector === String(hoveredCandidateIndex))
+    if (section) {
+      setHighlightedSectionId((prev) => (prev === section.id ? null : section.id))
+    }
+  }
+
+  // Double-click: create subsection (if zoomed in) or top-level section
+  const handleOverlayDblClick = async () => {
+    if (highlightedSectionId) {
+      // ── Subsection creation ──────────────────────────────────────────
+      const selector = hoveredSubSelectorRef.current
+      if (!selector) return
+      const existing = sections.find(
+        (s) => s.parent_id === highlightedSectionId && s.element_selector === selector
+      )
+      if (existing) return // already defined
+      await handleAddSection({ elementSelector: selector, parentId: highlightedSectionId })
+      return
+    }
+
+    // ── Top-level section creation ────────────────────────────────────
+    if (hoveredCandidateIndex === null) return
+    const existing = sections.find((s) => !s.parent_id && s.element_selector === String(hoveredCandidateIndex))
+    if (existing) {
+      setHighlightedSectionId(existing.id)
+      return
+    }
+    await handleAddSection({ elementSelector: String(hoveredCandidateIndex) })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
       <div className="p-4">
@@ -488,9 +1112,36 @@ export default function TemplateEdit() {
     return <div className="p-4 text-danger">Template not found.</div>
   }
 
+  // Computed iframe styles based on editor mode
+  const iframeStyle = editorMode === 'section'
+    ? {
+        width: IFRAME_NATURAL_WIDTH,
+        height: previewNaturalHeight,
+        border: 'none',
+        transform: `scale(${sectionScale})`,
+        transformOrigin: 'top left',
+        pointerEvents: 'none',
+        display: 'block',
+      }
+    : varZoom
+    ? {
+        width: IFRAME_NATURAL_WIDTH,
+        height: varZoom.naturalHeight,
+        border: 'none',
+        transform: `scale(${varZoom.scale})`,
+        transformOrigin: 'top left',
+        display: 'block',
+      }
+    : {
+        width: '100%',
+        height: 'auto',
+        minHeight: 'calc(100vh - 140px)',
+        border: 'none',
+      }
+
   return (
     <div className="d-flex h-100">
-      {/* Left sidebar panel */}
+      {/* ── Left sidebar ─────────────────────────────────────────────── */}
       <div
         className="border-end bg-light d-flex flex-column flex-shrink-0"
         style={{ width: 280 }}
@@ -522,6 +1173,7 @@ export default function TemplateEdit() {
         </div>
 
         <div className="p-3 flex-grow-1 overflow-auto">
+          {/* ── Details tab ─────────────────────────────────────────── */}
           {activeTab === 'details' && (
             <>
               <div className="mb-3">
@@ -575,27 +1227,202 @@ export default function TemplateEdit() {
             </>
           )}
 
+          {/* ── Sections tab ────────────────────────────────────────── */}
           {activeTab === 'sections' && (
             <>
-              <div className="d-flex align-items-center justify-content-between mb-3">
+              <div className="d-flex align-items-center justify-content-between mb-2">
                 <span className="small fw-semibold text-muted text-uppercase">Sections</span>
                 <button
                   className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
-                  onClick={handleAddSection}
+                  onClick={() => handleAddSection({})}
                   title="Add section"
                 >
                   <i className="bi bi-plus"></i>
                 </button>
               </div>
 
-              {sections.length === 0 && (
-                <div className="text-muted small text-center py-4">
+              {/* Mode-specific hint */}
+              {editorMode === 'section' ? (
+                <p className="text-muted small mb-3">
+                  Hover over the email preview to highlight rows. Double-click a row to define it as a section.
+                </p>
+              ) : (
+                <p className="text-muted small mb-3">
+                  Select text or click an image in the preview. The right section will be selected automatically.
+                </p>
+              )}
+
+              {topLevelSections.length === 0 && (
+                <div className="text-muted small text-center py-3">
                   <i className="bi bi-layers d-block fs-4 mb-2"></i>
-                  No sections yet. Click + to add one.
+                  No sections yet.
                 </div>
               )}
 
-              {sections.map((section) => (
+              {/* ── Section editor mode: sections list ──────────────── */}
+              {editorMode === 'section' && topLevelSections.map((section) => {
+                const isHighlighted = highlightedSectionId === section.id
+                const isDefined = section.element_selector != null
+                const isEditingName = editingSectionName?.sectionId === section.id
+                const previewText = isDefined
+                  ? candidatePreviewTexts[parseInt(section.element_selector, 10)] || ''
+                  : ''
+                const displayName = section.name || `Section ${section.position}`
+                const subs = sections.filter((s) => s.parent_id === section.id)
+                return (
+                  <div key={section.id} className="mb-2">
+                    <div
+                      className={`border rounded bg-white d-flex align-items-center px-3 py-2 ${isHighlighted ? 'border-danger' : ''}`}
+                      style={{ cursor: 'pointer', minWidth: 0 }}
+                      onClick={() =>
+                        setHighlightedSectionId((prev) => (prev === section.id ? null : section.id))
+                      }
+                    >
+                      {/* Chevron */}
+                      <i className={`bi me-2 small flex-shrink-0 ${isHighlighted ? 'bi-chevron-down' : subs.length > 0 ? 'bi-chevron-right' : 'bi-dash'}`}></i>
+
+                      {/* Name + preview */}
+                      <div className="flex-grow-1 me-2" style={{ minWidth: 0 }}>
+                        {isEditingName ? (
+                          <input
+                            autoFocus
+                            className="form-control form-control-sm border-0 p-0 bg-transparent fw-medium"
+                            style={{ fontSize: '0.875rem' }}
+                            value={editingSectionName.value}
+                            onChange={(e) =>
+                              setEditingSectionName((prev) => ({ ...prev, value: e.target.value }))
+                            }
+                            onBlur={handleSaveSectionName}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveSectionName()
+                              if (e.key === 'Escape') setEditingSectionName(null)
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <div
+                            className="small fw-medium text-truncate"
+                            title="Click to rename"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditingSectionName({ sectionId: section.id, value: displayName })
+                            }}
+                          >
+                            {displayName}
+                          </div>
+                        )}
+                        {!isEditingName && previewText && (
+                          <div className="text-truncate" style={{ fontSize: '0.7rem', color: '#adb5bd' }}>
+                            {previewText}
+                          </div>
+                        )}
+                      </div>
+
+                      {isDefined ? (
+                        <span className="badge bg-success-subtle text-success border border-success-subtle small me-2 flex-shrink-0">
+                          Defined
+                        </span>
+                      ) : (
+                        <span className="badge bg-secondary-subtle text-secondary border border-secondary-subtle small me-2 flex-shrink-0">
+                          No area
+                        </span>
+                      )}
+                      <button
+                        className="btn btn-sm btn-link text-danger p-0 flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteSection(section.id)
+                        }}
+                        title="Remove section"
+                      >
+                        <i className="bi bi-trash small"></i>
+                      </button>
+                    </div>
+
+                    {/* Subsections */}
+                    {subs.length > 0 && (
+                      <div className="ms-3 mt-1">
+                        {subs.map((sub) => {
+                          const subDisplay = sub.name || `${section.position}${String.fromCharCode(64 + sub.position)}`
+                          const subPreview = subsectionPreviewTexts[sub.id] || ''
+                          const subDefined = sub.element_selector != null
+                          const isEditingSubName = editingSectionName?.sectionId === sub.id
+                          return (
+                            <div
+                              key={sub.id}
+                              className={`mb-1 border rounded bg-white d-flex align-items-center px-2 py-1 ${highlightedSubsectionId === sub.id ? 'border-danger' : ''}`}
+                              style={{ minWidth: 0, cursor: 'pointer', borderColor: highlightedSubsectionId === sub.id ? undefined : subDefined ? 'rgba(111,66,193,0.35)' : undefined }}
+                              onClick={() => {
+                                const next = highlightedSubsectionId === sub.id ? null : sub.id
+                                setHighlightedSubsectionId(next)
+                                if (next) setHighlightedSectionId(section.id)
+                              }}
+                            >
+                              <i className="bi bi-diagram-2 me-2 flex-shrink-0" style={{ fontSize: '0.7rem', color: '#6f42c1' }}></i>
+                              <div className="flex-grow-1 me-1" style={{ minWidth: 0 }}>
+                                {isEditingSubName ? (
+                                  <input
+                                    autoFocus
+                                    className="form-control form-control-sm border-0 p-0 bg-transparent fw-medium"
+                                    style={{ fontSize: '0.8rem' }}
+                                    value={editingSectionName.value}
+                                    onChange={(e) =>
+                                      setEditingSectionName((prev) => ({ ...prev, value: e.target.value }))
+                                    }
+                                    onBlur={handleSaveSectionName}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveSectionName()
+                                      if (e.key === 'Escape') setEditingSectionName(null)
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <div
+                                    className="fw-medium text-truncate"
+                                    style={{ fontSize: '0.8rem', cursor: 'text' }}
+                                    title="Click to rename"
+                                    onClick={(e) => { e.stopPropagation(); setEditingSectionName({ sectionId: sub.id, value: subDisplay }) }}
+                                  >
+                                    {subDisplay}
+                                  </div>
+                                )}
+                                {!isEditingSubName && subPreview && (
+                                  <div className="text-truncate" style={{ fontSize: '0.68rem', color: '#adb5bd' }}>
+                                    {subPreview}
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                className="btn btn-link text-danger p-0 flex-shrink-0"
+                                style={{ fontSize: '0.7rem' }}
+                                onClick={(e) => { e.stopPropagation(); handleDeleteSection(sub.id) }}
+                                title="Remove subsection"
+                              >
+                                <i className="bi bi-trash"></i>
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Hint when zoomed into a defined section */}
+                    {isHighlighted && isDefined && (
+                      <div className="ms-3 mt-1 text-muted" style={{ fontSize: '0.68rem' }}>
+                        Hover elements in the preview · double-click to add a subsection
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* ── Variable editor mode: expandable sections with vars ─ */}
+              {editorMode === 'variable' && topLevelSections.map((section) => {
+                const previewText = section.element_selector != null
+                  ? candidatePreviewTexts[parseInt(section.element_selector, 10)] || ''
+                  : ''
+                const displayName = section.name || `Section ${section.position}`
+                return (
                 <div key={section.id} className="mb-2 border rounded bg-white">
                   <div
                     className="d-flex align-items-center px-3 py-2"
@@ -605,13 +1432,20 @@ export default function TemplateEdit() {
                     }
                   >
                     <i
-                      className={`bi me-2 small ${expandedSection === section.id ? 'bi-chevron-down' : 'bi-chevron-right'}`}
+                      className={`bi me-2 small flex-shrink-0 ${expandedSection === section.id ? 'bi-chevron-down' : 'bi-chevron-right'}`}
                     ></i>
-                    <span className="small fw-medium flex-grow-1">
-                      Section {section.position}
-                    </span>
+                    <div className="flex-grow-1 me-2" style={{ minWidth: 0 }}>
+                      <div className="small fw-medium text-truncate">
+                        {displayName}
+                      </div>
+                      {previewText && (
+                        <div className="text-truncate" style={{ fontSize: '0.7rem', color: '#adb5bd' }}>
+                          {previewText}
+                        </div>
+                      )}
+                    </div>
                     <button
-                      className="btn btn-sm btn-link text-danger p-0"
+                      className="btn btn-sm btn-link text-danger p-0 flex-shrink-0"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleDeleteSection(section.id)
@@ -621,9 +1455,9 @@ export default function TemplateEdit() {
                       <i className="bi bi-trash small"></i>
                     </button>
                   </div>
+
                   {expandedSection === section.id && (
                     <div className="px-3 pb-3 pt-1 border-top">
-                      {/* Inline create-variable form when a selection is pending */}
                       {popover && (
                         <div className="mb-3 pb-3 border-bottom">
                           <VariablePopover
@@ -643,7 +1477,6 @@ export default function TemplateEdit() {
                         <ul className="list-unstyled mb-0">
                           {section.variables.map((v) => {
                             const isEditing = editingVar?.varId === v.id
-                            const roleObj = SLOT_ROLES.find((r) => r.value === v.slot_role)
                             return (
                               <li
                                 key={v.id}
@@ -654,38 +1487,58 @@ export default function TemplateEdit() {
                                 {isEditing ? (
                                   <div className="border rounded p-2 bg-white">
                                     <p className="small fw-semibold mb-2">Edit Variable</p>
+
+                                    {v.variable_type === 'image' ? (
+                                      <div className="mb-2">
+                                        <label className="form-label small fw-semibold mb-1">Image Location</label>
+                                        <select
+                                          className="form-select form-select-sm"
+                                          value={editingVar.imageLocation || ''}
+                                          onChange={(e) => setEditingVar((prev) => ({ ...prev, imageLocation: e.target.value }))}
+                                        >
+                                          <option value="">Select location</option>
+                                          {IMAGE_LOCATION_TYPES.map((l) => (
+                                            <option key={l.value} value={l.value}>{l.label} — {l.description.slice(0, 35)}…</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <div className="mb-2">
+                                          <label className="form-label small fw-semibold mb-1">
+                                            Slot Role <span className="text-danger">*</span>
+                                          </label>
+                                          <select
+                                            className="form-select form-select-sm"
+                                            value={editingVar.slotRole || ''}
+                                            onChange={(e) => setEditingVar((prev) => ({ ...prev, slotRole: e.target.value }))}
+                                          >
+                                            <option value="">Select role</option>
+                                            {SLOT_ROLES.map((r) => (
+                                              <option key={r.value} value={r.value}>{r.label} — {r.description.slice(0, 30)}…</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        <div className="mb-2">
+                                          <label className="form-label small fw-semibold mb-1">
+                                            Word Count <span className="text-danger">*</span>
+                                          </label>
+                                          <input
+                                            type="number"
+                                            className="form-control form-control-sm"
+                                            value={editingVar.wordCount ?? ''}
+                                            min={1}
+                                            onChange={(e) => setEditingVar((prev) => ({ ...prev, wordCount: e.target.value }))}
+                                            style={{ width: 90 }}
+                                          />
+                                        </div>
+                                      </>
+                                    )}
+
                                     <div className="mb-2">
                                       <label className="form-label small fw-semibold mb-1">
-                                        Slot Role <span className="text-danger">*</span>
+                                        {v.variable_type === 'image' ? 'Image URL' : 'Original Text'}
                                       </label>
-                                      <select
-                                        className="form-select form-select-sm"
-                                        value={editingVar.slotRole || ''}
-                                        onChange={(e) => setEditingVar((prev) => ({ ...prev, slotRole: e.target.value }))}
-                                      >
-                                        <option value="">Select role</option>
-                                        {SLOT_ROLES.map((r) => (
-                                          <option key={r.value} value={r.value}>{r.label} — {r.description.slice(0, 30)}…</option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    {v.variable_type !== 'image' && (
-                                      <div className="mb-2">
-                                        <label className="form-label small fw-semibold mb-1">
-                                          Word Count <span className="text-danger">*</span>
-                                        </label>
-                                        <input
-                                          type="number"
-                                          className="form-control form-control-sm"
-                                          value={editingVar.wordCount ?? ''}
-                                          min={1}
-                                          onChange={(e) => setEditingVar((prev) => ({ ...prev, wordCount: e.target.value }))}
-                                          style={{ width: 90 }}
-                                        />
-                                      </div>
-                                    )}
-                                    <div className="mb-2">
-                                      <label className="form-label small fw-semibold mb-1">Original Text</label>
                                       <input
                                         type="text"
                                         className="form-control form-control-sm"
@@ -697,7 +1550,7 @@ export default function TemplateEdit() {
                                       <button
                                         className="btn btn-sm btn-danger"
                                         onClick={handleUpdateVariable}
-                                        disabled={!editingVar.slotRole}
+                                        disabled={v.variable_type !== 'image' && !editingVar.slotRole}
                                       >
                                         <i className="bi bi-check me-1"></i>Save
                                       </button>
@@ -719,25 +1572,35 @@ export default function TemplateEdit() {
                                       slotRole: v.slot_role || '',
                                       wordCount: v.word_count ?? '',
                                       defaultValue: v.default_value,
+                                      imageLocation: v.image_location || '',
                                     })}
                                   >
                                     <div className="d-flex align-items-center gap-2 mb-1">
-                                      {roleObj ? (
-                                        <span className="badge rounded-pill bg-light text-dark border small fw-normal">
-                                          {roleObj.label}
-                                        </span>
-                                      ) : (
-                                        <span className="badge rounded-pill bg-light text-muted border small fw-normal">
-                                          <i className={`bi ${v.variable_type === 'image' ? 'bi-image' : 'bi-type'} me-1`}></i>
-                                          No role
-                                        </span>
-                                      )}
-                                      <span className="ms-auto text-muted small">
-                                        {v.variable_type === 'image' ? (
-                                          <i className="bi bi-image"></i>
+                                      {v.variable_type === 'image' ? (() => {
+                                        const locObj = IMAGE_LOCATION_TYPES.find((l) => l.value === v.image_location)
+                                        return (
+                                          <span className="badge rounded-pill bg-light text-dark border small fw-normal">
+                                            <i className="bi bi-image me-1"></i>
+                                            {locObj ? locObj.label : 'No location'}
+                                          </span>
+                                        )
+                                      })() : (() => {
+                                        const roleObj = SLOT_ROLES.find((r) => r.value === v.slot_role)
+                                        return roleObj ? (
+                                          <span className="badge rounded-pill bg-light text-dark border small fw-normal">
+                                            {roleObj.label}
+                                          </span>
                                         ) : (
-                                          v.word_count != null ? `${v.word_count} Words` : null
-                                        )}
+                                          <span className="badge rounded-pill bg-light text-muted border small fw-normal">
+                                            <i className="bi bi-type me-1"></i>
+                                            No role
+                                          </span>
+                                        )
+                                      })()}
+                                      <span className="ms-auto text-muted small">
+                                        {v.variable_type !== 'image' && v.word_count != null
+                                          ? `${v.word_count} Words`
+                                          : null}
                                       </span>
                                       <button
                                         className="btn btn-link text-danger p-0"
@@ -758,10 +1621,46 @@ export default function TemplateEdit() {
                           })}
                         </ul>
                       )}
+
+                      {/* Subsections list */}
+                      {(() => {
+                        const subs = sections.filter((s) => s.parent_id === section.id)
+                        if (!subs.length) return null
+                        return (
+                          <div className="mt-2 pt-2 border-top">
+                            <div className="small text-muted mb-1 fw-semibold">Subsections</div>
+                            {subs.map((sub) => {
+                              const subDisplay = sub.name || `${section.position}${String.fromCharCode(64 + sub.position)}`
+                              const subPreview = subsectionPreviewTexts[sub.id] || ''
+                              const isActiveSubsection = highlightedSubsectionId === sub.id
+                              return (
+                                <div
+                                  key={sub.id}
+                                  className="d-flex align-items-center px-2 py-1 rounded mb-1"
+                                  style={{
+                                    background: isActiveSubsection ? 'rgba(111,66,193,0.12)' : 'rgba(111,66,193,0.05)',
+                                    border: isActiveSubsection ? '1px solid #6f42c1' : '1px solid rgba(111,66,193,0.2)',
+                                    cursor: 'pointer',
+                                  }}
+                                  onClick={() => setHighlightedSubsectionId(isActiveSubsection ? null : sub.id)}
+                                >
+                                  <i className="bi bi-diagram-2 me-2 flex-shrink-0" style={{ fontSize: '0.7rem', color: '#6f42c1' }}></i>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div className="small fw-medium text-truncate">{subDisplay}</div>
+                                    {subPreview && (
+                                      <div className="text-truncate" style={{ fontSize: '0.68rem', color: '#adb5bd' }}>{subPreview}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                 </div>
-              ))}
+              )})}
             </>
           )}
         </div>
@@ -778,28 +1677,95 @@ export default function TemplateEdit() {
         </div>
       </div>
 
-      {/* Main content area - HTML preview */}
-      <div className="flex-grow-1 overflow-auto">
-        <div className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-white">
+      {/* ── Right panel: preview ──────────────────────────────────────────── */}
+      <div className="flex-grow-1 d-flex flex-column overflow-hidden" ref={previewPanelRef}>
+        {/* Header with mode toggle */}
+        <div className="d-flex align-items-center gap-3 px-3 py-2 border-bottom bg-white flex-shrink-0">
           <span className="fw-semibold">Template Preview</span>
-          <small className="text-muted">
-            {expandedSection
-              ? 'Select text or click an image to create a variable'
-              : 'Expand a section to start creating variables'}
+
+          <div className="btn-group btn-group-sm" role="group">
+            <button
+              className={`btn ${editorMode === 'section' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setEditorMode('section')}
+            >
+              Section Editor
+            </button>
+            <button
+              className={`btn ${editorMode === 'variable' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setEditorMode('variable')}
+            >
+              Variable Editor
+            </button>
+          </div>
+
+          <small className="text-muted ms-auto">
+            {editorMode === 'section'
+              ? highlightedSectionId
+                ? hoveredSubSelector
+                  ? sections.find((s) => s.parent_id === highlightedSectionId && s.element_selector === hoveredSubSelector)
+                    ? 'Subsection already defined'
+                    : 'Double-click to add as subsection'
+                  : 'Hover over any element · double-click to add a subsection'
+                : hoveredCandidateIndex !== null
+                  ? sections.find((s) => !s.parent_id && s.element_selector === String(hoveredCandidateIndex))
+                    ? 'Section already defined — click to select'
+                    : 'Double-click to define this as a section'
+                  : 'Hover to highlight · double-click to define a section'
+              : 'Select text or click an image to create a variable'
+            }
           </small>
         </div>
-        <div className="p-3">
+
+        {/* Preview content */}
+        <div
+          ref={scrollablePanelRef}
+          className={`flex-grow-1 overflow-auto p-3 ${(editorMode === 'section' || varZoom) ? 'd-flex justify-content-center align-items-start' : ''}`}
+        >
           {rawSourceHtml ? (
             <div
-              className="mx-auto bg-white shadow-sm"
-              style={{ maxWidth: 680 }}
+              style={editorMode === 'section'
+                ? {
+                    position: 'relative',
+                    width: IFRAME_NATURAL_WIDTH * sectionScale,
+                    height: previewNaturalHeight * sectionScale,
+                    flexShrink: 0,
+                    transition: 'width 0.35s ease, height 0.35s ease',
+                  }
+                : varZoom
+                ? {
+                    position: 'relative',
+                    width: IFRAME_NATURAL_WIDTH * varZoom.scale,
+                    height: varZoom.naturalHeight * varZoom.scale,
+                    flexShrink: 0,
+                    transition: 'width 0.35s ease, height 0.35s ease',
+                  }
+                : {
+                    maxWidth: IFRAME_NATURAL_WIDTH,
+                    margin: '0 auto',
+                    background: 'white',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                  }
+              }
             >
               <iframe
                 ref={iframeRef}
                 title="Template Preview"
-                style={{ width: '100%', minHeight: 'calc(100vh - 140px)', border: 'none' }}
+                style={{
+                  ...iframeStyle,
+                  ...((editorMode === 'section' || varZoom) ? { transition: 'transform 0.35s ease' } : {}),
+                }}
                 sandbox="allow-same-origin"
               />
+              {editorMode === 'section' && (
+                <div
+                  ref={overlayRef}
+                  style={{ position: 'absolute', inset: 0, cursor: 'crosshair', zIndex: 1 }}
+                  onMouseMove={handleOverlayMove}
+                  onMouseLeave={handleOverlayLeave}
+                  onClick={handleOverlayClick}
+                  onDoubleClick={handleOverlayDblClick}
+                />
+              )}
             </div>
           ) : (
             <div className="text-center text-muted py-5">
@@ -808,7 +1774,6 @@ export default function TemplateEdit() {
             </div>
           )}
         </div>
-
       </div>
     </div>
   )

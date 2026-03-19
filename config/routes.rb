@@ -44,7 +44,7 @@ Rails.application.routes.draw do
         member do
           post :reset
         end
-        resources :sections, controller: "email_template_sections", only: [:index, :create, :destroy] do
+        resources :sections, controller: "email_template_sections", only: [:index, :create, :update, :destroy] do
           resources :variables, controller: "template_variables", only: [:index, :create, :update, :destroy]
         end
       end
