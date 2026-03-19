@@ -7,11 +7,11 @@ function getConsumer() {
   return consumer
 }
 
-// Subscribe to MergeChannel for a given mergeId.
+// Subscribe to EmailChannel for a given emailId.
 // Returns an unsubscribe function.
-export function subscribeMergeChannel(mergeId, { received }) {
+export function subscribeEmailChannel(emailId, { received }) {
   const subscription = getConsumer().subscriptions.create(
-    { channel: 'MergeChannel', merge_id: mergeId },
+    { channel: 'EmailChannel', email_id: emailId },
     { received }
   )
   return () => subscription.unsubscribe()

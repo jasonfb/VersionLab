@@ -49,14 +49,16 @@ Rails.application.routes.draw do
         end
       end
       resources :audiences, only: [:index, :create, :update, :destroy]
-      resources :merges, only: [:index, :create, :update, :destroy] do
+      resources :emails, only: [:index, :create, :update, :destroy] do
         member do
           post :run
           post :reject
+          post :summarize
           get :results
           get :preview
           get :export
         end
+        resources :email_documents, only: [:index, :create, :destroy]
       end
     end
     resources :assets, only: [:index, :create, :destroy]

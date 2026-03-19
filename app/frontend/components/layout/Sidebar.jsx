@@ -12,7 +12,7 @@ export default function Sidebar() {
     { to: '/templates', icon: 'bi-file-earmark-code', label: 'Templates' },
     { to: '/audiences', icon: 'bi-people', label: 'Audiences' },
     { to: '/assets', icon: 'bi-images', label: 'Assets' },
-    { to: '/merge', icon: 'bi-intersect', label: 'Merge' },
+    { to: '/emails', icon: 'bi-intersect', label: 'Emails' },
     { to: '/settings', icon: 'bi-gear', label: 'Settings' },
   ].filter(Boolean)
 

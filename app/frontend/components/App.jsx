@@ -9,8 +9,8 @@ import EmailTemplatesIndex from './templates/EmailTemplatesIndex'
 import TemplatesIndex from './templates/TemplatesIndex'
 import TemplateNew from './templates/TemplateNew'
 import TemplateEdit from './templates/TemplateEdit'
-import MergesIndex from './merges/MergesIndex'
-import MergeResultsPage from './merges/MergeResultsPage'
+import EmailsIndex from './emails/EmailsIndex'
+import EmailResultsPage from './emails/EmailResultsPage'
 import SettingsPage from './settings/SettingsPage'
 import AssetsIndex from './assets/AssetsIndex'
 import AudiencesIndex from './audiences/AudiencesIndex'
@@ -45,8 +45,8 @@ export default function App() {
           <Route path="clients/:clientId/templates/:id" element={<TemplateEdit />} />
           <Route path="audiences" element={<AudiencesIndex />} />
           <Route path="assets" element={<AssetsIndex />} />
-          <Route path="merge" element={<MergesIndex />} />
-          <Route path="clients/:clientId/merges/:mergeId/results" element={<MergeResultsPage />} />
+          <Route path="emails" element={<EmailsIndex />} />
+          <Route path="clients/:clientId/emails/:emailId/results" element={<EmailResultsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

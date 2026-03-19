@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { apiFetch, csrfToken } from '~/lib/api'
-import { subscribeMergeChannel } from '~/lib/cable'
+import { subscribeEmailChannel } from '~/lib/cable'
 
-export default function MergeResultsPage() {
-  const { clientId, mergeId } = useParams()
+export default function EmailResultsPage() {
+  const { clientId, emailId } = useParams()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -12,10 +12,10 @@ export default function MergeResultsPage() {
   const [activeTab, setActiveTab] = useState('table')
 
   const fetchResults = useCallback(() => {
-    return apiFetch(`/api/clients/${clientId}/merges/${mergeId}/results`)
+    return apiFetch(`/api/clients/${clientId}/emails/${emailId}/results`)
       .then(setData)
       .catch((e) => setError(e.message))
-  }, [clientId, mergeId])
+  }, [clientId, emailId])
 
   useEffect(() => {
     fetchResults().finally(() => setLoading(false))
@@ -23,10 +23,10 @@ export default function MergeResultsPage() {
 
   // Subscribe via Action Cable for real-time updates
   useEffect(() => {
-    return subscribeMergeChannel(mergeId, {
+    return subscribeEmailChannel(emailId, {
       received() { fetchResults() },
     })
-  }, [mergeId, fetchResults])
+  }, [emailId, fetchResults])
 
   if (loading) {
     return (
@@ -45,7 +45,7 @@ export default function MergeResultsPage() {
   return (
     <div className="p-4">
       <div className="d-flex align-items-center gap-3 mb-4">
-        <button className="btn btn-outline-secondary btn-sm" onClick={() => navigate('/merge')}>
+        <button className="btn btn-outline-secondary btn-sm" onClick={() => navigate('/emails')}>
           <i className="bi bi-arrow-left me-1"></i>Back
         </button>
         <div>
@@ -84,15 +84,15 @@ export default function MergeResultsPage() {
         <VariablesTable audiences={audiences} variables={variables} />
       )}
       {activeTab === 'preview' && (
-        <MergePreview
+        <EmailPreview
           clientId={clientId}
-          mergeId={mergeId}
+          emailId={emailId}
           audiences={audiences}
           onRejected={fetchResults}
         />
       )}
       {activeTab === 'export' && (
-        <ExportTab clientId={clientId} mergeId={mergeId} audiences={audiences} />
+        <ExportTab clientId={clientId} emailId={emailId} audiences={audiences} />
       )}
     </div>
   )
@@ -123,7 +123,7 @@ function VariablesTable({ audiences, variables }) {
   }, [audiences])
 
   if (variables.length === 0) {
-    return <p className="text-muted">No text variables found in this merge.</p>
+    return <p className="text-muted">No text variables found in this email.</p>
   }
 
   return (
@@ -193,7 +193,7 @@ function VersionSelector({ versions, selectedId, onChange }) {
 
 // ─── Export ─────────────────────────────────────────────────────────────────
 
-function ExportTab({ clientId, mergeId, audiences }) {
+function ExportTab({ clientId, emailId, audiences }) {
   const activeCount = audiences.filter((a) =>
     a.versions.some((v) => v.state === 'active')
   ).length
@@ -212,7 +212,7 @@ function ExportTab({ clientId, mergeId, audiences }) {
         )}
       </p>
       <a
-        href={`/api/clients/${clientId}/merges/${mergeId}/export`}
+        href={`/api/clients/${clientId}/emails/${emailId}/export`}
         className="btn btn-primary"
         download
       >
@@ -224,7 +224,7 @@ function ExportTab({ clientId, mergeId, audiences }) {
 
 // ─── Preview ────────────────────────────────────────────────────────────────
 
-function MergePreview({ clientId, mergeId, audiences, onRejected }) {
+function EmailPreview({ clientId, emailId, audiences, onRejected }) {
   const [selectedAudienceId, setSelectedAudienceId] = useState(audiences[0]?.id ?? null)
   const [html, setHtml] = useState(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
@@ -241,13 +241,13 @@ function MergePreview({ clientId, mergeId, audiences, onRejected }) {
     if (!activeVersion) { setHtml(null); return }
 
     setLoadingPreview(true)
-    fetch(`/api/clients/${clientId}/merges/${mergeId}/preview?audience_id=${selectedAudienceId}`, {
+    fetch(`/api/clients/${clientId}/emails/${emailId}/preview?audience_id=${selectedAudienceId}`, {
       headers: { 'X-CSRF-Token': csrfToken() },
     })
       .then((r) => r.text())
       .then(setHtml)
       .finally(() => setLoadingPreview(false))
-  }, [clientId, mergeId, selectedAudienceId, audiences])
+  }, [clientId, emailId, selectedAudienceId, audiences])
 
   useEffect(() => {
     const iframe = iframeRef.current
@@ -267,7 +267,7 @@ function MergePreview({ clientId, mergeId, audiences, onRejected }) {
     setRejecting(true)
     setRejectError(null)
     try {
-      await apiFetch(`/api/clients/${clientId}/merges/${mergeId}/reject`, {
+      await apiFetch(`/api/clients/${clientId}/emails/${emailId}/reject`, {
         method: 'POST',
         body: JSON.stringify({ audience_id: rejectModal.id, rejection_comment: rejectionComment }),
       })
@@ -344,7 +344,7 @@ function MergePreview({ clientId, mergeId, audiences, onRejected }) {
           <iframe
             ref={iframeRef}
             style={{ width: '100%', height: '100%', minHeight: 600, border: '1px solid #dee2e6', borderRadius: 4 }}
-            title="Merge Preview"
+            title="Email Preview"
           />
         </div>
       </div>

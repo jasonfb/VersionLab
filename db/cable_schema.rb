@@ -10,19 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_19_000003) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_19_000005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
 
   # Custom types defined in this database.
   # Note that some types may not work with other database engines. Be careful if changing database.
-  create_enum "ai_log_call_type", ["merge", "campaign_summary"]
+  create_enum "ai_log_call_type", ["email", "campaign_summary", "email_summary"]
   create_enum "asset_standardized_ratio", ["hero_3_1", "banner_2_1", "widescreen_16_9", "square_1_1", "portrait_4_5"]
   create_enum "campaign_ai_summary_state", ["idle", "generating", "generated", "failed"]
   create_enum "campaign_status", ["draft", "active", "completed", "archived"]
-  create_enum "merge_state", ["setup", "pending", "merged", "regenerating"]
-  create_enum "merge_version_state", ["generating", "active", "rejected"]
+  create_enum "email_state", ["setup", "pending", "merged", "regenerating"]
+  create_enum "email_version_state", ["generating", "active", "rejected"]
   create_enum "template_import_state", ["pending", "processing", "completed", "failed"]
   create_enum "template_import_type", ["bundled", "external"]
   create_enum "template_variable_image_location", ["hero", "banner", "sidebar", "inline", "footer"]
@@ -238,6 +238,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_19_000003) do
     t.string "version"
   end
 
+  create_table "email_audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "audience_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "email_id", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "email_documents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "content_text"
+    t.datetime "created_at", null: false
+    t.string "display_name", null: false
+    t.uuid "email_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email_id"], name: "index_email_documents_on_email_id"
+  end
+
   create_table "email_template_sections", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "element_selector"
@@ -258,6 +274,46 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_19_000003) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "email_version_variables", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "email_version_id", null: false
+    t.uuid "template_variable_id", null: false
+    t.datetime "updated_at", null: false
+    t.text "value", null: false
+    t.index ["email_version_id", "template_variable_id"], name: "idx_merge_version_variables_unique", unique: true
+  end
+
+  create_table "email_versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ai_model_id", null: false
+    t.uuid "ai_service_id", null: false
+    t.uuid "audience_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "email_id", null: false
+    t.text "rejection_comment"
+    t.enum "state", default: "generating", null: false, enum_type: "email_version_state"
+    t.datetime "updated_at", null: false
+    t.integer "version_number", default: 1, null: false
+    t.index ["email_id", "audience_id", "version_number"], name: "idx_merge_versions_unique", unique: true
+    t.index ["email_id", "audience_id"], name: "idx_merge_versions_on_merge_and_audience"
+  end
+
+  create_table "emails", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ai_model_id"
+    t.uuid "ai_service_id"
+    t.text "ai_summary"
+    t.datetime "ai_summary_generated_at", precision: nil
+    t.enum "ai_summary_state", default: "idle", null: false, enum_type: "campaign_ai_summary_state"
+    t.uuid "campaign_id"
+    t.uuid "client_id", null: false
+    t.text "context"
+    t.datetime "created_at", null: false
+    t.uuid "email_template_id", null: false
+    t.enum "state", default: "setup", null: false, enum_type: "email_state"
+    t.datetime "updated_at", null: false
+    t.index ["campaign_id"], name: "index_emails_on_campaign_id"
+    t.index ["client_id"], name: "index_emails_on_client_id"
+  end
+
   create_table "geographies", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -270,50 +326,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_19_000003) do
     t.string "name", null: false
     t.integer "position", default: 0, null: false
     t.datetime "updated_at", null: false
-  end
-
-  create_table "merge_audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "audience_id", null: false
-    t.datetime "created_at", null: false
-    t.uuid "merge_id", null: false
-    t.datetime "updated_at", null: false
-  end
-
-  create_table "merge_version_variables", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.uuid "merge_version_id", null: false
-    t.uuid "template_variable_id", null: false
-    t.datetime "updated_at", null: false
-    t.text "value", null: false
-    t.index ["merge_version_id", "template_variable_id"], name: "idx_merge_version_variables_unique", unique: true
-  end
-
-  create_table "merge_versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "ai_model_id", null: false
-    t.uuid "ai_service_id", null: false
-    t.uuid "audience_id", null: false
-    t.datetime "created_at", null: false
-    t.uuid "merge_id", null: false
-    t.text "rejection_comment"
-    t.enum "state", default: "generating", null: false, enum_type: "merge_version_state"
-    t.datetime "updated_at", null: false
-    t.integer "version_number", default: 1, null: false
-    t.index ["merge_id", "audience_id", "version_number"], name: "idx_merge_versions_unique", unique: true
-    t.index ["merge_id", "audience_id"], name: "idx_merge_versions_on_merge_and_audience"
-  end
-
-  create_table "merges", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "ai_model_id"
-    t.uuid "ai_service_id"
-    t.uuid "campaign_id"
-    t.uuid "client_id", null: false
-    t.text "context"
-    t.datetime "created_at", null: false
-    t.uuid "email_template_id", null: false
-    t.enum "state", default: "setup", null: false, enum_type: "merge_state"
-    t.datetime "updated_at", null: false
-    t.index ["campaign_id"], name: "index_merges_on_campaign_id"
-    t.index ["client_id"], name: "index_merges_on_client_id"
   end
 
   create_table "organization_types", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -536,8 +548,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_19_000003) do
   add_foreign_key "campaign_documents", "campaigns"
   add_foreign_key "campaign_links", "campaigns"
   add_foreign_key "campaigns", "clients"
-  add_foreign_key "merges", "campaigns"
-  add_foreign_key "merges", "clients"
+  add_foreign_key "email_documents", "emails"
+  add_foreign_key "emails", "campaigns"
+  add_foreign_key "emails", "clients"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

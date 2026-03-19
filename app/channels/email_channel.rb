@@ -1,8 +1,8 @@
-class MergeChannel < ApplicationCable::Channel
+class EmailChannel < ApplicationCable::Channel
   def subscribed
-    merge = find_merge
-    if merge
-      stream_from "merge:#{merge.id}"
+    email = find_email
+    if email
+      stream_from "email:#{email.id}"
     else
       reject
     end
@@ -14,14 +14,14 @@ class MergeChannel < ApplicationCable::Channel
 
   private
 
-  def find_merge
+  def find_email
     project_ids = current_user.accounts
                                .joins(:projects)
                                .select("projects.id")
                                .pluck("projects.id")
 
-    Merge.joins(:email_template)
+    Email.joins(:email_template)
          .where(email_templates: { project_id: project_ids })
-         .find_by(id: params[:merge_id])
+         .find_by(id: params[:email_id])
   end
 end

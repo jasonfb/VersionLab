@@ -31,7 +31,7 @@ class AiMergeService
     audiences.each do |audience|
       # Skip if already completed (handles job retries — don't re-process audiences
       # that succeeded before a failure on a later audience)
-      next if @merge.merge_versions.where(audience: audience, state: :active).exists?
+      next if @merge.email_versions.where(audience: audience, state: :active).exists?
 
       rejection_comment = @rejection_context[audience.id.to_s]
 
@@ -95,7 +95,7 @@ class AiMergeService
     content = raw_response.dig("choices", 0, "message", "content")
     AiLog.create!(
       account: account,
-      call_type: :merge,
+      call_type: :email,
       ai_service_id: ai_key.ai_service_id,
       ai_model: ai_model,
       loggable: @merge,
@@ -106,7 +106,7 @@ class AiMergeService
       total_tokens: usage["total_tokens"]
     )
   rescue StandardError => e
-    Rails.logger.error("AiLog failed to save for merge #{@merge.id}: #{e.message}")
+    Rails.logger.error("AiLog failed to save for email #{@merge.id}: #{e.message}")
   end
 
   def build_system_prompt
@@ -127,6 +127,7 @@ class AiMergeService
       - Use the audience name and details to inform tone and word choices
       - When a brand profile is provided, respect its tone rules, vocabulary constraints, and voice guidelines
       - When a campaign summary is provided, align the copy with the campaign's goals and messaging
+      - When an email reference documents summary is provided, use it to inform facts, data, and specific details in the copy
       - When merge context is provided, treat it as the most specific instruction and prioritise it
     PROMPT
   end
@@ -168,6 +169,10 @@ class AiMergeService
 
     if campaign&.ai_summary.present?
       sections << "## Campaign Summary\n#{campaign.ai_summary}"
+    end
+
+    if @merge.ai_summary.present?
+      sections << "## Email Reference Documents Summary\n#{@merge.ai_summary}"
     end
 
     if @merge.context.present?
@@ -219,22 +224,22 @@ class AiMergeService
 
     # During regeneration the controller pre-creates a generating version.
     # During initial run we create the active version here.
-    version = @merge.merge_versions
+    version = @merge.email_versions
                     .where(audience: audience, state: :generating)
                     .order(version_number: :desc)
                     .first
 
     if version
-      MergeVersionVariable.transaction do
+      EmailVersionVariable.transaction do
         vars_data.each do |variable_id, value|
           next unless variable_ids.include?(variable_id)
-          version.merge_version_variables.create!(template_variable_id: variable_id, value: value)
+          version.email_version_variables.create!(template_variable_id: variable_id, value: value)
         end
         version.update!(state: :active)
       end
     else
-      MergeVersion.transaction do
-        new_version = @merge.merge_versions.create!(
+      EmailVersion.transaction do
+        new_version = @merge.email_versions.create!(
           audience: audience,
           version_number: 1,
           state: :active,
@@ -243,7 +248,7 @@ class AiMergeService
         )
         vars_data.each do |variable_id, value|
           next unless variable_ids.include?(variable_id)
-          new_version.merge_version_variables.create!(template_variable_id: variable_id, value: value)
+          new_version.email_version_variables.create!(template_variable_id: variable_id, value: value)
         end
       end
     end
