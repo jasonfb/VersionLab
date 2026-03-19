@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_19_000005) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_19_000007) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -19,6 +19,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_19_000005) do
   # Note that some types may not work with other database engines. Be careful if changing database.
   create_enum "ai_log_call_type", ["email", "campaign_summary", "email_summary"]
   create_enum "asset_standardized_ratio", ["hero_3_1", "banner_2_1", "widescreen_16_9", "square_1_1", "portrait_4_5"]
+  create_enum "autolink_link_mode", ["user_url", "ai_decide"]
+  create_enum "autolink_mode", ["none", "link_relevant_text"]
   create_enum "campaign_ai_summary_state", ["idle", "generating", "generated", "failed"]
   create_enum "campaign_status", ["draft", "active", "completed", "archived"]
   create_enum "email_state", ["setup", "pending", "merged", "regenerating"]
@@ -136,8 +138,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_19_000005) do
   create_table "audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "client_id", null: false
     t.datetime "created_at", null: false
+    t.text "creative_and_imagery_rules"
+    t.text "demographics_and_financial_capacity"
     t.text "details"
+    t.text "executive_summary"
+    t.text "lapse_diagnosis"
+    t.text "motivational_drivers_and_messaging_framework"
     t.string "name", null: false
+    t.text "prohibited_patterns"
+    t.text "relationship_state_and_pre_lapse_indicators"
+    t.text "risk_scoring_model"
+    t.text "strategic_reactivation_and_upgrade_cadence"
+    t.text "success_indicators_and_macro_trends"
     t.datetime "updated_at", null: false
   end
 
@@ -252,6 +264,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_19_000005) do
     t.uuid "email_id", null: false
     t.datetime "updated_at", null: false
     t.index ["email_id"], name: "index_email_documents_on_email_id"
+  end
+
+  create_table "email_section_autolink_settings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.enum "autolink_mode", default: "none", null: false, enum_type: "autolink_mode"
+    t.boolean "bold_links", default: false, null: false
+    t.datetime "created_at", null: false
+    t.uuid "email_id", null: false
+    t.uuid "email_template_section_id", null: false
+    t.text "group_purpose"
+    t.boolean "italic_links", default: false, null: false
+    t.string "link_color"
+    t.enum "link_mode", enum_type: "autolink_link_mode"
+    t.boolean "underline_links", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.string "url"
+    t.index ["email_id", "email_template_section_id"], name: "idx_on_email_id_email_template_section_id_74badd651c", unique: true
   end
 
   create_table "email_template_sections", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

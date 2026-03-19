@@ -1,6 +1,6 @@
 class Api::EmailsController < Api::BaseController
   before_action :set_client
-  before_action :set_email, only: [:update, :destroy, :run, :results, :preview, :reject, :export, :summarize]
+  before_action :set_email, only: [:show, :update, :destroy, :run, :results, :preview, :reject, :export, :summarize]
 
   def index
     emails = Email.joins(:email_template)
@@ -9,6 +9,10 @@ class Api::EmailsController < Api::BaseController
                   .order(updated_at: :desc)
 
     render json: emails.map { |e| email_json(e) }
+  end
+
+  def show
+    render json: email_json(@email)
   end
 
   def create

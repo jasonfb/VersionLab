@@ -9,7 +9,7 @@ class AiMergeService
 
   def call
     template = @merge.email_template
-    account = template.project.account
+    account = template.client.account
     ai_key = account.ai_keys.find_by!(ai_service_id: @merge.ai_service_id)
     ai_model = @merge.ai_model
 
@@ -18,6 +18,10 @@ class AiMergeService
 
     raise Error, "No text variables found in template" if variables.empty?
     raise Error, "No audiences to process" if audiences.empty?
+
+    autolink_settings = @merge.email_section_autolink_settings
+                              .where.not(autolink_mode: "none")
+                              .includes(email_template_section: :template_variables)
 
     brand_profile = @merge.client.brand_profile&.tap do |bp|
       bp.association(:organization_type).load_target
@@ -36,7 +40,8 @@ class AiMergeService
       rejection_comment = @rejection_context[audience.id.to_s]
 
       messages = build_messages(template.raw_source_html, variables, audience, rejection_comment,
-                                brand_profile: brand_profile, campaign: campaign)
+                                brand_profile: brand_profile, campaign: campaign,
+                                autolink_settings: autolink_settings)
       raw_response = call_openai(
         api_key: ai_key.api_key,
         model: ai_model.api_identifier,
@@ -57,11 +62,12 @@ class AiMergeService
 
   MAX_RETRIES = 5
 
-  def build_messages(template_html, variables, audience, rejection_comment, brand_profile: nil, campaign: nil)
+  def build_messages(template_html, variables, audience, rejection_comment, brand_profile: nil, campaign: nil, autolink_settings: [])
     [
-      { role: "system", content: build_system_prompt },
+      { role: "system", content: build_system_prompt(has_autolinking: autolink_settings.any?) },
       { role: "user", content: build_user_prompt(template_html, variables, audience, rejection_comment,
-                                                  brand_profile: brand_profile, campaign: campaign) }
+                                                  brand_profile: brand_profile, campaign: campaign,
+                                                  autolink_settings: autolink_settings) }
     ]
   end
 
@@ -109,7 +115,9 @@ class AiMergeService
     Rails.logger.error("AiLog failed to save for email #{@merge.id}: #{e.message}")
   end
 
-  def build_system_prompt
+  def build_system_prompt(has_autolinking: false)
+    autolinking_rule = has_autolinking ? "\n      - When autolinking instructions are provided for specific variables, you MAY wrap relevant text phrases in HTML anchor tags (<a href=\"...\">text</a>). This is an exception to the no-HTML rule. Only add links to variables explicitly listed in the autolinking instructions." : ""
+
     <<~PROMPT
       You are an expert email copywriter. You will receive an email template with variable placeholders, a target audience, and optional context including a brand profile and campaign summary.
 
@@ -123,7 +131,7 @@ class AiMergeService
       Rules:
       - Rewrite every text variable listed
       - Keep approximate length similar to the original default value
-      - Do not include HTML tags unless the original default value contains them
+      - Do not include HTML tags unless the original default value contains them#{autolinking_rule}
       - Use the audience name and details to inform tone and word choices
       - When a brand profile is provided, respect its tone rules, vocabulary constraints, and voice guidelines
       - When a campaign summary is provided, align the copy with the campaign's goals and messaging
@@ -132,12 +140,19 @@ class AiMergeService
     PROMPT
   end
 
-  def build_user_prompt(template_html, variables, audience, rejection_comment, brand_profile: nil, campaign: nil)
+  def build_user_prompt(template_html, variables, audience, rejection_comment, brand_profile: nil, campaign: nil, autolink_settings: [])
     var_list = variables.map { |v|
       "- Variable ID: #{v.id}, Name: \"#{v.name}\", Default Value: \"#{v.default_value}\""
     }.join("\n")
 
-    details = audience.details.present? ? ", Details: \"#{audience.details}\"" : ""
+    details = audience.details.present? ? "\nDescription: #{audience.details}" : ""
+
+    # TODO: Prompt bloat concern — each filled audience intelligence field can add hundreds of tokens.
+    # With multiple audiences per email, this multiplies quickly. Consider options:
+    #   1. Summarise the audience profile into a single condensed block before sending.
+    #   2. Let users select which fields are "active" for prompt inclusion.
+    #   3. Truncate each field to a character limit (e.g. 500 chars) before injecting.
+    audience_intelligence = build_audience_intelligence_section(audience)
 
     rejection_section = if rejection_comment.present?
       "\n## Previous Version Rejection Feedback\n" \
@@ -160,7 +175,7 @@ class AiMergeService
 
       ## Target Audience
       Name: #{audience.name}#{details}
-      #{rejection_section}
+      #{audience_intelligence}#{rejection_section}
     SECTION
 
     if brand_profile.present?
@@ -178,6 +193,9 @@ class AiMergeService
     if @merge.context.present?
       sections << "## Merge Context\n#{@merge.context}"
     end
+
+    autolink_section = build_autolink_section(autolink_settings, variables)
+    sections << autolink_section if autolink_section.present?
 
     sections << "Respond with JSON only — a flat object mapping variable IDs to rewritten values."
 
@@ -209,6 +227,81 @@ class AiMergeService
     end
 
     lines.join("\n")
+  end
+
+  def build_audience_intelligence_section(audience)
+    fields = {
+      "Executive Summary"                                    => audience.executive_summary,
+      "Demographics and Financial Capacity"                  => audience.demographics_and_financial_capacity,
+      "Lapse Diagnosis"                                      => audience.lapse_diagnosis,
+      "Relationship State and Pre-Lapse Indicators"          => audience.relationship_state_and_pre_lapse_indicators,
+      "Motivational Drivers and Messaging Framework"         => audience.motivational_drivers_and_messaging_framework,
+      "Strategic Reactivation and Upgrade Cadence"           => audience.strategic_reactivation_and_upgrade_cadence,
+      "Creative and Imagery Rules"                           => audience.creative_and_imagery_rules,
+      "Risk Scoring Model (1-100)"                           => audience.risk_scoring_model,
+      "Prohibited Patterns — Language and Framing"          => audience.prohibited_patterns,
+      "Success Indicators and Macro-Trends"                  => audience.success_indicators_and_macro_trends,
+    }
+
+    present = fields.select { |_, v| v.present? }
+    return "" if present.empty?
+
+    lines = [ "\n### Audience Intelligence Profile" ]
+    present.each do |label, value|
+      lines << "**#{label}:** #{value}"
+    end
+    lines.join("\n")
+  end
+
+  def build_autolink_section(autolink_settings, variables)
+    return nil if autolink_settings.empty?
+
+    variable_ids = variables.map(&:id).to_set
+    eligible_roles = %w[subheadline body]
+
+    lines = [
+      "## Autolinking Instructions",
+      "",
+      "For the variable IDs listed below, you may add HTML hyperlinks to create links within the copy. " \
+      "Wrap relevant text phrases in anchor tags. This overrides the no-HTML rule for these variables only.",
+      ""
+    ]
+
+    any_section_added = false
+
+    autolink_settings.each do |setting|
+      section = setting.email_template_section
+      eligible_vars = section.template_variables.select { |v|
+        variable_ids.include?(v.id) && eligible_roles.include?(v.slot_role)
+      }
+      next if eligible_vars.empty?
+
+      any_section_added = true
+      lines << "### #{section.name.presence || "Section #{section.position}"}"
+      lines << "Variables: #{eligible_vars.map { |v| "#{v.id} (#{v.name}, role: #{v.slot_role})" }.join('; ')}"
+
+      if setting.user_url? && setting.url.present?
+        lines << "Link destination: Use this URL for all anchor tags in this section: #{setting.url}"
+      else
+        lines << "Link destination: Choose contextually appropriate URLs based on the copy."
+      end
+
+      lines << "Group purpose: #{setting.group_purpose}" if setting.group_purpose.present?
+
+      style_parts = []
+      style_parts << "color:#{setting.link_color}" if setting.link_color.present?
+      style_parts << "text-decoration:underline" if setting.underline_links
+      style_parts << "font-style:italic" if setting.italic_links
+      style_parts << "font-weight:bold" if setting.bold_links
+
+      if style_parts.any?
+        lines << "Anchor tag style: Apply this style attribute to all anchor tags — style=\"#{style_parts.join(';')}\""
+      end
+
+      lines << ""
+    end
+
+    any_section_added ? lines.join("\n") : nil
   end
 
   def parse_response(json_string)

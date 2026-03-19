@@ -10,10 +10,12 @@ import TemplatesIndex from './templates/TemplatesIndex'
 import TemplateNew from './templates/TemplateNew'
 import TemplateEdit from './templates/TemplateEdit'
 import EmailsIndex from './emails/EmailsIndex'
+import EmailDetail from './emails/EmailDetail'
 import EmailResultsPage from './emails/EmailResultsPage'
 import SettingsPage from './settings/SettingsPage'
 import AssetsIndex from './assets/AssetsIndex'
 import AudiencesIndex from './audiences/AudiencesIndex'
+import AudienceDetail from './audiences/AudienceDetail'
 import { useAccount } from './layout/AccountContext'
 
 function HomeRedirect() {
@@ -44,8 +46,10 @@ export default function App() {
           <Route path="clients/:clientId/templates/new" element={<TemplateNew />} />
           <Route path="clients/:clientId/templates/:id" element={<TemplateEdit />} />
           <Route path="audiences" element={<AudiencesIndex />} />
+          <Route path="audiences/:audienceId" element={<AudienceDetail />} />
           <Route path="assets" element={<AssetsIndex />} />
           <Route path="emails" element={<EmailsIndex />} />
+          <Route path="clients/:clientId/emails/:emailId" element={<EmailDetail />} />
           <Route path="clients/:clientId/emails/:emailId/results" element={<EmailResultsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>

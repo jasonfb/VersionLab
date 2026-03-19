@@ -48,8 +48,8 @@ Rails.application.routes.draw do
           resources :variables, controller: "template_variables", only: [:index, :create, :update, :destroy]
         end
       end
-      resources :audiences, only: [:index, :create, :update, :destroy]
-      resources :emails, only: [:index, :create, :update, :destroy] do
+      resources :audiences, only: [:index, :show, :create, :update, :destroy]
+      resources :emails, only: [:index, :show, :create, :update, :destroy] do
         member do
           post :run
           post :reject
@@ -59,6 +59,9 @@ Rails.application.routes.draw do
           get :export
         end
         resources :email_documents, only: [:index, :create, :destroy]
+        resources :autolink_settings, only: [:index, :update],
+                  controller: "email_autolink_settings",
+                  param: :section_id
       end
     end
     resources :assets, only: [:index, :create, :destroy]
