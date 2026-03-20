@@ -10,7 +10,7 @@ class AiMergeService
   def call
     template = @merge.email_template
     account = template.client.account
-    ai_key = account.ai_keys.find_by!(ai_service_id: @merge.ai_service_id)
+    ai_key = account.ai_keys.includes(:ai_service).find_by!(ai_service_id: @merge.ai_service_id)
     ai_model = @merge.ai_model
 
     variables = template.template_variables.where(variable_type: "text").order(:position)
@@ -42,16 +42,16 @@ class AiMergeService
       messages = build_messages(template.raw_source_html, variables, audience, rejection_comment,
                                 brand_profile: brand_profile, campaign: campaign,
                                 autolink_settings: autolink_settings)
-      raw_response = call_openai(
-        api_key: ai_key.api_key,
+      result = call_provider(
+        ai_key: ai_key,
         model: ai_model.api_identifier,
         messages: messages
       )
 
-      log_ai_call(account, ai_key, ai_model, messages, raw_response)
+      log_ai_call(account, ai_key, ai_model, messages, result)
 
-      content = raw_response.dig("choices", 0, "message", "content")
-      raise Error, "Empty response from OpenAI" if content.blank?
+      content = result[:content]
+      raise Error, "Empty response from AI" if content.blank?
 
       parsed = parse_response(content)
       attach_to_version(parsed, audience, variables)
@@ -59,8 +59,6 @@ class AiMergeService
   end
 
   private
-
-  MAX_RETRIES = 5
 
   def build_messages(template_html, variables, audience, rejection_comment, brand_profile: nil, campaign: nil, autolink_settings: [])
     [
@@ -71,34 +69,18 @@ class AiMergeService
     ]
   end
 
-  def call_openai(api_key:, model:, messages:)
-    client = OpenAI::Client.new(access_token: api_key)
-    attempts = 0
-
-    begin
-      attempts += 1
-      client.chat(
-        parameters: {
-          model: model,
-          messages: messages,
-          response_format: { type: "json_object" },
-          temperature: 0.7
-        }
-      )
-    rescue Faraday::TooManyRequestsError => e
-      raise Error, "OpenAI rate limit exceeded after #{MAX_RETRIES} retries" if attempts > MAX_RETRIES
-      # Use Retry-After header if present, otherwise exponential backoff (10, 20, 40, 80, 160s)
-      wait = e.response_headers&.[]("retry-after")&.to_f
-      wait = 10 * (2**(attempts - 1)) if wait.nil? || wait <= 0
-      Rails.logger.info("OpenAI rate limit hit, waiting #{wait}s (attempt #{attempts})")
-      sleep(wait)
-      retry
-    end
+  def call_provider(ai_key:, model:, messages:)
+    AiProviders::Factory.for_text(ai_key).complete(
+      model: model,
+      messages: messages,
+      temperature: 0.7,
+      json_mode: true
+    )
+  rescue AiProviders::Base::Error => e
+    raise Error, e.message
   end
 
-  def log_ai_call(account, ai_key, ai_model, messages, raw_response)
-    usage = raw_response["usage"] || {}
-    content = raw_response.dig("choices", 0, "message", "content")
+  def log_ai_call(account, ai_key, ai_model, messages, result)
     AiLog.create!(
       account: account,
       call_type: :email,
@@ -106,10 +88,10 @@ class AiMergeService
       ai_model: ai_model,
       loggable: @merge,
       prompt: messages.to_json,
-      response: content,
-      prompt_tokens: usage["prompt_tokens"],
-      completion_tokens: usage["completion_tokens"],
-      total_tokens: usage["total_tokens"]
+      response: result[:content],
+      prompt_tokens: result[:prompt_tokens],
+      completion_tokens: result[:completion_tokens],
+      total_tokens: result[:total_tokens]
     )
   rescue StandardError => e
     Rails.logger.error("AiLog failed to save for email #{@merge.id}: #{e.message}")
