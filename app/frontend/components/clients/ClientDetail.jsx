@@ -205,6 +205,10 @@ function BrandProfileTab({ clientId }) {
     approved_vocabulary: [],
     blocked_vocabulary: [],
     color_palette: [],
+    link_color: '',
+    underline_links: false,
+    italic_links: false,
+    bold_links: false,
     primary_audience_ids: [],
     tone_rule_ids: [],
     geography_ids: [],
@@ -228,6 +232,10 @@ function BrandProfileTab({ clientId }) {
           approved_vocabulary: bp.approved_vocabulary || [],
           blocked_vocabulary: bp.blocked_vocabulary || [],
           color_palette: bp.color_palette || [],
+          link_color: bp.link_color || '',
+          underline_links: bp.underline_links || false,
+          italic_links: bp.italic_links || false,
+          bold_links: bp.bold_links || false,
           primary_audience_ids: bp.primary_audience_ids || [],
           tone_rule_ids: bp.tone_rule_ids || [],
           geography_ids: bp.geography_ids || [],
@@ -388,6 +396,43 @@ function BrandProfileTab({ clientId }) {
           onChange={(colors) => setField('color_palette', colors)}
         />
       </div>
+
+      {/* DEFAULT LINK STYLING */}
+      <SectionHeading>Default Link Styling</SectionHeading>
+      <p className="text-muted small mb-3">Configure how hyperlinks appear in emails by default. Individual sections can override these settings.</p>
+      <div className="mb-2 d-flex align-items-center gap-2">
+        <label className="mb-0 form-label">Link Color</label>
+        <div
+          className="rounded flex-shrink-0"
+          style={{ width: 24, height: 24, background: form.link_color || '#000000', border: '1px solid #ccc' }}
+        />
+        <input
+          type="text"
+          className="form-control"
+          style={{ maxWidth: 120 }}
+          placeholder="#000000"
+          value={form.link_color}
+          onChange={(e) => setField('link_color', e.target.value)}
+          maxLength={7}
+        />
+      </div>
+      {[
+        { field: 'underline_links', label: 'Underline links' },
+        { field: 'italic_links', label: 'Italic links' },
+        { field: 'bold_links', label: 'Bold links' },
+      ].map(({ field, label }) => (
+        <div key={field} className="form-check form-switch mb-2">
+          <input
+            className="form-check-input"
+            type="checkbox"
+            role="switch"
+            id={`brand-${field}`}
+            checked={!!form[field]}
+            onChange={(e) => setField(field, e.target.checked)}
+          />
+          <label className="form-check-label" htmlFor={`brand-${field}`}>{label}</label>
+        </div>
+      ))}
 
       {/* GEOGRAPHY */}
       <SectionHeading>Geography</SectionHeading>

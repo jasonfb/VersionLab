@@ -152,7 +152,7 @@ export default function EmailDetail() {
   const isRunning = email.state === 'pending' || email.state === 'regenerating'
   const hasResults = email.state === 'merged' || email.state === 'regenerating'
   const isSetup = email.state === 'setup'
-  const canRun = isSetup && form.ai_service_id && form.ai_model_id && form.audience_ids?.length > 0
+  const canRun = isSetup && form.ai_service_id && form.ai_model_id && form.audience_ids?.length > 0 && form.context?.trim()
   const runBlockedReason = isSetup && !canRun
     ? (!form.audience_ids?.length ? 'Add an audience to run'
       : !form.ai_service_id ? 'Select an AI service to run'
@@ -281,7 +281,7 @@ export default function EmailDetail() {
       {/* Context */}
       <div className="mb-3">
         <label className="form-label fw-semibold">
-          Context <span className="text-muted fw-normal">(optional)</span>
+          Context
         </label>
         <textarea
           className="form-control"
@@ -329,7 +329,7 @@ export default function EmailDetail() {
       </div>
 
       <hr className="my-4" />
-      <SectionLabel icon="bi-link-45deg">Autolinking</SectionLabel>
+      <SectionLabel icon="bi-link-45deg">Sections</SectionLabel>
       <AutolinkingSection clientId={clientId} emailId={emailId} />
 
       <hr className="my-4" />
@@ -468,6 +468,7 @@ const DEFAULT_AUTOLINK = {
   link_mode: null,
   url: '',
   group_purpose: '',
+  override_brand_link_styling: false,
   link_color: '',
   underline_links: false,
   italic_links: false,
@@ -552,16 +553,12 @@ function AutolinkingSection({ clientId, emailId }) {
   }
 
   const setting = getActiveSetting()
-  const isOn = setting.autolink_mode === 'link_relevant_text'
+  const autolinkingOn = setting.autolink_mode === 'link_relevant_text'
   const activeSection = sections.find((s) => s.id === activeSectionId)
   const activeSubs = activeSection?.subsections || []
 
   return (
     <div className="mb-3">
-      <p className="text-muted small mb-2">
-        Configure per-section autolinking. Applies to <strong>Subheadline</strong> and <strong>Body</strong> role variables only.
-      </p>
-
       {/* Section tabs */}
       <ul className="nav nav-tabs mb-0" style={{ fontSize: '0.8rem' }}>
         {sections.map((s, idx) => (
@@ -602,13 +599,73 @@ function AutolinkingSection({ clientId, emailId }) {
 
       {/* Settings panel */}
       <div className="border border-top-0 rounded-bottom p-3">
-        {/* (1) Autolinking */}
+        {/* (1) Section Purpose — always visible, at top */}
         <div className="mb-3">
-          <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>Autolinking</label>
+          <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>
+            Section purpose <span className="text-muted fw-normal">(optional)</span>
+          </label>
+          <textarea
+            className="form-control form-control-sm"
+            rows={2}
+            placeholder="e.g. Include an impact statement linking to a relevant article to motivate clicks."
+            value={setting.group_purpose || ''}
+            onChange={(e) => updateSetting('group_purpose', e.target.value)}
+            onBlur={(e) => updateSetting('group_purpose', e.target.value)}
+          />
+        </div>
+
+        {/* (2) Link Mode — always visible */}
+        <div className="mb-3">
+          <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>Link Mode</label>
+          <p className="text-muted mb-1" style={{ fontSize: '0.75rem' }}>Choose how link destinations are determined for this section.</p>
           <div className="d-flex gap-3">
             {[
-              { value: 'none', label: 'None (Off)' },
-              { value: 'link_relevant_text', label: 'Link relevant text' },
+              { value: 'user_url', label: "I'll provide the URL" },
+              { value: 'ai_decide', label: 'Let AI decide' },
+            ].map(({ value, label }) => (
+              <div key={value} className="form-check">
+                <input
+                  className="form-check-input"
+                  type="radio"
+                  name={`link-mode-${activeSectionId}-${activeSubsectionId}`}
+                  id={`link-mode-${value}-${activeSectionId}-${activeSubsectionId}`}
+                  checked={setting.link_mode === value}
+                  onChange={() => updateSetting('link_mode', value)}
+                />
+                <label
+                  className="form-check-label"
+                  style={{ fontSize: '0.85rem' }}
+                  htmlFor={`link-mode-${value}-${activeSectionId}-${activeSubsectionId}`}
+                >
+                  {label}
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* URL — only when user_url */}
+        {setting.link_mode === 'user_url' && (
+          <div className="mb-3">
+            <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>URL</label>
+            <input
+              type="url"
+              className="form-control form-control-sm"
+              placeholder="https://example.com"
+              value={setting.url || ''}
+              onChange={(e) => updateSetting('url', e.target.value)}
+              onBlur={(e) => updateSetting('url', e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* (3) Subheading/body Auto-linking — YES/NO */}
+        <div className="mb-3">
+          <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>Subheading/body Auto-linking</label>
+          <div className="d-flex gap-3 mb-1">
+            {[
+              { value: 'link_relevant_text', label: 'Yes' },
+              { value: 'none', label: 'No' },
             ].map(({ value, label }) => (
               <div key={value} className="form-check">
                 <input
@@ -629,120 +686,83 @@ function AutolinkingSection({ clientId, emailId }) {
               </div>
             ))}
           </div>
+          <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
+            {autolinkingOn
+              ? 'Autolinking will be applied to body, subheading, buttons, and images in this section.'
+              : 'Autolinking will be applied to buttons and images in this section.'}
+          </p>
         </div>
 
-        {isOn && (
-          <>
-            {/* (2) Link Mode */}
-            <div className="mb-3">
-              <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>Link Mode</label>
-              <p className="text-muted mb-1" style={{ fontSize: '0.75rem' }}>Choose how link destinations are determined for this section.</p>
-              <div className="d-flex gap-3">
-                {[
-                  { value: 'user_url', label: "I'll provide the URL" },
-                  { value: 'ai_decide', label: 'Let AI decide' },
-                ].map(({ value, label }) => (
-                  <div key={value} className="form-check">
-                    <input
-                      className="form-check-input"
-                      type="radio"
-                      name={`link-mode-${activeSectionId}-${activeSubsectionId}`}
-                      id={`link-mode-${value}-${activeSectionId}-${activeSubsectionId}`}
-                      checked={setting.link_mode === value}
-                      onChange={() => updateSetting('link_mode', value)}
-                    />
-                    <label
-                      className="form-check-label"
-                      style={{ fontSize: '0.85rem' }}
-                      htmlFor={`link-mode-${value}-${activeSectionId}-${activeSubsectionId}`}
-                    >
-                      {label}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* Override Brand Link Styling toggle */}
+        <div className="mb-2">
+          <div className="form-check form-switch">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              role="switch"
+              id={`override-brand-link-styling-${activeSectionId}-${activeSubsectionId}`}
+              checked={!!setting.override_brand_link_styling}
+              onChange={(e) => updateSetting('override_brand_link_styling', e.target.checked)}
+            />
+            <label
+              className="form-check-label fw-semibold"
+              style={{ fontSize: '0.85rem' }}
+              htmlFor={`override-brand-link-styling-${activeSectionId}-${activeSubsectionId}`}
+            >
+              Override Brand Link Styling
+            </label>
+          </div>
+        </div>
 
-            {/* URL — only when user_url */}
-            {setting.link_mode === 'user_url' && (
-              <div className="mb-3">
-                <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>URL</label>
-                <input
-                  type="url"
-                  className="form-control form-control-sm"
-                  placeholder="https://example.com"
-                  value={setting.url || ''}
-                  onChange={(e) => updateSetting('url', e.target.value)}
-                  onBlur={(e) => updateSetting('url', e.target.value)}
-                />
-              </div>
-            )}
+        {/* Link Styling — shown only when override is on */}
+        {setting.override_brand_link_styling && (
+          <div className="mb-1 ps-2 border-start border-2">
+            <p className="text-muted mb-2" style={{ fontSize: '0.75rem' }}>Configure how hyperlinks appear in this section's content.</p>
 
-            {/* (3) Group Purpose */}
-            <div className="mb-3">
-              <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>
-                Group Purpose <span className="text-muted fw-normal">(optional)</span>
-              </label>
-              <textarea
+            {/* Link Color */}
+            <div className="mb-2 d-flex align-items-center gap-2">
+              <label className="mb-0" style={{ fontSize: '0.82rem', minWidth: 90 }}>Link Color</label>
+              <div
+                className="rounded flex-shrink-0"
+                style={{ width: 24, height: 24, background: setting.link_color || '#000000', border: '1px solid #ccc' }}
+              />
+              <input
+                type="text"
                 className="form-control form-control-sm"
-                rows={2}
-                placeholder="e.g. Include an impact statement linking to a relevant article to motivate clicks."
-                value={setting.group_purpose || ''}
-                onChange={(e) => updateSetting('group_purpose', e.target.value)}
-                onBlur={(e) => updateSetting('group_purpose', e.target.value)}
+                style={{ maxWidth: 110 }}
+                placeholder="#000000"
+                value={setting.link_color || ''}
+                onChange={(e) => updateSetting('link_color', e.target.value)}
+                onBlur={(e) => updateSetting('link_color', e.target.value)}
+                maxLength={7}
               />
             </div>
 
-            {/* Link Styling */}
-            <div className="mb-1">
-              <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>Link Styling</label>
-              <p className="text-muted mb-2" style={{ fontSize: '0.75rem' }}>Configure how hyperlinks appear in this section's content.</p>
-
-              {/* (4) Link Color */}
-              <div className="mb-2 d-flex align-items-center gap-2">
-                <label className="mb-0" style={{ fontSize: '0.82rem', minWidth: 90 }}>Link Color</label>
-                <div
-                  className="rounded flex-shrink-0"
-                  style={{ width: 24, height: 24, background: setting.link_color || '#000000', border: '1px solid #ccc' }}
-                />
+            {/* Toggles */}
+            {[
+              { field: 'underline_links', label: 'Underline links' },
+              { field: 'italic_links', label: 'Italic links' },
+              { field: 'bold_links', label: 'Bold links' },
+            ].map(({ field, label }) => (
+              <div key={field} className="form-check form-switch mb-1">
                 <input
-                  type="text"
-                  className="form-control form-control-sm"
-                  style={{ maxWidth: 110 }}
-                  placeholder="#000000"
-                  value={setting.link_color || ''}
-                  onChange={(e) => updateSetting('link_color', e.target.value)}
-                  onBlur={(e) => updateSetting('link_color', e.target.value)}
-                  maxLength={7}
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id={`${field}-${activeSectionId}-${activeSubsectionId}`}
+                  checked={!!setting[field]}
+                  onChange={(e) => updateSetting(field, e.target.checked)}
                 />
+                <label
+                  className="form-check-label"
+                  style={{ fontSize: '0.82rem' }}
+                  htmlFor={`${field}-${activeSectionId}-${activeSubsectionId}`}
+                >
+                  {label}
+                </label>
               </div>
-
-              {/* (5-7) Toggles */}
-              {[
-                { field: 'underline_links', label: 'Underline links' },
-                { field: 'italic_links', label: 'Italic links' },
-                { field: 'bold_links', label: 'Bold links' },
-              ].map(({ field, label }) => (
-                <div key={field} className="form-check form-switch mb-1">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    id={`${field}-${activeSectionId}-${activeSubsectionId}`}
-                    checked={!!setting[field]}
-                    onChange={(e) => updateSetting(field, e.target.checked)}
-                  />
-                  <label
-                    className="form-check-label"
-                    style={{ fontSize: '0.82rem' }}
-                    htmlFor={`${field}-${activeSectionId}-${activeSubsectionId}`}
-                  >
-                    {label}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </>
+            ))}
+          </div>
         )}
       </div>
     </div>

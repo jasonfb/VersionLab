@@ -66,6 +66,7 @@ Local test account: `jason@heliosdev.shop` / `password`
 - PostgreSQL with UUID primary keys — do not use Rails `references`; use UUIDs for foreign keys
 - Paranoia gem for soft deletes on critical models
 - When creating enums, always use a Postgres Enum-backed field; do not define enums against string columns in models
+- Always generate migrations with `bin/rails g migration MigrationName` — never create migration files manually with hand-crafted timestamps
 - Data-only migrations: `bin/rails g data_migration XyzName` (not schema migrations)
 - Do not use `seeds.rb`
 

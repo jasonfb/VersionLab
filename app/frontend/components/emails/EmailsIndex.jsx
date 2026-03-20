@@ -276,7 +276,7 @@ export default function EmailsIndex() {
                 {/* Context */}
                 <div className="mb-3">
                   <label className="form-label fw-semibold">
-                    Context <span className="text-muted fw-normal">(optional)</span>
+                    Context
                   </label>
                   <textarea
                     className="form-control"

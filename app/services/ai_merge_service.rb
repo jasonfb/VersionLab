@@ -20,7 +20,6 @@ class AiMergeService
     raise Error, "No audiences to process" if audiences.empty?
 
     autolink_settings = @merge.email_section_autolink_settings
-                              .where.not(autolink_mode: "none")
                               .includes(email_template_section: :template_variables)
 
     brand_profile = @merge.client.brand_profile&.tap do |bp|
@@ -98,7 +97,7 @@ class AiMergeService
   end
 
   def build_system_prompt(has_autolinking: false)
-    autolinking_rule = has_autolinking ? "\n      - When autolinking instructions are provided for specific variables, you MAY wrap relevant text phrases in HTML anchor tags (<a href=\"...\">text</a>). This is an exception to the no-HTML rule. Only add links to variables explicitly listed in the autolinking instructions." : ""
+    autolinking_rule = has_autolinking ? "\n      - When linking instructions are provided for specific variables, you MAY wrap relevant text phrases in HTML anchor tags (<a href=\"...\">text</a>). This is an exception to the no-HTML rule. Only add links to variables explicitly listed in the linking instructions. For variables marked as subheading/body autolinking enabled, choose contextually relevant phrases to hyperlink. For button and image variables, the entire value should be wrapped in a single anchor tag." : ""
 
     <<~PROMPT
       You are an expert email copywriter. You will receive an email template with variable placeholders, a target audience, and optional context including a brand profile and campaign summary.
@@ -176,7 +175,7 @@ class AiMergeService
       sections << "## Merge Context\n#{@merge.context}"
     end
 
-    autolink_section = build_autolink_section(autolink_settings, variables)
+    autolink_section = build_autolink_section(autolink_settings, variables, brand_profile: brand_profile)
     sections << autolink_section if autolink_section.present?
 
     sections << "Respond with JSON only — a flat object mapping variable IDs to rewritten values."
@@ -208,6 +207,15 @@ class AiMergeService
       lines << "Blocked vocabulary (do not use): #{bp.blocked_vocabulary}"
     end
 
+    link_style_parts = []
+    link_style_parts << "color:#{bp.link_color}" if bp.link_color.present?
+    link_style_parts << "text-decoration:underline" if bp.underline_links
+    link_style_parts << "font-style:italic" if bp.italic_links
+    link_style_parts << "font-weight:bold" if bp.bold_links
+    if link_style_parts.any?
+      lines << "Default link style: style=\"#{link_style_parts.join(';')}\" — apply to all anchor tags unless a section overrides it"
+    end
+
     lines.join("\n")
   end
 
@@ -235,32 +243,60 @@ class AiMergeService
     lines.join("\n")
   end
 
-  def build_autolink_section(autolink_settings, variables)
+  def build_autolink_section(autolink_settings, variables, brand_profile: nil)
     return nil if autolink_settings.empty?
 
     variable_ids = variables.map(&:id).to_set
-    eligible_roles = %w[subheadline body]
+    autolink_roles = %w[subheadline body]
+    always_linked_roles = %w[cta_text image]
 
     lines = [
-      "## Autolinking Instructions",
+      "## Linking Instructions",
       "",
-      "For the variable IDs listed below, you may add HTML hyperlinks to create links within the copy. " \
-      "Wrap relevant text phrases in anchor tags. This overrides the no-HTML rule for these variables only.",
+      "The following sections have linking configured. For each section, apply links to the listed variables " \
+      "according to the instructions. This overrides the no-HTML rule for these variables only.",
       ""
     ]
 
     any_section_added = false
 
+    # Build brand-level link style (used as fallback when override is off)
+    brand_style_parts = []
+    if brand_profile
+      brand_style_parts << "color:#{brand_profile.link_color}" if brand_profile.link_color.present?
+      brand_style_parts << "text-decoration:underline" if brand_profile.underline_links
+      brand_style_parts << "font-style:italic" if brand_profile.italic_links
+      brand_style_parts << "font-weight:bold" if brand_profile.bold_links
+    end
+
     autolink_settings.each do |setting|
       section = setting.email_template_section
-      eligible_vars = section.template_variables.select { |v|
-        variable_ids.include?(v.id) && eligible_roles.include?(v.slot_role)
-      }
+      subheading_body_vars = []
+      always_linked_vars = []
+
+      section.template_variables.each do |v|
+        next unless variable_ids.include?(v.id)
+        if always_linked_roles.include?(v.slot_role)
+          always_linked_vars << v
+        elsif autolink_roles.include?(v.slot_role) && setting.autolink_link_relevant_text?
+          subheading_body_vars << v
+        end
+      end
+
+      eligible_vars = subheading_body_vars + always_linked_vars
       next if eligible_vars.empty?
 
       any_section_added = true
       lines << "### #{section.name.presence || "Section #{section.position}"}"
-      lines << "Variables: #{eligible_vars.map { |v| "#{v.id} (#{v.name}, role: #{v.slot_role})" }.join('; ')}"
+
+      if subheading_body_vars.any?
+        lines << "Subheading/body variables (add contextually relevant hyperlinks within the copy): " \
+                 "#{subheading_body_vars.map { |v| "#{v.id} (#{v.name})" }.join('; ')}"
+      end
+      if always_linked_vars.any?
+        lines << "Button/image variables (wrap entire value in a single anchor tag): " \
+                 "#{always_linked_vars.map { |v| "#{v.id} (#{v.name})" }.join('; ')}"
+      end
 
       if setting.user_url? && setting.url.present?
         lines << "Link destination: Use this URL for all anchor tags in this section: #{setting.url}"
@@ -268,13 +304,18 @@ class AiMergeService
         lines << "Link destination: Choose contextually appropriate URLs based on the copy."
       end
 
-      lines << "Group purpose: #{setting.group_purpose}" if setting.group_purpose.present?
+      lines << "Section purpose: #{setting.group_purpose}" if setting.group_purpose.present?
 
-      style_parts = []
-      style_parts << "color:#{setting.link_color}" if setting.link_color.present?
-      style_parts << "text-decoration:underline" if setting.underline_links
-      style_parts << "font-style:italic" if setting.italic_links
-      style_parts << "font-weight:bold" if setting.bold_links
+      style_parts = if setting.override_brand_link_styling?
+        sp = []
+        sp << "color:#{setting.link_color}" if setting.link_color.present?
+        sp << "text-decoration:underline" if setting.underline_links
+        sp << "font-style:italic" if setting.italic_links
+        sp << "font-weight:bold" if setting.bold_links
+        sp
+      else
+        brand_style_parts
+      end
 
       if style_parts.any?
         lines << "Anchor tag style: Apply this style attribute to all anchor tags — style=\"#{style_parts.join(';')}\""

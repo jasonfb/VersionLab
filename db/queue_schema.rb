@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_20_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_20_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -276,6 +276,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_20_000001) do
     t.boolean "italic_links", default: false, null: false
     t.string "link_color"
     t.enum "link_mode", enum_type: "autolink_link_mode"
+    t.boolean "override_brand_link_styling", default: false, null: false
     t.boolean "underline_links", default: false, null: false
     t.datetime "updated_at", null: false
     t.string "url"

@@ -34,7 +34,7 @@ class Api::BrandProfilesController < Api::BaseController
   def scalar_params
     p = params.permit(
       :organization_name, :primary_domain, :organization_type_id, :industry_id,
-      :mission_statement,
+      :mission_statement, :link_color, :underline_links, :italic_links, :bold_links,
       core_programs: [], approved_vocabulary: [], blocked_vocabulary: [], color_palette: []
     )
     # Treat empty string IDs as nil
@@ -62,6 +62,10 @@ class Api::BrandProfilesController < Api::BaseController
       approved_vocabulary: bp.approved_vocabulary || [],
       blocked_vocabulary: bp.blocked_vocabulary || [],
       color_palette: bp.color_palette || [],
+      link_color: bp.link_color,
+      underline_links: bp.underline_links,
+      italic_links: bp.italic_links,
+      bold_links: bp.bold_links,
       primary_audience_ids: bp.primary_audiences.map(&:id),
       tone_rule_ids: bp.tone_rules.map(&:id),
       geography_ids: bp.geographies.map(&:id),

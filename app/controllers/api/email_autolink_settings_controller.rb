@@ -40,7 +40,7 @@ class Api::EmailAutolinkSettingsController < Api::BaseController
   def autolink_setting_params
     params.require(:autolink_setting).permit(
       :autolink_mode, :link_mode, :url, :group_purpose,
-      :link_color, :underline_links, :italic_links, :bold_links
+      :override_brand_link_styling, :link_color, :underline_links, :italic_links, :bold_links
     )
   end
 
@@ -80,6 +80,7 @@ class Api::EmailAutolinkSettingsController < Api::BaseController
       link_mode: setting.link_mode,
       url: setting.url,
       group_purpose: setting.group_purpose,
+      override_brand_link_styling: setting.override_brand_link_styling,
       link_color: setting.link_color,
       underline_links: setting.underline_links,
       italic_links: setting.italic_links,
