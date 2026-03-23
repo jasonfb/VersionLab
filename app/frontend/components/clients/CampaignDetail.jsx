@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { apiFetch, apiUpload } from '~/lib/api'
+import { useAccount } from '../layout/AccountContext'
 
 const STATUS_OPTIONS = ['draft', 'active', 'completed', 'archived']
 const STATUS_COLORS = { draft: 'secondary', active: 'success', completed: 'primary', archived: 'dark' }
 
 export default function CampaignDetail() {
-  const { clientId, campaignId } = useParams()
+  const ctx = useAccount()
+  const params = useParams()
+  // Support both /campaigns/:campaignId (non-agency) and /clients/:clientId/campaigns/:campaignId (agency)
+  const clientId = params.clientId || ctx?.current_client_id
+  const campaignId = params.campaignId
+  const isAgency = ctx?.is_agency
+  const isAgencyAdmin = isAgency && (ctx?.is_owner || ctx?.is_admin)
   const [campaign, setCampaign] = useState(null)
   const [documents, setDocuments] = useState([])
   const [links, setLinks] = useState([])
@@ -90,8 +97,8 @@ export default function CampaignDetail() {
   return (
     <div className="p-4" style={{ maxWidth: 800 }}>
       <div className="mb-3">
-        <Link to={`/clients/${clientId}`} className="text-muted small">
-          <i className="bi bi-arrow-left me-1"></i>Back to Client
+        <Link to={isAgencyAdmin ? `/clients/${clientId}` : '/campaigns'} className="text-muted small">
+          <i className="bi bi-arrow-left me-1"></i>{isAgencyAdmin ? 'Back to Client' : 'Back to Campaigns'}
         </Link>
       </div>
 

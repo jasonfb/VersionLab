@@ -17,6 +17,16 @@ export function subscribeEmailChannel(emailId, { received }) {
   return () => subscription.unsubscribe()
 }
 
+// Subscribe to AdChannel for a given adId.
+// Returns an unsubscribe function.
+export function subscribeAdChannel(adId, { received }) {
+  const subscription = getConsumer().subscriptions.create(
+    { channel: 'AdChannel', ad_id: adId },
+    { received }
+  )
+  return () => subscription.unsubscribe()
+}
+
 // Subscribe to TemplateImportChannel for a given importId.
 // Returns an unsubscribe function.
 export function subscribeTemplateImportChannel(importId, { received }) {

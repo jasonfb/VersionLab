@@ -49,6 +49,13 @@ Rails.application.routes.draw do
         end
       end
       resources :audiences, only: [:index, :show, :create, :update, :destroy]
+      resources :ads, only: [:index, :show, :create, :update, :destroy] do
+        member do
+          post :run
+          post :reject
+          get  :results
+        end
+      end
       resources :emails, only: [:index, :show, :create, :update, :destroy] do
         member do
           post :run

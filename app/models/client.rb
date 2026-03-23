@@ -1,5 +1,6 @@
 class Client < ApplicationRecord
   belongs_to :account
+  has_many :ads, dependent: :destroy
   has_many :email_templates, dependent: :destroy
   has_many :emails, dependent: :destroy
   has_many :audiences, dependent: :destroy

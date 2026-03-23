@@ -25,7 +25,7 @@ export default function ClientSwitcher() {
         onClick={() => setOpen(!open)}
       >
         <i className="bi bi-person-vcard"></i>
-        {currentClient?.name || 'Select Client'}
+        <span className="text-muted">Client:</span> {currentClient?.name || 'Select Client'}
         <i className="bi bi-chevron-down" style={{ fontSize: '0.7rem' }}></i>
       </button>
       {open && (

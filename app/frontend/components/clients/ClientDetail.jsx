@@ -186,7 +186,7 @@ function CampaignsTab({ clientId }) {
 
 // ─── Brand Profile Tab ────────────────────────────────────────────────────────
 
-function BrandProfileTab({ clientId }) {
+export function BrandProfileTab({ clientId }) {
   const [profile, setProfile] = useState(null)
   const [lookups, setLookups] = useState(null)
   const [loading, setLoading] = useState(true)

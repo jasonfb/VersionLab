@@ -10,14 +10,20 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_20_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_23_180507) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
 
   # Custom types defined in this database.
   # Note that some types may not work with other database engines. Be careful if changing database.
-  create_enum "ai_log_call_type", ["email", "campaign_summary", "email_summary"]
+  create_enum "ad_background_type", ["solid_color", "image"]
+  create_enum "ad_output_format", ["png", "jpg"]
+  create_enum "ad_overlay_type", ["solid", "gradient"]
+  create_enum "ad_state", ["setup", "pending", "merged", "regenerating"]
+  create_enum "ad_version_state", ["generating", "active", "rejected"]
+  create_enum "ad_versioning_mode", ["retain_existing", "version_ads"]
+  create_enum "ai_log_call_type", ["email", "campaign_summary", "email_summary", "ad"]
   create_enum "asset_standardized_ratio", ["hero_3_1", "banner_2_1", "widescreen_16_9", "square_1_1", "portrait_4_5"]
   create_enum "autolink_link_mode", ["user_url", "ai_decide"]
   create_enum "autolink_mode", ["none", "link_relevant_text"]
@@ -73,6 +79,61 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_20_000002) do
     t.uuid "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "ad_audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ad_id", null: false
+    t.uuid "audience_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ad_id", "audience_id"], name: "index_ad_audiences_on_ad_id_and_audience_id", unique: true
+  end
+
+  create_table "ad_versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ad_id", null: false
+    t.uuid "ai_model_id", null: false
+    t.uuid "ai_service_id", null: false
+    t.uuid "audience_id", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "generated_layers", default: []
+    t.text "rejection_comment"
+    t.enum "state", default: "generating", null: false, enum_type: "ad_version_state"
+    t.datetime "updated_at", null: false
+    t.integer "version_number", default: 1, null: false
+    t.index ["ad_id", "audience_id", "version_number"], name: "index_ad_versions_on_ad_id_and_audience_id_and_version_number", unique: true
+    t.index ["ad_id", "audience_id"], name: "index_ad_versions_on_ad_id_and_audience_id"
+  end
+
+  create_table "ads", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ai_model_id"
+    t.uuid "ai_service_id"
+    t.string "aspect_ratio"
+    t.uuid "background_asset_id"
+    t.string "background_color", default: "#000000"
+    t.enum "background_type", default: "solid_color", enum_type: "ad_background_type"
+    t.uuid "campaign_id"
+    t.uuid "client_id", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "file_warnings", default: []
+    t.integer "height"
+    t.boolean "keep_background", default: true, null: false
+    t.jsonb "layer_overrides", default: {}
+    t.string "name", null: false
+    t.text "nlp_prompt"
+    t.enum "output_format", default: "png", enum_type: "ad_output_format"
+    t.string "overlay_color", default: "#FFFFFF"
+    t.boolean "overlay_enabled", default: false, null: false
+    t.integer "overlay_opacity", default: 80
+    t.enum "overlay_type", default: "solid", enum_type: "ad_overlay_type"
+    t.jsonb "parsed_layers", default: []
+    t.string "play_button_color", default: "#FFFFFF"
+    t.boolean "play_button_enabled", default: false, null: false
+    t.string "play_button_style", default: "circle_filled"
+    t.enum "state", default: "setup", null: false, enum_type: "ad_state"
+    t.datetime "updated_at", null: false
+    t.enum "versioning_mode", default: "retain_existing", enum_type: "ad_versioning_mode"
+    t.integer "width"
+    t.index ["client_id"], name: "index_ads_on_client_id"
   end
 
   create_table "ai_keys", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -180,15 +241,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_20_000002) do
   create_table "brand_profiles", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "approved_vocabulary", default: [], array: true
     t.text "blocked_vocabulary", default: [], array: true
+    t.boolean "bold_links", default: false, null: false
     t.uuid "client_id", null: false
     t.text "color_palette", default: [], array: true
     t.text "core_programs", default: [], array: true
     t.datetime "created_at", null: false
     t.uuid "industry_id"
+    t.boolean "italic_links", default: false, null: false
+    t.string "link_color"
     t.text "mission_statement"
     t.string "organization_name"
     t.uuid "organization_type_id"
     t.string "primary_domain"
+    t.boolean "underline_links", default: false, null: false
     t.datetime "updated_at", null: false
     t.index ["client_id"], name: "index_brand_profiles_on_client_id", unique: true
   end
@@ -574,6 +639,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_20_000002) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "ad_audiences", "ads"
+  add_foreign_key "ad_audiences", "audiences"
+  add_foreign_key "ad_versions", "ads"
+  add_foreign_key "ad_versions", "audiences"
+  add_foreign_key "ads", "clients"
   add_foreign_key "ai_logs", "accounts"
   add_foreign_key "assets", "clients"
   add_foreign_key "brand_profile_geographies", "brand_profiles"

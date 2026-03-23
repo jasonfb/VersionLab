@@ -1,4 +1,5 @@
 
 vite: bin/vite dev
-web: SOLID_QUEUE_IN_PUMA=1 bin/rails s
+web: bin/rails s
+worker: bin/rails solid_queue:start
 css: yarn watch:css
