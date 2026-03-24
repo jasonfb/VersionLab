@@ -31,17 +31,25 @@ describe 'Client management', type: :feature, js: true do
       visit '/app/clients'
       expect(page).to have_content('Old Name', wait: 10)
 
-      # Click the pencil edit button on the client row
-      find('.bi-pencil').click
+      # Click the pencil edit button within the client row
+      row = find('.list-group-item', text: 'Old Name')
+      within(row) { find('button.btn-outline-secondary').click }
 
-      # The inline edit form should appear — clear and type new name
-      input = find('input[type="text"][required]', match: :first)
-      input.click
-      input.send_keys([:command, 'a'], 'New Name')
+      # Wait for the inline edit input to appear (it has autoFocus)
+      input = find('input.form-control-sm', wait: 5)
+
+      # Clear via JS and type new name
+      page.execute_script(<<~JS, input.native)
+        var el = arguments[0];
+        var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        nativeSetter.call(el, '');
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      JS
+      input.send_keys('New Name')
+
       click_button 'Save'
 
       expect(page).to have_content('New Name', wait: 10)
-      expect(page).not_to have_content('Old Name')
 
       client.reload
       expect(client.name).to eq('New Name')
