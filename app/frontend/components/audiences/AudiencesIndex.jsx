@@ -114,6 +114,13 @@ export default function AudiencesIndex() {
               <div className="d-flex align-items-center gap-2 ms-3">
                 <small className="text-muted">{new Date(a.updated_at).toLocaleDateString()}</small>
                 <button
+                  className="btn btn-outline-secondary btn-sm"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/audiences/${a.id}`) }}
+                  title="Edit"
+                >
+                  <i className="bi bi-pencil"></i>
+                </button>
+                <button
                   className="btn btn-outline-danger btn-sm"
                   onClick={(e) => { e.stopPropagation(); deleteAudience(a.id) }}
                   title="Delete"
