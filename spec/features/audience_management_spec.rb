@@ -44,8 +44,10 @@ describe 'Audience management', type: :feature, js: true do
       expect(page).to have_content('Back to Audiences', wait: 10)
 
       # Edit basic fields — labels aren't linked via for=, so use CSS selectors
+      # Use JS to clear React-controlled input and dispatch event
       name_input = find('input.form-control[type="text"]')
-      name_input.fill_in with: 'Cold Lapsed Updated'
+      page.execute_script("arguments[0].focus(); arguments[0].select();", name_input.native)
+      name_input.send_keys('Cold Lapsed Updated')
 
       textareas = all('textarea.form-control')
       # textareas[0] = details, [1] = Executive Summary, [2] = Demographics...

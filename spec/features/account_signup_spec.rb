@@ -28,7 +28,7 @@ describe 'Account signup', type: :feature do
         fill_in 'email', with: 'brand_new@example.com'
         click_button 'Continue'
 
-        expect(page).to have_content('Complete Your Account')
+        expect(page).to have_current_path('/start/signup', ignore_query: true, wait: 5)
         expect(page).to have_field('Organization name')
         expect(page).to have_field('Password')
         expect(page).to have_field('Password confirmation')
