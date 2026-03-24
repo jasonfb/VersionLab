@@ -12,24 +12,26 @@ class EmailJob < ApplicationJob
     broadcast(email, :merged)
   rescue AiMergeService::Error => e
     Rails.logger.error("EmailJob failed for email #{email_id}: #{e.message}")
-    handle_failure(email, audience_id)
+    handle_failure(email, audience_id, error: e.message)
   rescue StandardError => e
     Rails.logger.error("EmailJob unexpected error for email #{email_id}: #{e.message}")
-    handle_failure(email, audience_id)
+    handle_failure(email, audience_id, error: e.message)
     raise
   end
 
   private
 
-  def handle_failure(email, audience_id)
+  def handle_failure(email, audience_id, error: nil)
     return unless email
     email.email_versions.where(audience_id: audience_id, state: :generating).destroy_all if audience_id
     new_state = email.email_versions.active.any? ? :merged : :setup
     email.update!(state: new_state)
-    broadcast(email, new_state)
+    broadcast(email, new_state, error: error)
   end
 
-  def broadcast(email, state)
-    ActionCable.server.broadcast("email:#{email.id}", { state: state.to_s, email_id: email.id })
+  def broadcast(email, state, error: nil)
+    payload = { state: state.to_s, email_id: email.id }
+    payload[:error] = error if error.present?
+    ActionCable.server.broadcast("email:#{email.id}", payload)
   end
 end

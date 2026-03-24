@@ -13,6 +13,7 @@ export default function AdResults() {
   const [loading, setLoading] = useState(true)
   const [rejectForm, setRejectForm] = useState(null) // { audienceId, comment }
   const [rejecting, setRejecting] = useState(false)
+  const [selectedVersions, setSelectedVersions] = useState({}) // { audienceId: versionIndex }
 
   const fetchResults = () => {
     apiFetch(`/api/clients/${clientId}/ads/${adId}/results`)
@@ -127,7 +128,11 @@ export default function AdResults() {
         </div>
       ) : (
         data.audiences.map((audience) => {
-          const latestVersion = audience.versions[audience.versions.length - 1]
+          const latestIdx = audience.versions.length - 1
+          const selectedIdx = selectedVersions[audience.id] ?? latestIdx
+          const version = audience.versions[selectedIdx]
+          const latestVersion = audience.versions[latestIdx]
+          const isLatest = selectedIdx === latestIdx
           const hasActive = latestVersion?.state === 'active'
 
           return (
@@ -136,42 +141,73 @@ export default function AdResults() {
                 <div className="d-flex align-items-center gap-2">
                   <i className="bi bi-person-circle text-muted"></i>
                   <strong>{audience.name}</strong>
-                  {latestVersion && stateBadge(latestVersion.state)}
-                  {latestVersion && (
-                    <small className="text-muted">v{latestVersion.version_number}</small>
+                  {version && stateBadge(version.state)}
+                  {audience.versions.length > 1 ? (
+                    <select
+                      className="form-select form-select-sm"
+                      style={{ width: 'auto' }}
+                      value={selectedIdx}
+                      onChange={(e) => setSelectedVersions((prev) => ({ ...prev, [audience.id]: Number(e.target.value) }))}
+                    >
+                      {audience.versions.map((v, i) => (
+                        <option key={v.id} value={i}>
+                          v{v.version_number}{i === latestIdx ? ' (Current)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : version && (
+                    <small className="text-muted">v{version.version_number}</small>
                   )}
                 </div>
-                {hasActive && (
-                  <button
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={() => openReject(audience.id)}
-                  >
-                    <i className="bi bi-x-circle me-1"></i>Reject
-                  </button>
-                )}
-                {latestVersion?.state === 'generating' && (
-                  <span className="d-flex align-items-center gap-1 text-warning">
-                    <span className="spinner-border spinner-border-sm" />
-                    <small>Generating…</small>
-                  </span>
-                )}
+                <div className="d-flex align-items-center gap-2">
+                  {version?.rendered_image_url && (
+                    <a
+                      href={`/api/clients/${clientId}/ads/${adId}/download_version?version_id=${version.id}`}
+                      className="btn btn-sm btn-outline-primary"
+                      download
+                    >
+                      <i className="bi bi-download me-1"></i>Download
+                    </a>
+                  )}
+                  {hasActive && isLatest && (
+                    <button
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={() => openReject(audience.id)}
+                    >
+                      <i className="bi bi-x-circle me-1"></i>Reject
+                    </button>
+                  )}
+                  {latestVersion?.state === 'generating' && isLatest && (
+                    <span className="d-flex align-items-center gap-1 text-warning">
+                      <span className="spinner-border spinner-border-sm" />
+                      <small>Generating…</small>
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="card-body">
-                {/* Version history */}
-                {audience.versions.length === 0 && (
+                {!version ? (
                   <p className="text-muted small mb-0">No versions generated yet.</p>
-                )}
-
-                {audience.versions.map((version) => (
-                  <div key={version.id} className={`mb-3 ${version.state === 'rejected' ? 'opacity-50' : ''}`}>
+                ) : (
+                  <>
                     {version.state === 'rejected' && version.rejection_comment && (
                       <div className="alert alert-danger alert-sm py-2 px-3 mb-2 d-flex align-items-start gap-2">
                         <i className="bi bi-x-circle mt-1 small"></i>
                         <div>
-                          <small className="fw-semibold d-block">Rejected (v{version.version_number})</small>
+                          <small className="fw-semibold d-block">Rejected</small>
                           <small>"{version.rejection_comment}"</small>
                         </div>
+                      </div>
+                    )}
+                    {version.rendered_image_url && (
+                      <div className="mb-3 text-center">
+                        <img
+                          src={version.rendered_image_url}
+                          alt={`${data.ad_name} - ${audience.name} v${version.version_number}`}
+                          className="img-fluid rounded border"
+                          style={{ maxHeight: 500 }}
+                        />
                       </div>
                     )}
                     {version.generated_layers?.length > 0 && (
@@ -209,8 +245,8 @@ export default function AdResults() {
                         {version.ai_service_name} · {version.ai_model_name}
                       </small>
                     </div>
-                  </div>
-                ))}
+                  </>
+                )}
               </div>
             </div>
           )

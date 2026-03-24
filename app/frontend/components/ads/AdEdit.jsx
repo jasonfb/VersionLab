@@ -33,6 +33,7 @@ export default function AdEdit() {
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [running, setRunning] = useState(false)
+  const [jobError, setJobError] = useState(null)
   const [styleGuideOpen, setStyleGuideOpen] = useState(false)
   const [layerOverrides, setLayerOverrides] = useState({})
 
@@ -82,6 +83,9 @@ export default function AdEdit() {
     return subscribeAdChannel(adId, {
       received(data) {
         setAd((prev) => prev ? { ...prev, state: data.state } : prev)
+        if (data.error) {
+          setJobError(data.error)
+        }
       },
     })
   }, [adId])
@@ -101,6 +105,7 @@ export default function AdEdit() {
 
   const runAd = async () => {
     setRunning(true)
+    setJobError(null)
     try {
       const updated = await apiFetch(`/api/clients/${clientId}/ads/${adId}/run`, { method: 'POST' })
       setAd(updated)
@@ -153,6 +158,14 @@ export default function AdEdit() {
 
   return (
     <div className="p-4">
+      {/* Job error */}
+      {jobError && (
+        <div className="alert alert-danger alert-dismissible mb-3" role="alert">
+          <strong>Run failed:</strong> {jobError}
+          <button type="button" className="btn-close" onClick={() => setJobError(null)} />
+        </div>
+      )}
+
       {/* Header */}
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div className="d-flex align-items-center gap-3">

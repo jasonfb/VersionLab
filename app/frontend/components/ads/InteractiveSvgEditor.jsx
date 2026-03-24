@@ -48,6 +48,42 @@ function normalizeColor(color) {
   return '#' + m.slice(0, 3).map((n) => parseInt(n).toString(16).padStart(2, '0')).join('')
 }
 
+// Extract bounding rect from a clipPath element by parsing its path/rect children
+function getClipBounds(svg, clipPathRef) {
+  // clipPathRef is like "url(#clip-0)"
+  const match = clipPathRef?.match(/url\(#(.+?)\)/)
+  if (!match) return null
+  const clipEl = svg.querySelector(`#${match[1]}`)
+  if (!clipEl) return null
+
+  // Try <rect> children first
+  const rect = clipEl.querySelector('rect')
+  if (rect) {
+    return {
+      x: parseFloat(rect.getAttribute('x')) || 0,
+      y: parseFloat(rect.getAttribute('y')) || 0,
+      width: parseFloat(rect.getAttribute('width')) || 0,
+      height: parseFloat(rect.getAttribute('height')) || 0,
+    }
+  }
+
+  // Try <path> children — extract bounds from M/L commands (rectangular clip paths)
+  const path = clipEl.querySelector('path')
+  if (path) {
+    const d = path.getAttribute('d') || ''
+    const coords = d.match(/[\d.]+/g)?.map(Number)
+    if (coords && coords.length >= 8) {
+      const xs = [coords[0], coords[2], coords[4], coords[6]]
+      const ys = [coords[1], coords[3], coords[5], coords[7]]
+      const minX = Math.min(...xs), minY = Math.min(...ys)
+      const maxX = Math.max(...xs), maxY = Math.max(...ys)
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+    }
+  }
+
+  return null
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function InteractiveSvgEditor({ svgUrl, layers, onLayerOverridesChange, initialOverrides }) {
@@ -56,6 +92,7 @@ export default function InteractiveSvgEditor({ svgUrl, layers, onLayerOverridesC
   const layerOffsets = useRef({}) // { layerId: { x, y } }
   const [hoveredId, setHoveredId] = useState(null)
   const [editingLayer, setEditingLayer] = useState(null)
+  const [editingRegion, setEditingRegion] = useState(null) // { id, content }
   const [ready, setReady] = useState(false)
 
   const buildInteractiveLayer = useCallback(() => {
@@ -96,29 +133,43 @@ export default function InteractiveSvgEditor({ svgUrl, layers, onLayerOverridesC
 
     interactiveEls.forEach(({ el, layerId, type }) => {
       let bbox
-      try {
-        bbox = el.getBBox()
-      } catch (_) {
-        return
+
+      // For clipped regions (PDF-converted), use clip-path bounds instead of getBBox
+      // because getBBox returns the full unclipped area (entire canvas)
+      if (type === 'region') {
+        const clipRef = el.getAttribute('clip-path')
+        const clipBounds = getClipBounds(svg, clipRef)
+        if (clipBounds && clipBounds.width > 0 && clipBounds.height > 0) {
+          bbox = clipBounds
+        }
+      }
+
+      if (!bbox) {
+        try {
+          bbox = el.getBBox()
+        } catch (_) {
+          return
+        }
       }
       if (!bbox || (bbox.width === 0 && bbox.height === 0)) return
 
+      const pad = 6
       const offset = layerOffsets.current[layerId] || { x: 0, y: 0 }
-      const rx = bbox.x - 4 + offset.x
-      const ry = bbox.y - 4 + offset.y
-      const rw = bbox.width + 8
-      const rh = bbox.height + 8
+      const rx = bbox.x - pad + offset.x
+      const ry = bbox.y - pad + offset.y
+      const rw = bbox.width + pad * 2
+      const rh = bbox.height + pad * 2
 
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
       rect.setAttribute('x', rx)
       rect.setAttribute('y', ry)
       rect.setAttribute('width', rw)
       rect.setAttribute('height', rh)
-      rect.setAttribute('fill', 'rgba(220,0,0,0.04)')
+      rect.setAttribute('fill', 'rgba(220,0,0,0.06)')
       rect.setAttribute('stroke', '#dd0000')
-      rect.setAttribute('stroke-width', '1.5')
-      rect.setAttribute('stroke-dasharray', '5,3')
-      rect.setAttribute('rx', '2')
+      rect.setAttribute('stroke-width', '4')
+      rect.setAttribute('stroke-dasharray', '10,5')
+      rect.setAttribute('rx', '4')
       rect.setAttribute('data-layer-id', layerId)
       rect.style.cursor = 'move'
 
@@ -149,14 +200,19 @@ export default function InteractiveSvgEditor({ svgUrl, layers, onLayerOverridesC
         }
       })
 
-      // Double-click to edit (only for native text elements)
-      if (type === 'text') {
-        rect.addEventListener('dblclick', (e) => {
-          e.preventDefault()
-          e.stopPropagation()
+      // Double-click to edit
+      rect.addEventListener('dblclick', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (type === 'text') {
           openEditor(el, layerId, svg)
-        })
-      }
+        } else {
+          // Region (PDF-converted): open content-only editor
+          const layerData = layers?.find((l) => l.id === layerId)
+          const existingContent = layerData?.content || ''
+          setEditingRegion({ id: layerId, content: existingContent })
+        }
+      })
     })
 
     setReady(true)
@@ -317,12 +373,24 @@ export default function InteractiveSvgEditor({ svgUrl, layers, onLayerOverridesC
       {/* Inline SVG container */}
       <div ref={containerRef} style={{ maxWidth: '100%', display: 'block' }} />
 
-      {/* Style editor popover */}
+      {/* Style editor popover (native text) */}
       {editingLayer && (
         <LayerStyleEditor
           layer={editingLayer}
           onSave={saveEdit}
           onClose={() => setEditingLayer(null)}
+        />
+      )}
+
+      {/* Content editor popover (PDF-converted regions) */}
+      {editingRegion && (
+        <RegionContentEditor
+          region={editingRegion}
+          onSave={(content) => {
+            onLayerOverridesChange?.(editingRegion.id, { content })
+            setEditingRegion(null)
+          }}
+          onClose={() => setEditingRegion(null)}
         />
       )}
     </div>
@@ -388,7 +456,7 @@ function LayerStyleEditor({ layer, onSave, onClose }) {
   return (
     <div
       className="position-absolute bg-white shadow-lg rounded border"
-      style={{ top: 0, right: 0, zIndex: 100, width: 340, maxHeight: '90vh', overflowY: 'auto' }}
+      style={{ top: 0, right: 0, zIndex: 100, width: 340, maxHeight: '90vh', overflowY: 'auto', lineHeight: 'normal' }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-light">
@@ -545,6 +613,43 @@ function LayerStyleEditor({ layer, onSave, onClose }) {
         <div className="d-flex gap-2 justify-content-end">
           <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancel</button>
           <button className="btn btn-sm btn-danger" onClick={() => onSave(form)}>Save</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Region Content Editor (PDF-converted layers) ────────────────────────────
+
+function RegionContentEditor({ region, onSave, onClose }) {
+  const [content, setContent] = useState(region.content || '')
+
+  return (
+    <div
+      className="position-absolute bg-white shadow-lg rounded border"
+      style={{ top: 0, right: 0, zIndex: 100, width: 340, lineHeight: 'normal' }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-light">
+        <span className="fw-semibold small text-uppercase" style={{ letterSpacing: '0.06em' }}>Edit Region Text</span>
+        <button className="btn btn-sm btn-link p-0 text-muted" onClick={onClose}>
+          <i className="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div className="p-3">
+        <div className="text-muted small mb-2">Text content for <strong>{region.id}</strong> used by AI versioning.</div>
+        <textarea
+          className="form-control form-control-sm mb-3"
+          rows={4}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          autoFocus
+          placeholder="Enter the text for this region…"
+        />
+        <div className="d-flex gap-2 justify-content-end">
+          <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn btn-sm btn-danger" onClick={() => onSave(content)}>Save</button>
         </div>
       </div>
     </div>

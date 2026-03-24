@@ -1,6 +1,6 @@
 class Api::AdsController < Api::BaseController
   before_action :set_client
-  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :results ]
+  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :results, :download_version ]
 
   def index
     ads = @client.ads.includes(:audiences, :campaign, :ai_service, :ai_model)
@@ -165,6 +165,17 @@ class Api::AdsController < Api::BaseController
     }
   end
 
+  def download_version
+    version = @ad.ad_versions.find(params[:version_id])
+    unless version.rendered_image.attached?
+      return render json: { error: "Rendered image not available" }, status: :not_found
+    end
+
+    redirect_to Rails.application.routes.url_helpers.rails_blob_url(
+      version.rendered_image, only_path: true, disposition: "attachment"
+    ), allow_other_host: true
+  end
+
   private
 
   def set_client
@@ -183,7 +194,9 @@ class Api::AdsController < Api::BaseController
       rejection_comment: version.rejection_comment,
       ai_service_name: version.ai_service.name,
       ai_model_name: version.ai_model.name,
-      generated_layers: version.generated_layers
+      generated_layers: version.generated_layers,
+      rendered_image_url: version.rendered_image.attached? ?
+        Rails.application.routes.url_helpers.rails_blob_url(version.rendered_image, only_path: true) : nil
     }
   end
 

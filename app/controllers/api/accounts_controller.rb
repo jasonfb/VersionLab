@@ -49,7 +49,17 @@ class Api::AccountsController < Api::BaseController
       return render json: { error: "Account is already an Agency" }, status: :unprocessable_entity
     end
 
-    @current_account.update!(is_agency: true)
+    @current_account.transaction do
+      @current_account.update!(is_agency: true)
+
+      # Unhide the default "self" client so it appears in the agency client list,
+      # and rename it to the account name so the user recognizes it.
+      default_client = @current_account.default_client
+      if default_client
+        default_client.update!(hidden: false, name: @current_account.name)
+      end
+    end
+
     render json: { is_agency: true }
   end
 end

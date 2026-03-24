@@ -15,13 +15,13 @@ class EmailChannel < ApplicationCable::Channel
   private
 
   def find_email
-    project_ids = current_user.accounts
-                               .joins(:projects)
-                               .select("projects.id")
-                               .pluck("projects.id")
+    client_ids = current_user.accounts
+                              .joins(:clients)
+                              .select("clients.id")
+                              .pluck("clients.id")
 
     Email.joins(:email_template)
-         .where(email_templates: { project_id: project_ids })
+         .where(email_templates: { client_id: client_ids })
          .find_by(id: params[:email_id])
   end
 end

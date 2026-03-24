@@ -21,9 +21,7 @@ class Ad < ApplicationRecord
 
   def file_url
     return nil unless file.attached?
-    Rails.application.routes.url_helpers.rails_blob_url(
-      file, only_path: false, **ActionMailer::Base.default_url_options
-    )
+    Rails.application.routes.url_helpers.rails_blob_url(file, only_path: true)
   end
 
   def file_content_type
@@ -33,8 +31,6 @@ class Ad < ApplicationRecord
   def svg_url
     blob = converted_svg.attached? ? converted_svg : (file.attached? && file_content_type&.include?("svg") ? file : nil)
     return nil unless blob&.attached?
-    Rails.application.routes.url_helpers.rails_blob_url(
-      blob, only_path: false, **ActionMailer::Base.default_url_options
-    )
+    Rails.application.routes.url_helpers.rails_blob_url(blob, only_path: true)
   end
 end

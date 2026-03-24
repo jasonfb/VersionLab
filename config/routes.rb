@@ -54,6 +54,7 @@ Rails.application.routes.draw do
           post :run
           post :reject
           get  :results
+          get  :download_version
         end
       end
       resources :emails, only: [:index, :show, :create, :update, :destroy] do

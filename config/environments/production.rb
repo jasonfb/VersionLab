@@ -82,7 +82,7 @@ Rails.application.configure do
 
   # Enable DNS rebinding protection and other `Host` header attacks.
   config.hosts = ENV.fetch("APPLICATION_HOSTS", "").split(",").map(&:strip).reject(&:empty?)
-  config.hosts << /.*\.hatchboxapp\.com/
+  config.hosts << "6778m.hatchboxapp.com"
 
   # Skip DNS rebinding protection for the default health check endpoint.
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }

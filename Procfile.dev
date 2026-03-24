@@ -1,5 +1,5 @@
 
 vite: bin/vite dev
 web: bin/rails s
-worker: bin/rails solid_queue:start
+worker: OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES bin/rails solid_queue:start
 css: yarn watch:css

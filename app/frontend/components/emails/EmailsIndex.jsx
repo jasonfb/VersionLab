@@ -95,6 +95,8 @@ export default function EmailsIndex() {
       setEmails((prev) => [created, ...prev])
       setNewForm(null)
       navigate(`/clients/${clientId}/emails/${created.id}`)
+    } catch (e) {
+      alert(e.message || 'Failed to save email')
     } finally {
       setSaving(false)
     }

@@ -13,7 +13,7 @@ class AdMergeService
     ai_model = @ad.ai_model
     campaign = @ad.campaign
 
-    text_layers = @ad.parsed_layers.select { |l| l["type"] == "text" }
+    text_layers = enriched_text_layers
     audiences = @audience_ids ? @ad.audiences.where(id: @audience_ids) : @ad.audiences
 
     raise Error, "No text layers found in ad" if text_layers.empty?
@@ -37,6 +37,19 @@ class AdMergeService
 
   private
 
+  # Merge content from layer_overrides into parsed_layers so the AI sees
+  # user-provided text for PDF-converted regions (where parsed content is empty).
+  def enriched_text_layers
+    overrides = @ad.layer_overrides || {}
+    (@ad.parsed_layers || []).select { |l| l["type"] == "text" }.map { |l|
+      layer = l.dup
+      ov = overrides[l["id"]] || {}
+      # Prefer override content, then parsed content
+      layer["content"] = ov["content"].presence || l["content"].presence || ""
+      layer
+    }
+  end
+
   def build_messages(text_layers, audience, rejection_comment, campaign: nil)
     [
       { role: "system", content: build_system_prompt },
@@ -57,7 +70,7 @@ class AdMergeService
 
       Rules:
       - Rewrite every text layer listed
-      - Keep the rewritten text approximately the same length as the original (ads have fixed layout space)
+      - CRITICAL: Keep the rewritten text the SAME word count as the original. Each layer has a fixed visual space in the ad — if the original is 3 words, your rewrite must be approximately 3 words. Never exceed the original word count.
       - Maintain the same tone and energy level as the original ad
       - Use the audience name and details to inform word choices and messaging angle
       - When campaign context is provided, align copy with campaign goals
@@ -68,7 +81,9 @@ class AdMergeService
 
   def build_user_prompt(text_layers, audience, rejection_comment, campaign: nil)
     layer_list = text_layers.map { |l|
-      "- Layer ID: #{l['id']}, Content: \"#{l['content']}\""
+      word_count = l["content"].to_s.split.size
+      constraint = word_count > 0 ? " (#{word_count} words — keep your rewrite to approximately #{word_count} words)" : ""
+      "- Layer ID: #{l['id']}, Content: \"#{l['content']}\"#{constraint}"
     }.join("\n")
 
     sections = []

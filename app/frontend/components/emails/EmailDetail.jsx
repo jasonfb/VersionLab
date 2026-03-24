@@ -21,6 +21,7 @@ export default function EmailDetail() {
   const [campaignSummaryOpen, setCampaignSummaryOpen] = useState(false)
   const [campaignSummaryData, setCampaignSummaryData] = useState(null)
   const [campaignSummaryLoading, setCampaignSummaryLoading] = useState(false)
+  const [jobError, setJobError] = useState(null)
 
   useEffect(() => {
     if (!clientId || !emailId) return
@@ -53,6 +54,9 @@ export default function EmailDetail() {
     return subscribeEmailChannel(emailId, {
       received(data) {
         setEmail((prev) => prev ? { ...prev, state: data.state } : prev)
+        if (data.error) {
+          setJobError(data.error)
+        }
       },
     })
   }, [emailId])
@@ -85,6 +89,7 @@ export default function EmailDetail() {
 
   const runEmail = async () => {
     setRunning(true)
+    setJobError(null)
     try {
       const updated = await apiFetch(`/api/clients/${clientId}/emails/${emailId}/run`, { method: 'POST' })
       setEmail(updated)
@@ -152,7 +157,7 @@ export default function EmailDetail() {
   const isRunning = email.state === 'pending' || email.state === 'regenerating'
   const hasResults = email.state === 'merged' || email.state === 'regenerating'
   const isSetup = email.state === 'setup'
-  const canRun = isSetup && form.ai_service_id && form.ai_model_id && form.audience_ids?.length > 0 && form.context?.trim()
+  const canRun = isSetup && form.ai_service_id && form.ai_model_id && form.audience_ids?.length > 0
   const runBlockedReason = isSetup && !canRun
     ? (!form.audience_ids?.length ? 'Add an audience to run'
       : !form.ai_service_id ? 'Select an AI service to run'
@@ -169,6 +174,14 @@ export default function EmailDetail() {
           <i className="bi bi-arrow-left me-1"></i>Back to Emails
         </Link>
       </div>
+
+      {/* Job error */}
+      {jobError && (
+        <div className="alert alert-danger alert-dismissible mb-3" role="alert">
+          <strong>Run failed:</strong> {jobError}
+          <button type="button" className="btn-close" onClick={() => setJobError(null)} />
+        </div>
+      )}
 
       {/* Header */}
       <div className="d-flex align-items-center justify-content-between mb-4">

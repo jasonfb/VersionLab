@@ -10,7 +10,7 @@ class Email < ApplicationRecord
   has_many :email_documents, dependent: :destroy
   has_many :email_section_autolink_settings, dependent: :destroy
 
-  validates :context, presence: true
+  validates :context, length: { maximum: 5000 }, allow_blank: true
 
   enum :state, { setup: "setup", pending: "pending", merged: "merged", regenerating: "regenerating" }
   enum :ai_summary_state, { idle: "idle", generating: "generating", generated: "generated", failed: "failed" }, prefix: :summary

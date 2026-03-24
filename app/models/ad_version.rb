@@ -4,6 +4,8 @@ class AdVersion < ApplicationRecord
   belongs_to :ai_service
   belongs_to :ai_model
 
+  has_one_attached :rendered_image
+
   enum :state, { generating: "generating", active: "active", rejected: "rejected" }
 
   validates :version_number, presence: true
