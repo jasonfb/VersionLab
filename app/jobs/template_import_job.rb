@@ -67,7 +67,7 @@ class TemplateImportJob < ApplicationJob
   def process_external(import)
     template = import.email_template
     folder = folder_name(template)
-    account = template.client.account
+    client = template.client
     warnings = []
     asset_map = {} # "https://..." => asset_id
 
@@ -91,7 +91,7 @@ class TemplateImportJob < ApplicationJob
         filename = "#{SecureRandom.hex(4)}_#{filename}" unless filename.match?(/\.[a-z]{2,5}$/i)
         content_type = Marcel::MimeType.for(StringIO.new(data), name: filename)
 
-        asset = create_asset(account, data, filename, content_type, folder)
+        asset = create_asset(client, data, filename, content_type, folder)
         asset_map[src] = asset.id
       rescue => e
         warnings << "Failed to download #{src}: #{e.message}"

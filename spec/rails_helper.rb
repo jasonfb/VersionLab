@@ -52,7 +52,7 @@ VCR.configure do |config|
   config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
   config.hook_into :webmock
   config.ignore_request do |request|
-    ["127.0.0.1", "chromedriver.storage.googleapis.com" ,  "googlechromelabs.github.io", "edgedl.me.gvt1.com"].include? URI(request.uri).host
+    ["127.0.0.1", "localhost", "chromedriver.storage.googleapis.com" ,  "googlechromelabs.github.io", "edgedl.me.gvt1.com"].include? URI(request.uri).host
   end
 end
 
@@ -110,3 +110,4 @@ Capybara.register_driver :selenium do |app|
 end
 
 Capybara.default_driver = :selenium
+Capybara.server_host = 'localhost'
