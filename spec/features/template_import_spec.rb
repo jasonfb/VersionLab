@@ -81,8 +81,8 @@ describe 'Email template import', type: :feature, js: true do
       find('input[type="file"]').set(file_fixture('br-test-AF_Feb_Cold_v01.zip').to_s)
       click_button 'Import Template'
 
-      # Wait for the API call to complete and the import to process
-      expect(page).to have_content('Queued').or(have_content('Importing')).or(have_content('Import complete'))
+      # Wait for the upload to finish — the button disappears when the import starts
+      expect(page).not_to have_button('Import Template', wait: 15)
 
       template = EmailTemplate.find_by(name: 'AF Feb Cold Template')
       expect(template).to be_present

@@ -43,17 +43,15 @@ describe 'Audience management', type: :feature, js: true do
       find('button[title="Edit"]').click
       expect(page).to have_content('Back to Audiences', wait: 10)
 
-      # Edit basic fields — labels aren't linked via for=, so use CSS selectors
-      # Use JS to clear React-controlled input and dispatch event
+      # Edit basic fields — use JS to properly set React-controlled inputs
       name_input = find('input.form-control[type="text"]')
-      page.execute_script("arguments[0].focus(); arguments[0].select();", name_input.native)
-      name_input.send_keys('Cold Lapsed Updated')
+      react_fill_in(name_input, with: 'Cold Lapsed Updated')
 
       textareas = all('textarea.form-control')
       # textareas[0] = details, [1] = Executive Summary, [2] = Demographics...
-      textareas[0].set('Donors who have lapsed 12+ months')
-      textareas[1].set('High-value donors who stopped giving over a year ago.')
-      textareas[2].set('Age 45-65, income $75k+, suburban households.')
+      react_fill_in_textarea(textareas[0], with: 'Donors who have lapsed 12+ months')
+      react_fill_in_textarea(textareas[1], with: 'High-value donors who stopped giving over a year ago.')
+      react_fill_in_textarea(textareas[2], with: 'Age 45-65, income $75k+, suburban households.')
 
       click_button 'Save'
 
