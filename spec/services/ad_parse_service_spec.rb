@@ -94,6 +94,94 @@ RSpec.describe AdParseService, type: :service do
     end
   end
 
+  describe "text content extraction from outlined-text PDFs" do
+    context "with 1_SolidBkg_StaticType.pdf" do
+      let(:ad) { build_ad_with_pdf("1_SolidBkg_StaticType.pdf") }
+
+      before { described_class.new(ad).call; ad.reload }
+
+      it "extracts headline text from outlined paths" do
+        headline = ad.parsed_layers.find { |l| l["content"]&.include?("FANTASTIC") }
+        expect(headline).to be_present, "Expected a layer containing 'FANTASTIC'"
+        expect(headline["content"]).to include("HEADLINE")
+        expect(headline["content"]).to include("FOR YOU")
+      end
+
+      it "extracts body copy text" do
+        body = ad.parsed_layers.find { |l| l["content"]&.match?(/body\s*copy/i) }
+        expect(body).to be_present, "Expected a layer containing body copy text"
+        expect(body["content"]).to match(/amazing/i)
+      end
+
+      it "extracts CTA text" do
+        cta = ad.parsed_layers.find { |l| l["content"]&.match?(/Click\s*Here/i) }
+        expect(cta).to be_present, "Expected a layer containing 'Click Here'"
+      end
+
+      it "populates content for all text layers (no empty strings)" do
+        text_layers = ad.parsed_layers.select { |l| l["type"] == "text" }
+        text_layers.each do |layer|
+          expect(layer["content"]).to be_present,
+            "Layer #{layer['id']} has empty content — text extraction failed"
+        end
+      end
+    end
+
+    context "with 1_SolidBkg_VariableType.pdf" do
+      let(:ad) { build_ad_with_pdf("1_SolidBkg_VariableType.pdf") }
+
+      before { described_class.new(ad).call; ad.reload }
+
+      it "extracts headline text" do
+        headline = ad.parsed_layers.find { |l| l["content"]&.include?("FANTASTIC") }
+        expect(headline).to be_present, "Expected a layer containing 'FANTASTIC'"
+      end
+
+      it "extracts body copy text" do
+        body = ad.parsed_layers.find { |l| l["content"]&.match?(/body\s*copy/i) }
+        expect(body).to be_present, "Expected a layer containing body copy text"
+      end
+    end
+
+    context "with 3_FB_1080x1080_PhotoBkg.pdf (photo background)" do
+      let(:ad) { build_ad_with_pdf("3_FB_1080x1080_PhotoBkg.pdf") }
+
+      before { described_class.new(ad).call; ad.reload }
+
+      it "extracts headline text even with photo background" do
+        headline = ad.parsed_layers.find { |l| l["content"]&.include?("FANTASTIC") }
+        expect(headline).to be_present, "Expected a layer containing 'FANTASTIC'"
+      end
+
+      it "extracts body copy text" do
+        body = ad.parsed_layers.find { |l| l["content"]&.match?(/body\s*copy/i) }
+        expect(body).to be_present, "Expected a layer containing body copy text"
+      end
+    end
+
+    context "with 5_FB_1080x1350_SolidBkg.pdf" do
+      let(:ad) { build_ad_with_pdf("5_FB_1080x1350_SolidBkg.pdf") }
+
+      before { described_class.new(ad).call; ad.reload }
+
+      it "extracts headline text" do
+        headline = ad.parsed_layers.find { |l| l["content"]&.include?("FANTASTIC") }
+        expect(headline).to be_present, "Expected a layer containing 'FANTASTIC'"
+        expect(headline["content"]).to include("FOR YOU")
+      end
+
+      it "extracts body copy text" do
+        body = ad.parsed_layers.find { |l| l["content"]&.match?(/body\s*copy/i) }
+        expect(body).to be_present, "Expected a layer containing body copy text"
+      end
+
+      it "extracts CTA text" do
+        cta = ad.parsed_layers.find { |l| l["content"]&.match?(/Click\s*Here/i) }
+        expect(cta).to be_present, "Expected a layer containing 'Click Here'"
+      end
+    end
+  end
+
   describe "idempotent re-parsing" do
     it "replaces previous converted_svg on re-parse" do
       ad = build_ad_with_pdf("1_SolidBkg_StaticType.pdf")

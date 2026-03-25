@@ -4,7 +4,19 @@
       "mcp__chrome-devtools__click",
       "mcp__chrome-devtools__take_snapshot",
       "mcp__chrome-devtools__get_network_request",
-      "mcp__chrome-devtools__list_network_requests"
+      "mcp__chrome-devtools__list_network_requests",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//Users/jason/Work/Version_Lab/VersionLab/app/models/**)",
+      "Bash(done)",
+      "Bash(bin/rspec spec/models/account_spec.rb spec/models/account_user_spec.rb spec/models/user_spec.rb spec/models/role_spec.rb spec/models/user_role_spec.rb spec/models/client_spec.rb spec/models/client_user_spec.rb 2>&1)",
+      "Bash(ls db/migrate/*email_template_section* db/migrate/*template_variable* db/migrate/*template_import* db/migrate/*email_audience* db/migrate/*email_version* db/migrate/*email_document* db/migrate/*email_section_autolink* db/migrate/*create_email*)",
+      "Bash(bin/rails runner:*)",
+      "Bash(bundle exec:*)",
+      "Bash(bin/rspec spec/models/ad_spec.rb spec/models/ad_audience_spec.rb spec/models/ad_version_spec.rb spec/models/ai_service_spec.rb spec/models/ai_model_spec.rb spec/models/ai_key_spec.rb spec/models/ai_log_spec.rb spec/models/asset_spec.rb spec/models/audience_spec.rb spec/models/brand_profile_spec.rb spec/models/brand_profile_geography_spec.rb spec/models/brand_profile_primary_audience_spec.rb spec/models/brand_profile_tone_rule_spec.rb spec/models/campaign_spec.rb spec/models/campaign_document_spec.rb spec/models/campaign_link_spec.rb spec/models/geography_spec.rb spec/models/industry_spec.rb spec/models/organization_type_spec.rb spec/models/primary_audience_spec.rb spec/models/tone_rule_spec.rb spec/models/project_spec.rb 2>&1)",
+      "Bash(grep:*)",
+      "Bash(bin/rspec spec/models/email_template_spec.rb spec/models/email_template_section_spec.rb spec/models/template_variable_spec.rb spec/models/template_import_spec.rb spec/models/email_spec.rb spec/models/email_audience_spec.rb spec/models/email_version_spec.rb spec/models/email_version_variable_spec.rb spec/models/email_document_spec.rb spec/models/email_section_autolink_setting_spec.rb 2>&1)",
+      "Bash(md5 -q spec/models/client_spec.rb)"
     ]
   }
 }

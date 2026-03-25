@@ -1,7 +1,9 @@
 FactoryBot.define do
   factory :account_user do
-    account_id { "" }
-    user_id { "" }
+    account
+    user
     is_owner { false }
+    is_admin { false }
+    is_billing_admin { false }
   end
 end

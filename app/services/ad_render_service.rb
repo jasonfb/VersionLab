@@ -17,6 +17,93 @@ class AdRenderService
   private
 
   def build_svg
+    if @ad.converted_svg&.attached?
+      build_svg_from_converted
+    else
+      build_svg_from_scratch
+    end
+  end
+
+  # For PDFs with outlined text: use the converted SVG as a base, remove text
+  # region groups, and overlay new text — preserving logos, buttons, and styling.
+  def build_svg_from_converted
+    svg_data = @ad.converted_svg.blob.download
+    doc = Nokogiri::XML(svg_data)
+    root = doc.at_css("svg") || doc.root
+    w = @ad.width.to_i
+    h = @ad.height.to_i
+
+    generated = generated_content_map
+    parsed = @ad.parsed_layers || []
+    overrides = @ad.layer_overrides || {}
+
+    # Identify and remove the clip-path groups that contain outlined text
+    remove_text_region_groups(doc, root, parsed)
+
+    # Add new text elements for generated content
+    parsed.select { |l| l["type"] == "text" }.each do |layer|
+      layer_id = layer["id"]
+      content = generated[layer_id]
+      next unless content.present?
+
+      ov = (overrides[layer_id] || {}).with_indifferent_access
+      x = (layer["x"].to_f + (ov[:x_offset] || 0).to_f).round
+      y = (layer["y"].to_f + (ov[:y_offset] || 0).to_f).round
+      lw = layer["width"].to_f.round
+      lh = layer["height"].to_f.round
+
+      text_xml = build_text_element(x, y, lw, lh, content, ov)
+      root.add_child(Nokogiri::XML.fragment(text_xml))
+    end
+
+    if @ad.overlay_enabled?
+      root.add_child(Nokogiri::XML.fragment(build_overlay(w, h)))
+    end
+    if @ad.play_button_enabled?
+      root.add_child(Nokogiri::XML.fragment(build_play_button(w, h)))
+    end
+
+    doc.to_xml
+  end
+
+  # Remove clip-path groups that contain text glyph outlines, while preserving
+  # groups that provide visual styling (button backgrounds, shapes, etc.).
+  #
+  # pdftocairo renders outlined text as nested clip-path groups:
+  #   <g clip-path="url(#outer-bbox)">      ← bounding rectangle
+  #     <g clip-path="url(#inner-shape)">   ← glyph outlines OR simple shape
+  #       <use href="#raster-image"/>
+  #     </g>
+  #   </g>
+  #
+  # Groups with complex inner clips (many path coordinates) are glyph outlines → remove.
+  # Groups with simple inner clips (rounded rects, etc.) are visual elements → keep.
+  def remove_text_region_groups(doc, root, _parsed_layers)
+    body_groups = root.children.select { |n| n.element? && n.name == "g" }
+
+    body_groups.each do |g|
+      outer_clip_id = g["clip-path"]&.match(/url\(#([^)]+)\)/)&.[](1)
+      next unless outer_clip_id
+
+      inner_g = g.at_css("g[clip-path]")
+      next unless inner_g
+
+      inner_clip_id = inner_g["clip-path"]&.match(/url\(#([^)]+)\)/)&.[](1)
+      next unless inner_clip_id
+
+      inner_clip_el = doc.at_css("##{inner_clip_id}")
+      next unless inner_clip_el
+
+      path = inner_clip_el.at_css("path")
+      next unless path
+
+      # Glyph outlines have many coordinates; simple shapes (rounded rects) have few
+      coord_count = path["d"].to_s.scan(/-?[\d.]+/).length
+      g.remove if coord_count > 40
+    end
+  end
+
+  def build_svg_from_scratch
     w = @ad.width.to_i
     h = @ad.height.to_i
 

@@ -1,6 +1,6 @@
 FactoryBot.define do
-  factory :user_role do
+  factory :client_user do
+    client
     user
-    role
   end
 end

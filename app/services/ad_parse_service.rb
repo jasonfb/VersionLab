@@ -185,7 +185,11 @@ class AdParseService
 
     # Try native SVG text elements first; fall back to clipped image regions
     layers = extract_svg_text_layers(doc)
-    layers = extract_clipped_layers(doc) if layers.empty?
+    if layers.empty?
+      layers = extract_clipped_layers(doc)
+      # For clipped layers (outlined text), use pdf-reader to extract text content
+      fill_clipped_layer_text(layers, reader.pages.first, height) if layers.any?
+    end
     warnings += check_svg_warnings(layers, doc) if layers.any? { |l| l[:type] == "text" && l[:content].present? }
 
     if layers.empty?
@@ -228,7 +232,129 @@ class AdParseService
       }
     end
 
-    layers
+    remove_nested_regions(layers)
+  end
+
+  # Remove regions fully contained within another region to avoid
+  # overlapping text in rendered output.
+  def remove_nested_regions(layers)
+    layers.reject { |inner|
+      ix = inner[:x].to_f
+      iy = inner[:y].to_f
+      iw = inner[:width].to_f
+      ih = inner[:height].to_f
+
+      layers.any? { |outer|
+        next false if outer.equal?(inner)
+        ox = outer[:x].to_f
+        oy = outer[:y].to_f
+        ow = outer[:width].to_f
+        oh = outer[:height].to_f
+
+        ox <= ix && oy <= iy &&
+          (ox + ow) >= (ix + iw) &&
+          (oy + oh) >= (iy + ih)
+      }
+    }.each_with_index.map { |layer, i|
+      layer[:id] = "region_#{i}"
+      layer
+    }
+  end
+
+  # Use pdf-reader text runs to populate content for clipped regions.
+  # PDF coordinates have origin at bottom-left (y-up); SVG at top-left (y-down).
+  def fill_clipped_layer_text(layers, page, page_height)
+    return if page_height.nil? || page_height <= 0
+
+    runs = begin
+      page.runs
+    rescue => e
+      Rails.logger.warn("AdParseService: could not extract PDF text runs: #{e.message}")
+      return
+    end
+    return if runs.empty?
+
+    layers.each do |layer|
+      rx = layer[:x].to_f
+      ry = layer[:y].to_f
+      rw = layer[:width].to_f
+      rh = layer[:height].to_f
+
+      # Convert region bounds to PDF coordinate space
+      pdf_y_bottom = page_height - (ry + rh)
+      pdf_y_top    = page_height - ry
+
+      # Collect runs whose baseline falls within this region (with generous padding
+      # since clip-path bounding boxes may not perfectly match text extents)
+      pad = 15
+      matched = runs.select { |r|
+        r.origin.x >= (rx - pad) &&
+          r.origin.x <= (rx + rw + pad) &&
+          r.origin.y >= (pdf_y_bottom - pad) &&
+          r.origin.y <= (pdf_y_top + pad)
+      }
+      next if matched.empty?
+
+      # Group into lines by y-proximity (within half a font size)
+      lines = group_runs_into_lines(matched)
+
+      # Build text: join characters within words, words with spaces, lines with spaces
+      text = lines.map { |line_runs|
+        join_runs_into_text(line_runs)
+      }.join(" ")
+
+      layer[:content] = text.strip
+    end
+  end
+
+  def group_runs_into_lines(runs)
+    sorted = runs.sort_by { |r| [ -r.origin.y, r.origin.x ] }
+    lines = []
+    current_line = [ sorted.first ]
+
+    sorted[1..].each do |r|
+      prev = current_line.last
+      # Same line if y-values are within half the font size
+      threshold = [ prev.font_size, r.font_size ].max * 0.5
+      if (prev.origin.y - r.origin.y).abs <= threshold
+        current_line << r
+      else
+        lines << current_line.sort_by { |x| x.origin.x }
+        current_line = [ r ]
+      end
+    end
+    lines << current_line.sort_by { |x| x.origin.x }
+    lines
+  end
+
+  # Proportional width estimates (fraction of em-square) for common characters.
+  # Used to detect word boundaries when reconstructing text from individual glyph runs.
+  CHAR_WIDTH_RATIO = Hash.new(0.55).merge(
+    "i" => 0.3,  "l" => 0.3,  "j" => 0.35, "!" => 0.3,  "." => 0.3,
+    "," => 0.3,  ":" => 0.3,  ";" => 0.3,  "'" => 0.25, "|" => 0.3,
+    "1" => 0.45, "f" => 0.4,  "r" => 0.4,  "t" => 0.4,
+    "m" => 0.8,  "w" => 0.75,
+    "I" => 0.4,  "J" => 0.45, "M" => 0.85, "W" => 0.85,
+    "A" => 0.7,  "B" => 0.7,  "C" => 0.65, "D" => 0.7,  "E" => 0.6,
+    "F" => 0.55, "G" => 0.7,  "H" => 0.7,  "K" => 0.65, "L" => 0.6,
+    "N" => 0.7,  "O" => 0.75, "P" => 0.65, "Q" => 0.75, "R" => 0.65,
+    "S" => 0.6,  "T" => 0.6,  "U" => 0.7,  "V" => 0.65, "X" => 0.65,
+    "Y" => 0.6,  "Z" => 0.6
+  ).freeze
+
+  def join_runs_into_text(line_runs)
+    return "" if line_runs.empty?
+    return line_runs.first.text if line_runs.size == 1
+
+    result = line_runs.first.text.dup
+    line_runs.each_cons(2) do |prev, curr|
+      gap = curr.origin.x - prev.origin.x
+      advance_estimate = CHAR_WIDTH_RATIO[prev.text] * prev.font_size
+      extra_space = gap - advance_estimate
+      result << " " if extra_space > prev.font_size * 0.12
+      result << curr.text
+    end
+    result
   end
 
   def bounding_rect_from_clip(clip_el)

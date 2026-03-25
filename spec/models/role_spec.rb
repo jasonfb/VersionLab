@@ -1,5 +1,16 @@
 require 'rails_helper'
 
 RSpec.describe Role, type: :model do
-  pending "add some examples to (or delete) #{__FILE__}"
+  describe "associations" do
+    it "has many user_roles" do
+      assoc = described_class.reflect_on_association(:user_roles)
+      expect(assoc.macro).to eq(:has_many)
+    end
+
+    it "has many users through user_roles" do
+      assoc = described_class.reflect_on_association(:users)
+      expect(assoc.macro).to eq(:has_many)
+      expect(assoc.options[:through]).to eq(:user_roles)
+    end
+  end
 end
