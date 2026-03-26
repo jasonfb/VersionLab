@@ -1,10 +1,11 @@
 class AdMergeService
   class Error < StandardError; end
 
-  def initialize(ad, audience_ids: nil, rejection_context: {})
+  def initialize(ad, audience_ids: nil, rejection_context: {}, ad_resize_id: nil)
     @ad = ad
     @audience_ids = audience_ids
     @rejection_context = rejection_context # { audience_id_string => rejection_comment }
+    @ad_resize = ad_resize_id ? ad.ad_resizes.find(ad_resize_id) : nil
   end
 
   def call
@@ -20,7 +21,7 @@ class AdMergeService
     raise Error, "No audiences to process" if audiences.empty?
 
     audiences.each do |audience|
-      next if @ad.ad_versions.where(audience: audience, state: :active).exists?
+      next if @ad.ad_versions.where(audience: audience, ad_resize: @ad_resize, state: :active).exists?
 
       rejection_comment = @rejection_context[audience.id.to_s]
       messages = build_messages(text_layers, audience, rejection_comment, campaign: campaign)
@@ -40,11 +41,17 @@ class AdMergeService
   # Merge content from layer_overrides into parsed_layers so the AI sees
   # user-provided text for PDF-converted regions (where parsed content is empty).
   def enriched_text_layers
-    overrides = @ad.layer_overrides || {}
-    (@ad.parsed_layers || []).select { |l| l["type"] == "text" }.map { |l|
+    if @ad_resize
+      layers = @ad_resize.resized_layers || []
+      overrides = @ad_resize.layer_overrides.presence || @ad.layer_overrides || {}
+    else
+      layers = @ad.parsed_layers || []
+      overrides = @ad.layer_overrides || {}
+    end
+
+    layers.select { |l| l["type"] == "text" }.map { |l|
       layer = l.dup
       ov = overrides[l["id"]] || {}
-      # Prefer override content, then parsed content
       layer["content"] = ov["content"].presence || l["content"].presence || ""
       layer
     }
@@ -154,17 +161,18 @@ class AdMergeService
 
   def attach_to_version(layers_data, audience)
     version = @ad.ad_versions
-                  .where(audience: audience, state: :generating)
+                  .where(audience: audience, ad_resize: @ad_resize, state: :generating)
                   .order(version_number: :desc)
                   .first
 
-    layer_ids = @ad.parsed_layers.map { |l| l["id"] }.to_set
+    source_layers = @ad_resize ? (@ad_resize.resized_layers || []) : (@ad.parsed_layers || [])
+    layer_ids = source_layers.map { |l| l["id"] }.to_set
 
     if version
       AdVersion.transaction do
         generated = layers_data.each_with_object([]) do |(layer_id, new_text), arr|
           next unless layer_ids.include?(layer_id)
-          original = @ad.parsed_layers.find { |l| l["id"] == layer_id }
+          original = source_layers.find { |l| l["id"] == layer_id }
           arr << { "id" => layer_id, "content" => new_text, "original_content" => original&.dig("content") }
         end
         version.update!(generated_layers: generated, state: :active)
@@ -173,11 +181,12 @@ class AdMergeService
       AdVersion.transaction do
         generated = layers_data.each_with_object([]) do |(layer_id, new_text), arr|
           next unless layer_ids.include?(layer_id)
-          original = @ad.parsed_layers.find { |l| l["id"] == layer_id }
+          original = source_layers.find { |l| l["id"] == layer_id }
           arr << { "id" => layer_id, "content" => new_text, "original_content" => original&.dig("content") }
         end
         @ad.ad_versions.create!(
           audience: audience,
+          ad_resize: @ad_resize,
           version_number: 1,
           state: :active,
           ai_service_id: @ad.ai_service_id,

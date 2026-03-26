@@ -1,6 +1,6 @@
 class Api::AdsController < Api::BaseController
   before_action :set_client
-  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :results, :download_version ]
+  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version ]
 
   def index
     ads = @client.ads.includes(:audiences, :campaign, :ai_service, :ai_model)
@@ -71,9 +71,40 @@ class Api::AdsController < Api::BaseController
     head :no_content
   end
 
+  # POST /api/clients/:client_id/ads/:id/resize
+  def resize
+    unless @ad.setup? || @ad.resizing?
+      return render json: { error: "Ad must be in setup or resizing state to resize" }, status: :unprocessable_entity
+    end
+
+    platforms = params[:platforms]
+    unless platforms.is_a?(Array) && platforms.any?
+      return render json: { error: "At least one platform must be selected" }, status: :unprocessable_entity
+    end
+
+    # Clear any existing versions if going back from Step 2
+    @ad.ad_versions.destroy_all if @ad.ad_versions.any?
+
+    resizes = AdResizeService.new(@ad, platforms: platforms).call
+    @ad.update!(state: :resizing)
+
+    render json: {
+      ad_id: @ad.id,
+      state: @ad.state,
+      resizes: resizes.compact.map { |r| resize_json(r) }
+    }
+  rescue AdResizeService::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  # GET /api/clients/:client_id/ads/:id/resizes
+  def resizes
+    render json: @ad.ad_resizes.order(:width, :height).map { |r| resize_json(r) }
+  end
+
   def run
-    unless @ad.setup?
-      return render json: { error: "Ad must be in setup state to run" }, status: :unprocessable_entity
+    unless @ad.setup? || @ad.resizing?
+      return render json: { error: "Ad must be in setup or resizing state to run" }, status: :unprocessable_entity
     end
 
     unless @ad.ai_service_id.present? && @ad.ai_model_id.present?
@@ -84,7 +115,13 @@ class Api::AdsController < Api::BaseController
       return render json: { error: "Ad must have at least one audience selected" }, status: :unprocessable_entity
     end
 
-    unless @ad.parsed_layers.any? { |l| l["type"] == "text" }
+    has_text_layers = if @ad.ad_resizes.where(state: :resized).any?
+      @ad.ad_resizes.where(state: :resized).any? { |r| r.resized_layers.any? { |l| l["type"] == "text" } }
+    else
+      @ad.parsed_layers.any? { |l| l["type"] == "text" }
+    end
+
+    unless has_text_layers
       return render json: { error: "No editable text layers found in this ad" }, status: :unprocessable_entity
     end
 
@@ -103,51 +140,28 @@ class Api::AdsController < Api::BaseController
       return render json: { error: "Cannot reject a version while generation is not yet complete" }, status: :unprocessable_entity
     end
 
-    audience = @ad.audiences.find(params[:audience_id])
-    active_version = @ad.ad_versions
-                        .where(audience: audience, state: :active)
-                        .order(version_number: :desc)
-                        .first
-
-    unless active_version
-      return render json: { error: "No active version found for this audience" }, status: :unprocessable_entity
-    end
-
     rejection_comment = params[:rejection_comment].to_s.strip
     if rejection_comment.blank?
       return render json: { error: "Rejection comment is required" }, status: :unprocessable_entity
     end
 
-    new_version = nil
-    AdVersion.transaction do
-      active_version.update!(state: :rejected, rejection_comment: rejection_comment)
-      new_version = @ad.ad_versions.create!(
-        audience: audience,
-        version_number: active_version.version_number + 1,
-        state: :generating,
-        ai_service_id: @ad.ai_service_id,
-        ai_model_id: @ad.ai_model_id
-      )
-      @ad.update!(state: :regenerating)
+    if params[:version_id].present?
+      reject_single_version(rejection_comment)
+    elsif params[:audience_id].present?
+      reject_audience(rejection_comment)
+    else
+      render json: { error: "Must specify version_id or audience_id" }, status: :unprocessable_entity
     end
-
-    AdJob.perform_later(@ad.id, audience_id: audience.id.to_s, rejection_comment: rejection_comment)
-
-    render json: {
-      ad_id: @ad.id,
-      state: @ad.state,
-      audience_id: audience.id,
-      new_version_number: new_version.version_number
-    }
   end
 
   def results
     audiences = @ad.audiences.to_a
-    versions = @ad.ad_versions.includes(:ai_service, :ai_model).order(:version_number)
-    versions_by_audience = versions.group_by(&:audience_id)
+    resizes = @ad.ad_resizes.order(:width, :height).to_a
+    versions = @ad.ad_versions.includes(:ai_service, :ai_model, :audience, :ad_resize)
+                   .order(:version_number)
 
     audiences_data = audiences.map do |a|
-      audience_versions = versions_by_audience[a.id] || []
+      audience_versions = versions.select { |v| v.audience_id == a.id }
       {
         id: a.id,
         name: a.name,
@@ -161,6 +175,7 @@ class Api::AdsController < Api::BaseController
       ad_name: @ad.name,
       aspect_ratio: @ad.aspect_ratio,
       parsed_layers: @ad.parsed_layers,
+      resizes: resizes.map { |r| resize_json(r) },
       audiences: audiences_data
     }
   end
@@ -178,6 +193,73 @@ class Api::AdsController < Api::BaseController
 
   private
 
+  def reject_single_version(rejection_comment)
+    version = @ad.ad_versions.find(params[:version_id])
+    unless version.active?
+      return render json: { error: "Version is not active" }, status: :unprocessable_entity
+    end
+
+    new_version = nil
+    AdVersion.transaction do
+      version.update!(state: :rejected, rejection_comment: rejection_comment)
+      new_version = @ad.ad_versions.create!(
+        audience: version.audience,
+        ad_resize: version.ad_resize,
+        version_number: version.version_number + 1,
+        state: :generating,
+        ai_service_id: @ad.ai_service_id,
+        ai_model_id: @ad.ai_model_id
+      )
+      @ad.update!(state: :regenerating)
+    end
+
+    AdJob.perform_later(
+      @ad.id,
+      audience_id: version.audience_id.to_s,
+      rejection_comment: rejection_comment,
+      ad_resize_id: version.ad_resize_id
+    )
+
+    render json: {
+      ad_id: @ad.id,
+      state: @ad.state,
+      new_version_id: new_version.id,
+      new_version_number: new_version.version_number
+    }
+  end
+
+  def reject_audience(rejection_comment)
+    audience = @ad.audiences.find(params[:audience_id])
+    active_versions = @ad.ad_versions.where(audience: audience, state: :active)
+
+    unless active_versions.any?
+      return render json: { error: "No active versions for this audience" }, status: :unprocessable_entity
+    end
+
+    AdVersion.transaction do
+      active_versions.each do |version|
+        version.update!(state: :rejected, rejection_comment: rejection_comment)
+        @ad.ad_versions.create!(
+          audience: audience,
+          ad_resize: version.ad_resize,
+          version_number: version.version_number + 1,
+          state: :generating,
+          ai_service_id: @ad.ai_service_id,
+          ai_model_id: @ad.ai_model_id
+        )
+      end
+      @ad.update!(state: :regenerating)
+    end
+
+    AdJob.perform_later(@ad.id, audience_id: audience.id.to_s, rejection_comment: rejection_comment)
+
+    render json: {
+      ad_id: @ad.id,
+      state: @ad.state,
+      audience_id: audience.id
+    }
+  end
+
   def set_client
     @client = @current_account.clients.find(params[:client_id])
   end
@@ -192,11 +274,33 @@ class Api::AdsController < Api::BaseController
       version_number: version.version_number,
       state: version.state,
       rejection_comment: version.rejection_comment,
+      ad_resize_id: version.ad_resize_id,
+      resize_dimensions: version.ad_resize ? version.ad_resize.dimensions : nil,
+      resize_label: version.ad_resize&.label,
       ai_service_name: version.ai_service.name,
       ai_model_name: version.ai_model.name,
       generated_layers: version.generated_layers,
       rendered_image_url: version.rendered_image.attached? ?
         Rails.application.routes.url_helpers.rails_blob_url(version.rendered_image, only_path: true) : nil
+    }
+  end
+
+  def resize_json(resize)
+    {
+      id: resize.id,
+      platform_labels: resize.platform_labels,
+      label: resize.label,
+      width: resize.width,
+      height: resize.height,
+      aspect_ratio: resize.aspect_ratio,
+      dimensions: resize.dimensions,
+      state: resize.state,
+      resized_layers: resize.resized_layers,
+      layer_overrides: resize.layer_overrides,
+      preview_image_url: resize.preview_image.attached? ?
+        Rails.application.routes.url_helpers.rails_blob_url(resize.preview_image, only_path: true) : nil,
+      resized_svg_url: resize.resized_svg.attached? ?
+        Rails.application.routes.url_helpers.rails_blob_url(resize.resized_svg, only_path: true) : nil
     }
   end
 
@@ -235,6 +339,8 @@ class Api::AdsController < Api::BaseController
       svg_url: ad.svg_url,
       file_url: ad.file_url,
       file_content_type: ad.file_content_type,
+      has_resizes: ad.ad_resizes.any?,
+      resize_count: ad.ad_resizes.count,
       updated_at: ad.updated_at
     }
   end

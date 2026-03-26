@@ -90,8 +90,11 @@ describe 'Ad upload and versioning', type: :feature, js: true do
       visit "/app/clients/#{client.id}/ads/#{ad.id}"
       expect(page).to have_content('Test Ad', wait: 10)
 
+      # Step 1 (Resize) is shown by default — skip to Step 2 (Version)
+      click_on 'Skip Resizing'
+
       # The ad edit page should show detected text layers
-      expect(page).to have_content('Headline Text')
+      expect(page).to have_content('Headline Text', wait: 5)
       expect(page).to have_content('Body copy here')
 
       # Select "Version Ads" mode to reveal campaign/audience/AI options

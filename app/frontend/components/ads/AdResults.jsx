@@ -11,9 +11,13 @@ export default function AdResults() {
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [rejectForm, setRejectForm] = useState(null) // { audienceId, comment }
+  const [rejectForm, setRejectForm] = useState(null) // { mode, audienceId?, versionId?, comment }
   const [rejecting, setRejecting] = useState(false)
-  const [selectedVersions, setSelectedVersions] = useState({}) // { audienceId: versionIndex }
+  const [selectedVersions, setSelectedVersions] = useState({}) // { "audienceId-resizeId": versionIndex }
+
+  // Filters
+  const [sizeFilter, setSizeFilter] = useState('all')
+  const [audienceFilter, setAudienceFilter] = useState('all')
 
   const fetchResults = () => {
     apiFetch(`/api/clients/${clientId}/ads/${adId}/results`)
@@ -42,20 +46,28 @@ export default function AdResults() {
     })
   }, [adId, data])
 
-  const openReject = (audienceId) => {
-    setRejectForm({ audienceId, comment: '' })
+  const openRejectVersion = (versionId) => {
+    setRejectForm({ mode: 'version', versionId, comment: '' })
+  }
+
+  const openRejectAudience = (audienceId) => {
+    setRejectForm({ mode: 'audience', audienceId, comment: '' })
   }
 
   const submitReject = async () => {
     if (!rejectForm?.comment?.trim()) return
     setRejecting(true)
     try {
+      const body = { rejection_comment: rejectForm.comment }
+      if (rejectForm.mode === 'version') {
+        body.version_id = rejectForm.versionId
+      } else {
+        body.audience_id = rejectForm.audienceId
+      }
+
       await apiFetch(`/api/clients/${clientId}/ads/${adId}/reject`, {
         method: 'POST',
-        body: JSON.stringify({
-          audience_id: rejectForm.audienceId,
-          rejection_comment: rejectForm.comment,
-        }),
+        body: JSON.stringify(body),
       })
       setRejectForm(null)
       fetchResults()
@@ -72,7 +84,7 @@ export default function AdResults() {
   }
 
   const adStateBadge = (state) => {
-    const colors = { setup: 'secondary', pending: 'warning text-dark', merged: 'success', regenerating: 'warning text-dark' }
+    const colors = { setup: 'secondary', resizing: 'info', pending: 'warning text-dark', merged: 'success', regenerating: 'warning text-dark' }
     return <span className={`badge bg-${colors[state] || 'secondary'} text-capitalize`}>{state}</span>
   }
 
@@ -94,6 +106,20 @@ export default function AdResults() {
     )
   }
 
+  const hasResizes = data.resizes && data.resizes.length > 0
+
+  // Build filtered view
+  const filteredAudiences = data.audiences
+    .filter((a) => audienceFilter === 'all' || a.id === audienceFilter)
+    .map((a) => ({
+      ...a,
+      versions: a.versions.filter((v) => {
+        if (sizeFilter === 'all') return true
+        if (sizeFilter === 'original') return !v.ad_resize_id
+        return v.ad_resize_id === sizeFilter
+      }),
+    }))
+
   return (
     <div className="p-4">
       {/* Header */}
@@ -109,6 +135,9 @@ export default function AdResults() {
               {data.aspect_ratio && (
                 <span className="badge bg-light text-dark border">{data.aspect_ratio}</span>
               )}
+              {hasResizes && (
+                <small className="text-muted">{data.resizes.length} resize{data.resizes.length !== 1 ? 's' : ''}</small>
+              )}
             </div>
           </div>
         </div>
@@ -120,20 +149,57 @@ export default function AdResults() {
         )}
       </div>
 
+      {/* Filter bar */}
+      {(hasResizes || data.audiences.length > 1) && (
+        <div className="d-flex align-items-center gap-3 mb-4 p-3 bg-light rounded">
+          {hasResizes && (
+            <div className="d-flex align-items-center gap-2">
+              <label className="form-label small fw-semibold mb-0">Size:</label>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 'auto' }}
+                value={sizeFilter}
+                onChange={(e) => setSizeFilter(e.target.value)}
+              >
+                <option value="all">All Sizes</option>
+                {data.resizes.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.dimensions} — {r.platform_labels.map((pl) => `${pl.platform} ${pl.size_name}`).join(', ')}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {data.audiences.length > 1 && (
+            <div className="d-flex align-items-center gap-2">
+              <label className="form-label small fw-semibold mb-0">Audience:</label>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 'auto' }}
+                value={audienceFilter}
+                onChange={(e) => setAudienceFilter(e.target.value)}
+              >
+                <option value="all">All Audiences</option>
+                {data.audiences.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Per-audience results */}
-      {data.audiences.length === 0 ? (
+      {filteredAudiences.length === 0 ? (
         <div className="text-center text-muted py-5">
           <i className="bi bi-people fs-1 d-block mb-3"></i>
-          <p>No audiences found for this ad.</p>
+          <p>No results match the current filters.</p>
         </div>
       ) : (
-        data.audiences.map((audience) => {
-          const latestIdx = audience.versions.length - 1
-          const selectedIdx = selectedVersions[audience.id] ?? latestIdx
-          const version = audience.versions[selectedIdx]
-          const latestVersion = audience.versions[latestIdx]
-          const isLatest = selectedIdx === latestIdx
-          const hasActive = latestVersion?.state === 'active'
+        filteredAudiences.map((audience) => {
+          // Group versions by resize for display
+          const versionsByResize = groupVersionsByResize(audience.versions, data.resizes)
+          const hasActiveVersions = audience.versions.some((v) => v.state === 'active')
 
           return (
             <div key={audience.id} className="card mb-4">
@@ -141,111 +207,154 @@ export default function AdResults() {
                 <div className="d-flex align-items-center gap-2">
                   <i className="bi bi-person-circle text-muted"></i>
                   <strong>{audience.name}</strong>
-                  {version && stateBadge(version.state)}
-                  {audience.versions.length > 1 ? (
-                    <select
-                      className="form-select form-select-sm"
-                      style={{ width: 'auto' }}
-                      value={selectedIdx}
-                      onChange={(e) => setSelectedVersions((prev) => ({ ...prev, [audience.id]: Number(e.target.value) }))}
-                    >
-                      {audience.versions.map((v, i) => (
-                        <option key={v.id} value={i}>
-                          v{v.version_number}{i === latestIdx ? ' (Current)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  ) : version && (
-                    <small className="text-muted">v{version.version_number}</small>
-                  )}
+                  <small className="text-muted">
+                    {audience.versions.filter((v) => v.state === 'active').length} active version{audience.versions.filter((v) => v.state === 'active').length !== 1 ? 's' : ''}
+                  </small>
                 </div>
-                <div className="d-flex align-items-center gap-2">
-                  {version?.rendered_image_url && (
-                    <a
-                      href={`/api/clients/${clientId}/ads/${adId}/download_version?version_id=${version.id}`}
-                      className="btn btn-sm btn-outline-primary"
-                      download
-                    >
-                      <i className="bi bi-download me-1"></i>Download
-                    </a>
-                  )}
-                  {hasActive && isLatest && (
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => openReject(audience.id)}
-                    >
-                      <i className="bi bi-x-circle me-1"></i>Reject
-                    </button>
-                  )}
-                  {latestVersion?.state === 'generating' && isLatest && (
-                    <span className="d-flex align-items-center gap-1 text-warning">
-                      <span className="spinner-border spinner-border-sm" />
-                      <small>Generating…</small>
-                    </span>
-                  )}
-                </div>
+                {hasActiveVersions && hasResizes && (
+                  <button
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={() => openRejectAudience(audience.id)}
+                    title="Reject all sizes for this audience"
+                  >
+                    <i className="bi bi-x-circle me-1"></i>Reject All Sizes
+                  </button>
+                )}
               </div>
 
               <div className="card-body">
-                {!version ? (
-                  <p className="text-muted small mb-0">No versions generated yet.</p>
+                {audience.versions.length === 0 ? (
+                  <p className="text-muted small mb-0">No versions match the current filters.</p>
                 ) : (
-                  <>
-                    {version.state === 'rejected' && version.rejection_comment && (
-                      <div className="alert alert-danger alert-sm py-2 px-3 mb-2 d-flex align-items-start gap-2">
-                        <i className="bi bi-x-circle mt-1 small"></i>
-                        <div>
-                          <small className="fw-semibold d-block">Rejected</small>
-                          <small>"{version.rejection_comment}"</small>
+                  <div className="row g-3">
+                    {versionsByResize.map((group) => {
+                      const groupKey = `${audience.id}-${group.resizeId || 'original'}`
+                      const latestIdx = group.versions.length - 1
+                      const selectedIdx = selectedVersions[groupKey] ?? latestIdx
+                      const version = group.versions[selectedIdx]
+                      const latestVersion = group.versions[latestIdx]
+                      const isLatest = selectedIdx === latestIdx
+                      const hasActive = latestVersion?.state === 'active'
+
+                      return (
+                        <div key={groupKey} className={hasResizes ? 'col-lg-6' : 'col-12'}>
+                          <div className="border rounded p-3">
+                            {/* Resize dimensions header */}
+                            {group.resizeDimensions && (
+                              <div className="d-flex align-items-center gap-2 mb-2">
+                                <span className="badge bg-info text-white">{group.resizeDimensions}</span>
+                                {group.resizeLabel && (
+                                  <small className="text-muted" style={{ fontSize: '0.7rem' }}>{group.resizeLabel}</small>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Version selector + actions */}
+                            <div className="d-flex align-items-center justify-content-between mb-2">
+                              <div className="d-flex align-items-center gap-2">
+                                {version && stateBadge(version.state)}
+                                {group.versions.length > 1 ? (
+                                  <select
+                                    className="form-select form-select-sm"
+                                    style={{ width: 'auto' }}
+                                    value={selectedIdx}
+                                    onChange={(e) => setSelectedVersions((prev) => ({ ...prev, [groupKey]: Number(e.target.value) }))}
+                                  >
+                                    {group.versions.map((v, i) => (
+                                      <option key={v.id} value={i}>
+                                        v{v.version_number}{i === latestIdx ? ' (Current)' : ''}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : version && (
+                                  <small className="text-muted">v{version.version_number}</small>
+                                )}
+                              </div>
+                              <div className="d-flex align-items-center gap-1">
+                                {version?.rendered_image_url && (
+                                  <a
+                                    href={`/api/clients/${clientId}/ads/${adId}/download_version?version_id=${version.id}`}
+                                    className="btn btn-sm btn-outline-primary"
+                                    download
+                                    title="Download"
+                                  >
+                                    <i className="bi bi-download"></i>
+                                  </a>
+                                )}
+                                {hasActive && isLatest && (
+                                  <button
+                                    className="btn btn-sm btn-outline-danger"
+                                    onClick={() => openRejectVersion(latestVersion.id)}
+                                    title="Reject this version"
+                                  >
+                                    <i className="bi bi-x-circle"></i>
+                                  </button>
+                                )}
+                                {latestVersion?.state === 'generating' && isLatest && (
+                                  <span className="spinner-border spinner-border-sm text-warning" />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Version content */}
+                            {version && (
+                              <>
+                                {version.state === 'rejected' && version.rejection_comment && (
+                                  <div className="alert alert-danger alert-sm py-1 px-2 mb-2">
+                                    <small><strong>Rejected:</strong> "{version.rejection_comment}"</small>
+                                  </div>
+                                )}
+                                {version.rendered_image_url && (
+                                  <div className="mb-2 text-center">
+                                    <img
+                                      src={version.rendered_image_url}
+                                      alt={`${data.ad_name} - ${audience.name} v${version.version_number}`}
+                                      className="img-fluid rounded border"
+                                      style={{ maxHeight: hasResizes ? 300 : 500 }}
+                                    />
+                                  </div>
+                                )}
+                                {version.generated_layers?.length > 0 && (
+                                  <div className="table-responsive">
+                                    <table className="table table-sm table-bordered mb-0">
+                                      <thead className="table-light">
+                                        <tr>
+                                          <th style={{ width: '25%' }}>Layer</th>
+                                          <th>Original</th>
+                                          <th>Generated</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {version.generated_layers.map((layer, i) => {
+                                          const original = data.parsed_layers?.find((l) => l.id === layer.id)
+                                          return (
+                                            <tr key={i}>
+                                              <td className="text-muted small">{layer.id}</td>
+                                              <td className="small" style={{ whiteSpace: 'pre-wrap' }}>
+                                                {layer.original_content || original?.content || '–'}
+                                              </td>
+                                              <td className="small" style={{ whiteSpace: 'pre-wrap' }}>
+                                                {layer.content}
+                                              </td>
+                                            </tr>
+                                          )
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                                <div className="d-flex align-items-center gap-2 mt-1">
+                                  <small className="text-muted">
+                                    {version.ai_service_name} · {version.ai_model_name}
+                                  </small>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {version.rendered_image_url && (
-                      <div className="mb-3 text-center">
-                        <img
-                          src={version.rendered_image_url}
-                          alt={`${data.ad_name} - ${audience.name} v${version.version_number}`}
-                          className="img-fluid rounded border"
-                          style={{ maxHeight: 500 }}
-                        />
-                      </div>
-                    )}
-                    {version.generated_layers?.length > 0 && (
-                      <div className="table-responsive">
-                        <table className="table table-sm table-bordered mb-0">
-                          <thead className="table-light">
-                            <tr>
-                              <th style={{ width: '30%' }}>Layer</th>
-                              <th>Original</th>
-                              <th>Generated{version.state === 'active' ? ' ✓' : ''}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {version.generated_layers.map((layer, i) => {
-                              const original = data.parsed_layers?.find((l) => l.id === layer.id)
-                              return (
-                                <tr key={i}>
-                                  <td className="text-muted small">{layer.id}</td>
-                                  <td className="small" style={{ whiteSpace: 'pre-wrap' }}>
-                                    {layer.original_content || original?.content || '–'}
-                                  </td>
-                                  <td className="small" style={{ whiteSpace: 'pre-wrap' }}>
-                                    {layer.content}
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                    <div className="d-flex align-items-center gap-2 mt-1">
-                      {stateBadge(version.state)}
-                      <small className="text-muted">
-                        {version.ai_service_name} · {version.ai_model_name}
-                      </small>
-                    </div>
-                  </>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </div>
@@ -259,12 +368,16 @@ export default function AdResults() {
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Reject Version</h5>
+                <h5 className="modal-title">
+                  {rejectForm.mode === 'audience' ? 'Reject All Sizes for Audience' : 'Reject Version'}
+                </h5>
                 <button type="button" className="btn-close" onClick={() => setRejectForm(null)} />
               </div>
               <div className="modal-body">
                 <p className="text-muted small mb-2">
-                  Provide feedback so the AI can improve the next version.
+                  {rejectForm.mode === 'audience'
+                    ? 'All active versions for this audience (across all sizes) will be rejected and regenerated.'
+                    : 'Provide feedback so the AI can improve the next version.'}
                 </p>
                 <textarea
                   className="form-control"
@@ -297,4 +410,34 @@ export default function AdResults() {
       )}
     </div>
   )
+}
+
+// Group versions by resize ID for card layout
+function groupVersionsByResize(versions, resizes) {
+  const groups = {}
+
+  versions.forEach((v) => {
+    const key = v.ad_resize_id || 'original'
+    if (!groups[key]) {
+      groups[key] = {
+        resizeId: v.ad_resize_id,
+        resizeDimensions: v.resize_dimensions,
+        resizeLabel: v.resize_label,
+        versions: [],
+      }
+    }
+    groups[key].versions.push(v)
+  })
+
+  // If there are no resizes, return a single group
+  if (Object.keys(groups).length === 0) {
+    return []
+  }
+
+  // Sort groups: original first, then by dimensions
+  return Object.values(groups).sort((a, b) => {
+    if (!a.resizeId) return -1
+    if (!b.resizeId) return 1
+    return (a.resizeDimensions || '').localeCompare(b.resizeDimensions || '')
+  })
 }

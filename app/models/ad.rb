@@ -10,8 +10,9 @@ class Ad < ApplicationRecord
   has_many :ad_audiences, dependent: :destroy
   has_many :audiences, through: :ad_audiences
   has_many :ad_versions, dependent: :destroy
+  has_many :ad_resizes, dependent: :destroy
 
-  enum :state, { setup: "setup", pending: "pending", merged: "merged", regenerating: "regenerating" }
+  enum :state, { setup: "setup", resizing: "resizing", pending: "pending", merged: "merged", regenerating: "regenerating" }
   enum :background_type, { solid_color: "solid_color", image: "image" }
   enum :overlay_type, { solid: "solid", gradient: "gradient" }
   enum :versioning_mode, { retain_existing: "retain_existing", version_ads: "version_ads" }

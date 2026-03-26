@@ -53,9 +53,12 @@ Rails.application.routes.draw do
         member do
           post :run
           post :reject
+          post :resize
+          get  :resizes
           get  :results
           get  :download_version
         end
+        resources :ad_resizes, only: [:update], controller: "ad_resizes"
       end
       resources :emails, only: [:index, :show, :create, :update, :destroy] do
         member do

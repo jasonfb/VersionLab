@@ -1,5 +1,6 @@
 class AdVersion < ApplicationRecord
   belongs_to :ad
+  belongs_to :ad_resize, optional: true
   belongs_to :audience
   belongs_to :ai_service
   belongs_to :ai_model

@@ -49,6 +49,12 @@ RSpec.describe Ad, type: :model do
       expect(assoc.macro).to eq(:has_many)
       expect(assoc.options[:dependent]).to eq(:destroy)
     end
+
+    it "has many ad_resizes with dependent destroy" do
+      assoc = described_class.reflect_on_association(:ad_resizes)
+      expect(assoc.macro).to eq(:has_many)
+      expect(assoc.options[:dependent]).to eq(:destroy)
+    end
   end
 
   describe "validations" do
@@ -67,7 +73,7 @@ RSpec.describe Ad, type: :model do
   describe "enums" do
     it "defines state enum" do
       expect(described_class.states).to eq(
-        "setup" => "setup", "pending" => "pending", "merged" => "merged", "regenerating" => "regenerating"
+        "setup" => "setup", "resizing" => "resizing", "pending" => "pending", "merged" => "merged", "regenerating" => "regenerating"
       )
     end
 

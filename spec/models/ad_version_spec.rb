@@ -21,6 +21,12 @@ RSpec.describe AdVersion, type: :model do
       assoc = described_class.reflect_on_association(:ai_model)
       expect(assoc.macro).to eq(:belongs_to)
     end
+
+    it "belongs to ad_resize (optional)" do
+      assoc = described_class.reflect_on_association(:ad_resize)
+      expect(assoc.macro).to eq(:belongs_to)
+      expect(assoc.options[:optional]).to eq(true)
+    end
   end
 
   describe "validations" do

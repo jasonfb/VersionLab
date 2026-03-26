@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_23_180507) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_26_203943) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -20,7 +20,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_23_180507) do
   create_enum "ad_background_type", ["solid_color", "image"]
   create_enum "ad_output_format", ["png", "jpg"]
   create_enum "ad_overlay_type", ["solid", "gradient"]
-  create_enum "ad_state", ["setup", "pending", "merged", "regenerating"]
+  create_enum "ad_resize_state", ["pending", "resized", "failed"]
+  create_enum "ad_state", ["setup", "pending", "merged", "regenerating", "resizing"]
   create_enum "ad_version_state", ["generating", "active", "rejected"]
   create_enum "ad_versioning_mode", ["retain_existing", "version_ads"]
   create_enum "ai_log_call_type", ["email", "campaign_summary", "email_summary", "ad"]
@@ -89,8 +90,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_23_180507) do
     t.index ["ad_id", "audience_id"], name: "index_ad_audiences_on_ad_id_and_audience_id", unique: true
   end
 
+  create_table "ad_resizes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ad_id", null: false
+    t.string "aspect_ratio"
+    t.datetime "created_at", null: false
+    t.integer "height", null: false
+    t.jsonb "layer_overrides", default: {}
+    t.jsonb "platform_labels", default: [], null: false
+    t.jsonb "resized_layers", default: []
+    t.enum "state", default: "pending", null: false, enum_type: "ad_resize_state"
+    t.datetime "updated_at", null: false
+    t.integer "width", null: false
+    t.index ["ad_id", "width", "height"], name: "index_ad_resizes_on_ad_id_and_width_and_height", unique: true
+    t.index ["ad_id"], name: "index_ad_resizes_on_ad_id"
+  end
+
   create_table "ad_versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "ad_id", null: false
+    t.uuid "ad_resize_id"
     t.uuid "ai_model_id", null: false
     t.uuid "ai_service_id", null: false
     t.uuid "audience_id", null: false
@@ -100,8 +117,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_23_180507) do
     t.enum "state", default: "generating", null: false, enum_type: "ad_version_state"
     t.datetime "updated_at", null: false
     t.integer "version_number", default: 1, null: false
-    t.index ["ad_id", "audience_id", "version_number"], name: "index_ad_versions_on_ad_id_and_audience_id_and_version_number", unique: true
-    t.index ["ad_id", "audience_id"], name: "index_ad_versions_on_ad_id_and_audience_id"
+    t.index ["ad_id", "ad_resize_id", "audience_id", "version_number"], name: "idx_ad_versions_unique_per_resize_audience", unique: true
+    t.index ["ad_id", "ad_resize_id", "audience_id"], name: "idx_ad_versions_on_ad_resize_audience"
   end
 
   create_table "ads", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -641,6 +658,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_23_180507) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "ad_audiences", "ads"
   add_foreign_key "ad_audiences", "audiences"
+  add_foreign_key "ad_resizes", "ads"
+  add_foreign_key "ad_versions", "ad_resizes"
   add_foreign_key "ad_versions", "ads"
   add_foreign_key "ad_versions", "audiences"
   add_foreign_key "ads", "clients"

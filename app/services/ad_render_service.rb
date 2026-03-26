@@ -4,10 +4,11 @@ class AdRenderService
   def initialize(ad_version)
     @version = ad_version
     @ad = ad_version.ad
+    @resize = ad_version.ad_resize
   end
 
   def call
-    raise Error, "Ad has no dimensions" unless @ad.width.present? && @ad.height.present?
+    raise Error, "Ad has no dimensions" unless effective_width.present? && effective_height.present?
 
     svg = build_svg
     binary = rasterize(svg)
@@ -30,12 +31,19 @@ class AdRenderService
     svg_data = @ad.converted_svg.blob.download
     doc = Nokogiri::XML(svg_data)
     root = doc.at_css("svg") || doc.root
-    w = @ad.width.to_i
-    h = @ad.height.to_i
+    w = effective_width.to_i
+    h = effective_height.to_i
+
+    # When rendering a resize, update SVG dimensions to target size
+    if @resize
+      root["viewBox"] ||= "0 0 #{@ad.width} #{@ad.height}"
+      root["width"] = w.to_s
+      root["height"] = h.to_s
+    end
 
     generated = generated_content_map
-    parsed = @ad.parsed_layers || []
-    overrides = @ad.layer_overrides || {}
+    parsed = effective_parsed_layers
+    overrides = effective_layer_overrides
 
     # Identify and remove the clip-path groups that contain outlined text
     remove_text_region_groups(doc, root, parsed)
@@ -104,8 +112,8 @@ class AdRenderService
   end
 
   def build_svg_from_scratch
-    w = @ad.width.to_i
-    h = @ad.height.to_i
+    w = effective_width.to_i
+    h = effective_height.to_i
 
     layers_xml = build_background(w, h) +
                  build_text_layers +
@@ -142,8 +150,8 @@ class AdRenderService
     generated = generated_content_map
     return "" if generated.empty?
 
-    parsed = @ad.parsed_layers || []
-    overrides = @ad.layer_overrides || {}
+    parsed = effective_parsed_layers
+    overrides = effective_layer_overrides
 
     parsed.select { |l| l["type"] == "text" }.map { |layer|
       layer_id = layer["id"]
@@ -323,13 +331,32 @@ class AdRenderService
   def attach_image(binary_data)
     format = @ad.jpg? ? "jpg" : "png"
     content_type = @ad.jpg? ? "image/jpeg" : "image/png"
-    filename = "#{@ad.name.parameterize}-#{@version.audience.name.parameterize}-v#{@version.version_number}.#{format}"
+    size_part = @resize ? "-#{@resize.width}x#{@resize.height}" : ""
+    filename = "#{@ad.name.parameterize}#{size_part}-#{@version.audience.name.parameterize}-v#{@version.version_number}.#{format}"
 
     @version.rendered_image.attach(
       io: StringIO.new(binary_data),
       filename: filename,
       content_type: content_type
     )
+  end
+
+  def effective_width
+    @resize&.width || @ad.width
+  end
+
+  def effective_height
+    @resize&.height || @ad.height
+  end
+
+  def effective_parsed_layers
+    @resize ? (@resize.resized_layers || []) : (@ad.parsed_layers || [])
+  end
+
+  def effective_layer_overrides
+    base = @ad.layer_overrides || {}
+    resize_overrides = @resize&.layer_overrides || {}
+    base.merge(resize_overrides)
   end
 
   def escape(str)
