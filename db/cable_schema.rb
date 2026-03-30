@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_26_203943) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_30_173324) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -32,6 +32,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_26_203943) do
   create_enum "campaign_status", ["draft", "active", "completed", "archived"]
   create_enum "email_state", ["setup", "pending", "merged", "regenerating"]
   create_enum "email_version_state", ["generating", "active", "rejected"]
+  create_enum "payment_status", ["succeeded", "failed", "pending", "refunded"]
+  create_enum "subscription_billing_interval", ["monthly", "annual"]
   create_enum "template_import_state", ["pending", "processing", "completed", "failed"]
   create_enum "template_import_type", ["bundled", "external"]
   create_enum "template_variable_image_location", ["hero", "banner", "sidebar", "inline", "footer"]
@@ -51,7 +53,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_26_203943) do
     t.datetime "created_at", null: false
     t.boolean "is_agency", default: false, null: false
     t.string "name"
+    t.string "stripe_customer_id"
     t.datetime "updated_at", null: false
+    t.index ["stripe_customer_id"], name: "index_accounts_on_stripe_customer_id", unique: true
   end
 
   create_table "active_storage_attachments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -446,6 +450,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_26_203943) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "payment_methods", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "account_id", null: false
+    t.string "card_brand"
+    t.integer "card_exp_month"
+    t.integer "card_exp_year"
+    t.string "card_last4"
+    t.datetime "created_at", null: false
+    t.boolean "is_default", default: false, null: false
+    t.string "stripe_payment_method_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_payment_methods_on_account_id"
+    t.index ["stripe_payment_method_id"], name: "index_payment_methods_on_stripe_payment_method_id", unique: true
+  end
+
+  create_table "payments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "account_id", null: false
+    t.integer "amount_cents", null: false
+    t.datetime "created_at", null: false
+    t.string "currency", default: "usd", null: false
+    t.string "description"
+    t.text "failure_reason"
+    t.uuid "payment_method_id"
+    t.enum "status", null: false, enum_type: "payment_status"
+    t.string "stripe_payment_intent_id"
+    t.uuid "subscription_id"
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_payments_on_account_id"
+    t.index ["stripe_payment_intent_id"], name: "index_payments_on_stripe_payment_intent_id", unique: true
+    t.index ["subscription_id"], name: "index_payments_on_subscription_id"
+  end
+
   create_table "primary_audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -600,6 +635,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_26_203943) do
     t.index ["expires_at"], name: "index_solid_queue_semaphores_on_expires_at"
     t.index ["key", "value"], name: "index_solid_queue_semaphores_on_key_and_value"
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
+  end
+
+  create_table "subscription_tiers", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "annual_price_cents", null: false
+    t.datetime "created_at", null: false
+    t.integer "monthly_price_cents", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.string "slug", null: false
+    t.datetime "updated_at", null: false
+    t.index ["slug"], name: "index_subscription_tiers_on_slug", unique: true
+  end
+
+  create_table "subscriptions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "account_id", null: false
+    t.enum "billing_interval", null: false, enum_type: "subscription_billing_interval"
+    t.date "canceled_date"
+    t.datetime "created_at", null: false
+    t.integer "credit_applied_cents"
+    t.date "paid_through_date", null: false
+    t.integer "prorated_refund_cents"
+    t.date "start_date", null: false
+    t.uuid "subscription_tier_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_subscriptions_on_account_id"
+    t.index ["subscription_tier_id"], name: "index_subscriptions_on_subscription_tier_id"
   end
 
   create_table "template_imports", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

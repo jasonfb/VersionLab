@@ -4,6 +4,7 @@ import Sidebar from './Sidebar'
 import AccountSwitcher from './AccountSwitcher'
 import ClientSwitcher from './ClientSwitcher'
 import { AccountProvider } from './AccountContext'
+import TrialExpiredBanner from './TrialExpiredBanner'
 
 export default function AppLayout() {
   return (
@@ -23,6 +24,7 @@ export default function AppLayout() {
           </main>
         </div>
       </div>
+      <TrialExpiredBanner />
     </AccountProvider>
   )
 }

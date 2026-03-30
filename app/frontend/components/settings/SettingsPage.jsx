@@ -2,19 +2,26 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '~/lib/api'
 import { useAccount } from '../layout/AccountContext'
+import SubscriptionTab from './SubscriptionTab'
 
 export default function SettingsPage() {
+  const ctx = useAccount()
   const [tab, setTab] = useState('account')
+
+  const hasBillingAccess = ctx?.is_owner || ctx?.is_admin || ctx?.is_billing_admin
+
+  const tabs = [
+    { key: 'account', label: 'Account' },
+    { key: 'ai_keys', label: 'AI Keys' },
+    { key: 'users', label: 'Users' },
+    ...(hasBillingAccess ? [{ key: 'subscription', label: 'Subscription' }] : []),
+  ]
 
   return (
     <div className="p-4">
       <h4 className="mb-4">Settings</h4>
       <ul className="nav nav-tabs mb-4">
-        {[
-          { key: 'account', label: 'Account' },
-          { key: 'ai_keys', label: 'AI Keys' },
-          { key: 'users', label: 'Users' },
-        ].map(({ key, label }) => (
+        {tabs.map(({ key, label }) => (
           <li key={key} className="nav-item">
             <button
               className={`nav-link ${tab === key ? 'active' : ''}`}
@@ -29,6 +36,7 @@ export default function SettingsPage() {
       {tab === 'account' && <AccountTab />}
       {tab === 'ai_keys' && <AiKeysTab />}
       {tab === 'users' && <UsersTab />}
+      {tab === 'subscription' && <SubscriptionTab />}
     </div>
   )
 }

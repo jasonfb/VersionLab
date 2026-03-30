@@ -76,6 +76,16 @@ Rails.application.routes.draw do
       end
     end
     resources :assets, only: [:index, :create, :destroy]
+    resource :subscription, only: [:show] do
+      post :create_payment_intent
+      post :confirm
+    end
+    resources :payment_methods, only: [:index, :destroy] do
+      member do
+        post :set_default
+      end
+    end
+    resources :payments, only: [:index]
     post "switch_account", to: "accounts#switch"
     post "switch_client", to: "accounts#switch_client"
   end

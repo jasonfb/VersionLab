@@ -41,4 +41,11 @@ class Api::BaseController < ApplicationController
   def current_account_user
     @current_account_user ||= @current_account.account_users.find_by(user: current_user)
   end
+
+  def require_billing_access!
+    au = current_account_user
+    unless au&.is_owner? || au&.is_admin? || au&.is_billing_admin?
+      render json: { errors: ["Billing access required"] }, status: :forbidden
+    end
+  end
 end

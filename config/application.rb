@@ -61,5 +61,7 @@ module VersionLab
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
+
+    Stripe.api_key = ENV["STRIPE_SECRET_KEY"]
   end
 end

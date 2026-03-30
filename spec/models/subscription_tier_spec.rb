@@ -1,0 +1,44 @@
+require "rails_helper"
+
+RSpec.describe SubscriptionTier do
+  subject(:tier) { build(:subscription_tier) }
+
+  describe "validations" do
+    it { is_expected.to be_valid }
+
+    it "requires a name" do
+      tier.name = nil
+      expect(tier).not_to be_valid
+    end
+
+    it "requires a unique slug" do
+      create(:subscription_tier, slug: "standard")
+      tier.slug = "standard"
+      expect(tier).not_to be_valid
+    end
+
+    it "requires monthly_price_cents >= 0" do
+      tier.monthly_price_cents = -1
+      expect(tier).not_to be_valid
+    end
+
+    it "requires annual_price_cents >= 0" do
+      tier.annual_price_cents = -1
+      expect(tier).not_to be_valid
+    end
+  end
+
+  describe "#monthly_price" do
+    it "returns price in dollars" do
+      tier.monthly_price_cents = 4900
+      expect(tier.monthly_price).to eq(49.0)
+    end
+  end
+
+  describe "#annual_price" do
+    it "returns price in dollars" do
+      tier.annual_price_cents = 49900
+      expect(tier.annual_price).to eq(499.0)
+    end
+  end
+end

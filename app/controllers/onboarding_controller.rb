@@ -36,6 +36,14 @@ class OnboardingController < ApplicationController
       account = Account.create!(name: onboarding_params[:account_name])
       AccountUser.create!(user: @user, account: account, is_owner: true)
       account.clients.create!(name: account.name, hidden: true)
+
+      free_trial_tier = SubscriptionTier.find_by!(slug: "free_trial")
+      account.subscriptions.create!(
+        subscription_tier: free_trial_tier,
+        billing_interval: "monthly",
+        start_date: Date.current,
+        paid_through_date: Date.current + 7.days
+      )
     end
 
     sign_in(@user)

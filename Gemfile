@@ -100,3 +100,5 @@ gem "ruby-openai", "~> 7.4"
 
 gem "rubyzip", "~> 2.4"
 gem "pdf-reader", "~> 2.0"
+
+gem "stripe", "~> 14.0"

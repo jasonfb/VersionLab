@@ -4,6 +4,8 @@ class Api::AccountsController < Api::BaseController
     clients = accessible_clients.order(:name)
     current_au = account_users.find { |au| au.account_id == @current_account.id }
 
+    current_sub = @current_account&.active_subscription
+
     render json: {
       current_user_id: current_user.id,
       accounts: account_users.map { |au|
@@ -22,7 +24,15 @@ class Api::AccountsController < Api::BaseController
       is_admin: current_au&.is_admin? || false,
       is_billing_admin: current_au&.is_billing_admin? || false,
       clients: clients.map { |c| { id: c.id, name: c.name } },
-      current_client_id: @current_client&.id
+      current_client_id: @current_client&.id,
+      subscription: {
+        tier_slug: current_sub&.subscription_tier&.slug,
+        tier_name: current_sub&.subscription_tier&.name,
+        billing_interval: current_sub&.billing_interval,
+        paid_through_date: current_sub&.paid_through_date,
+        trial_expired: @current_account&.trial_expired? || false,
+        on_free_trial: @current_account&.on_free_trial? || false
+      }
     }
   end
 

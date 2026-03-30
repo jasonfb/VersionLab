@@ -38,8 +38,8 @@ export default function AdEdit() {
   const [styleGuideOpen, setStyleGuideOpen] = useState(false)
   const [layerOverrides, setLayerOverrides] = useState({})
 
-  // Two-step flow state
-  const [step, setStep] = useState(1) // 1 = resize, 2 = version
+  // Three-step flow state
+  const [step, setStep] = useState(1) // 1 = resize, 2 = style, 3 = version
   const [selectedPlatforms, setSelectedPlatforms] = useState([])
   const [resizes, setResizes] = useState([])
   const [resizing, setResizing] = useState(false)
@@ -90,9 +90,9 @@ export default function AdEdit() {
           if (r.length > 0) setStep(1)
         })
       }
-      // If ad is already in versioning states, go to step 2
+      // If ad is already in versioning states, go to step 3
       if (['pending', 'merged', 'regenerating'].includes(a.state)) {
-        setStep(2)
+        setStep(3)
       }
     }).catch(() => {}).finally(() => setLoading(false))
   }, [clientId, adId])
@@ -159,7 +159,7 @@ export default function AdEdit() {
     }
   }
 
-  const handleContinueToVersioning = () => {
+  const handleContinueToStyling = () => {
     setStep(2)
   }
 
@@ -167,11 +167,19 @@ export default function AdEdit() {
     setStep(2)
   }
 
+  const handleContinueToVersioning = () => {
+    save().then(() => setStep(3))
+  }
+
   const handleBackToResize = () => {
+    setStep(1)
+  }
+
+  const handleBackToStyle = () => {
     if (ad.state === 'merged' || ad.state === 'regenerating') {
       if (!confirm('Going back will discard all generated versions. Continue?')) return
     }
-    setStep(1)
+    setStep(2)
   }
 
   const handleEditResize = (resize) => {
@@ -289,10 +297,12 @@ export default function AdEdit() {
 
       {/* Step indicator */}
       <div className="d-flex align-items-center gap-3 mb-4">
-        <StepIndicator number={1} label="Resize" active={step === 1} completed={step === 2 && resizes.length > 0} />
+        <StepIndicator number={1} label="Resize" active={step === 1} completed={step > 1 && resizes.length > 0} />
         <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
-        <StepIndicator number={2} label="Version" active={step === 2} />
-        {step === 2 && resizes.length > 0 && (
+        <StepIndicator number={2} label="Style" active={step === 2} completed={step > 2} />
+        <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
+        <StepIndicator number={3} label="Version" active={step === 3} />
+        {step === 3 && resizes.length > 0 && (
           <small className="text-muted ms-2">
             Versioning {resizeCount} size{resizeCount !== 1 ? 's' : ''}
           </small>
@@ -323,13 +333,13 @@ export default function AdEdit() {
           resizes={resizes}
           onGenerateResizes={generateResizes}
           onEditResize={handleEditResize}
-          onContinue={handleContinueToVersioning}
+          onContinue={handleContinueToStyling}
           onSkip={handleSkipResizing}
           resizing={resizing}
         />
       )}
 
-      {/* Step 2: Version settings + preview */}
+      {/* Step 2: Style settings + preview */}
       {step === 2 && (
         <>
           {/* Back to resize button */}
@@ -340,19 +350,8 @@ export default function AdEdit() {
           </div>
 
           <div className="row g-4">
-            {/* Left panel: settings */}
+            {/* Left panel: style settings */}
             <div className="col-lg-5">
-              {/* Ad name */}
-              <div className="mb-4">
-                <label className="form-label fw-semibold small text-uppercase text-muted">Ad Name</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-              </div>
-
               {/* Background */}
               <div className="mb-4">
                 <label className="form-label fw-semibold d-flex align-items-center gap-2">
@@ -532,7 +531,109 @@ export default function AdEdit() {
                 )}
               </div>
 
-              <hr />
+              {/* Output format */}
+              <div className="mb-4">
+                <label className="form-label fw-semibold">Output Format</label>
+                <div className="d-flex gap-3">
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      id="fmt-png"
+                      checked={form.output_format === 'png'}
+                      onChange={() => setForm({ ...form, output_format: 'png' })}
+                    />
+                    <label className="form-check-label" htmlFor="fmt-png">PNG</label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      id="fmt-jpg"
+                      checked={form.output_format === 'jpg'}
+                      onChange={() => setForm({ ...form, output_format: 'jpg' })}
+                    />
+                    <label className="form-check-label" htmlFor="fmt-jpg">JPG</label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="d-flex gap-2 flex-wrap">
+                <button className="btn btn-outline-secondary btn-sm" onClick={save} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save Settings'}
+                </button>
+                <button className="btn btn-danger btn-sm" onClick={handleContinueToVersioning} disabled={saving}>
+                  {saving ? 'Saving…' : <><span className="me-1">&rarr;</span>Continue to Versioning</>}
+                </button>
+              </div>
+            </div>
+
+            {/* Right panel: preview */}
+            <div className="col-lg-7">
+              <div className="sticky-top" style={{ top: '1rem' }}>
+                <label className="form-label fw-semibold small text-uppercase text-muted mb-2">Preview</label>
+                {hasSvg ? (
+                  <div className="position-relative rounded overflow-hidden border" style={{ ...( form.background_type === 'solid_color' ? { backgroundColor: form.background_color } : {} ), maxWidth: '100%' }}>
+                    <InteractiveSvgEditor
+                      svgUrl={ad.svg_url}
+                      layers={ad.parsed_layers}
+                      onLayerOverridesChange={handleLayerOverride}
+                      initialOverrides={layerOverrides}
+                    />
+                    {form.overlay_enabled && (
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: form.overlay_type === 'gradient'
+                          ? `linear-gradient(to bottom, transparent, ${form.overlay_color}${Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0')})`
+                          : form.overlay_color + Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0'),
+                        pointerEvents: 'none',
+                      }} />
+                    )}
+                    {form.play_button_enabled && (
+                      <div className="position-absolute top-50 start-50 translate-middle" style={{ pointerEvents: 'none' }}>
+                        <PlayButtonIcon style={form.play_button_style} color={form.play_button_color} />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <AdPreview
+                    ad={ad}
+                    form={form}
+                    isPdf={isPdf}
+                    isSvg={isSvg}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Step 3: Version settings + preview */}
+      {step === 3 && (
+        <>
+          {/* Back to style button */}
+          <div className="mb-3">
+            <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToStyle}>
+              <i className="bi bi-arrow-left me-1"></i>Back to Style
+            </button>
+          </div>
+
+          <div className="row g-4">
+            {/* Left panel: version settings */}
+            <div className="col-lg-5">
+              {/* Ad name */}
+              <div className="mb-4">
+                <label className="form-label fw-semibold small text-uppercase text-muted">Ad Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </div>
 
               {/* Versioning */}
               <div className="mb-4">
@@ -613,31 +714,6 @@ export default function AdEdit() {
                     )}
                   </div>
 
-                  {/* Background source */}
-                  <div className="mb-3">
-                    <label className="form-label fw-semibold">Background</label>
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        id="bg-keep"
-                        checked={form.keep_background}
-                        onChange={() => setForm({ ...form, keep_background: true })}
-                      />
-                      <label className="form-check-label" htmlFor="bg-keep">Keep background image</label>
-                    </div>
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        id="bg-dam"
-                        checked={!form.keep_background}
-                        onChange={() => setForm({ ...form, keep_background: false })}
-                      />
-                      <label className="form-check-label" htmlFor="bg-dam">System chooses from Asset Library</label>
-                    </div>
-                  </div>
-
                   {/* AI Service / Model */}
                   <div className="row mb-3">
                     <div className="col-6">
@@ -670,33 +746,6 @@ export default function AdEdit() {
                   </div>
                 </>
               )}
-
-              {/* Output format */}
-              <div className="mb-4">
-                <label className="form-label fw-semibold">Output Format</label>
-                <div className="d-flex gap-3">
-                  <div className="form-check">
-                    <input
-                      className="form-check-input"
-                      type="radio"
-                      id="fmt-png"
-                      checked={form.output_format === 'png'}
-                      onChange={() => setForm({ ...form, output_format: 'png' })}
-                    />
-                    <label className="form-check-label" htmlFor="fmt-png">PNG</label>
-                  </div>
-                  <div className="form-check">
-                    <input
-                      className="form-check-input"
-                      type="radio"
-                      id="fmt-jpg"
-                      checked={form.output_format === 'jpg'}
-                      onChange={() => setForm({ ...form, output_format: 'jpg' })}
-                    />
-                    <label className="form-check-label" htmlFor="fmt-jpg">JPG</label>
-                  </div>
-                </div>
-              </div>
 
               {/* Action buttons */}
               <div className="d-flex gap-2 flex-wrap">
