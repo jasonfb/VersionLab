@@ -98,13 +98,26 @@ class AdResizeService
     doc = Nokogiri::XML(svg_data)
     root = doc.at_css("svg") || doc.root
 
-    # Ensure viewBox is set to original dimensions for proportional scaling
-    unless root["viewBox"]
-      root["viewBox"] = "0 0 #{@ad.width} #{@ad.height}"
-    end
+    orig_w = @ad.width.to_f
+    orig_h = @ad.height.to_f
+    scale_x = target_width.to_f / orig_w
+    scale_y = target_height.to_f / orig_h
 
+    # Update viewBox to target dimensions so the SVG coordinate system
+    # matches the new size — content is repositioned via the scale transform
+    root["viewBox"] = "0 0 #{target_width} #{target_height}"
     root["width"] = target_width.to_s
     root["height"] = target_height.to_s
+
+    # Wrap all existing children in a group that scales from original
+    # coordinate space to the target coordinate space
+    wrapper = Nokogiri::XML::Node.new("g", doc)
+    wrapper["transform"] = "scale(#{scale_x}, #{scale_y})"
+
+    # Move all children (defs, groups, text, images, etc.) into the wrapper
+    children = root.children.to_a
+    children.each { |child| wrapper.add_child(child) }
+    root.add_child(wrapper)
 
     doc.to_xml
   end
