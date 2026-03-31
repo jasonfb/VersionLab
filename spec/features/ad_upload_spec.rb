@@ -51,6 +51,11 @@ describe 'Ad upload and versioning', type: :feature, js: true do
           { 'id' => 'layer_0', 'type' => 'text', 'content' => 'Headline Text', 'font_size' => '24' },
           { 'id' => 'layer_1', 'type' => 'text', 'content' => 'Body copy here', 'font_size' => '14' }
         ],
+        classified_layers: [
+          { 'id' => 'layer_0', 'type' => 'text', 'content' => 'Headline Text', 'font_size' => '24', 'role' => 'headline', 'confidence' => 0.85 },
+          { 'id' => 'layer_1', 'type' => 'text', 'content' => 'Body copy here', 'font_size' => '14', 'role' => 'body', 'confidence' => 0.7 }
+        ],
+        classifications_confirmed: true,
         width: 1080,
         height: 1080,
         aspect_ratio: '1:1'
@@ -90,10 +95,14 @@ describe 'Ad upload and versioning', type: :feature, js: true do
       visit "/app/clients/#{client.id}/ads/#{ad.id}"
       expect(page).to have_content('Test Ad', wait: 10)
 
-      # Step 1 (Resize) is shown by default — skip to Step 2 (Version)
+      # Step 2 (Resize) is shown since classifications are confirmed — skip to Step 3 (Style)
       click_on 'Skip Resizing'
+      expect(page).to have_content('Back to Resize', wait: 5)
 
-      # The ad edit page should show detected text layers
+      # Continue to Step 4 (Version)
+      click_on 'Continue to Versioning'
+
+      # The version step should show detected text layers
       expect(page).to have_content('Headline Text', wait: 5)
       expect(page).to have_content('Body copy here')
 

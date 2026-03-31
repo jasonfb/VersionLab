@@ -16,17 +16,21 @@ class AdResizeService
     # Clear existing resizes (user went back to Step 1)
     @ad.ad_resizes.destroy_all
 
+    engine = AdLayout::LayoutEngine.new(@ad)
+
     deduped.map do |size_info|
+      layout_result = engine.compute_layout(size_info[:width], size_info[:height])
+
       resize = @ad.ad_resizes.create!(
         platform_labels: size_info[:labels],
         width: size_info[:width],
         height: size_info[:height],
         aspect_ratio: compute_aspect_ratio(size_info[:width], size_info[:height]),
         state: :pending,
-        resized_layers: resize_layers(size_info[:width], size_info[:height])
+        resized_layers: layout_result.layers
       )
 
-      generate_resized_svg(resize)
+      generate_resized_svg(resize, layout_result)
       generate_preview(resize)
       resize.update!(state: :resized)
       resize
@@ -39,29 +43,8 @@ class AdResizeService
 
   private
 
-  def resize_layers(target_width, target_height)
-    scale_x = target_width.to_f / @ad.width
-    scale_y = target_height.to_f / @ad.height
-
-    (@ad.parsed_layers || []).map do |layer|
-      resized = layer.dup
-      resized["x"] = (layer["x"].to_f * scale_x).round.to_s if layer["x"]
-      resized["y"] = (layer["y"].to_f * scale_y).round.to_s if layer["y"]
-      resized["width"]  = (layer["width"].to_f * scale_x).round.to_s if layer["width"]
-      resized["height"] = (layer["height"].to_f * scale_y).round.to_s if layer["height"]
-
-      if layer["font_size"].present?
-        original_size = layer["font_size"].to_f
-        min_scale = [ scale_x, scale_y ].min
-        resized["font_size"] = [ original_size * min_scale, 8 ].max.round.to_s
-      end
-
-      resized
-    end
-  end
-
-  def generate_resized_svg(resize)
-    svg_string = build_resized_svg(resize)
+  def generate_resized_svg(resize, layout_result)
+    svg_string = build_resized_svg(resize, layout_result)
 
     resize.resized_svg.attach(
       io: StringIO.new(svg_string),
@@ -84,8 +67,11 @@ class AdResizeService
     )
   end
 
-  def build_resized_svg(resize)
-    if @ad.converted_svg&.attached?
+  def build_resized_svg(resize, layout_result)
+    # Use SvgComposer for classified ads; legacy rescale for old ads
+    if @ad.classifications_confirmed?
+      AdLayout::SvgComposer.new(@ad).compose(layout_result)
+    elsif @ad.converted_svg&.attached?
       rescale_svg(@ad.converted_svg.blob.download, resize.width, resize.height)
     elsif @ad.file&.attached? && @ad.file_content_type&.include?("svg")
       rescale_svg(@ad.file.blob.download, resize.width, resize.height)
@@ -98,26 +84,13 @@ class AdResizeService
     doc = Nokogiri::XML(svg_data)
     root = doc.at_css("svg") || doc.root
 
-    orig_w = @ad.width.to_f
-    orig_h = @ad.height.to_f
-    scale_x = target_width.to_f / orig_w
-    scale_y = target_height.to_f / orig_h
+    # Ensure viewBox is set to original dimensions for proportional scaling
+    unless root["viewBox"]
+      root["viewBox"] = "0 0 #{@ad.width} #{@ad.height}"
+    end
 
-    # Update viewBox to target dimensions so the SVG coordinate system
-    # matches the new size — content is repositioned via the scale transform
-    root["viewBox"] = "0 0 #{target_width} #{target_height}"
     root["width"] = target_width.to_s
     root["height"] = target_height.to_s
-
-    # Wrap all existing children in a group that scales from original
-    # coordinate space to the target coordinate space
-    wrapper = Nokogiri::XML::Node.new("g", doc)
-    wrapper["transform"] = "scale(#{scale_x}, #{scale_y})"
-
-    # Move all children (defs, groups, text, images, etc.) into the wrapper
-    children = root.children.to_a
-    children.each { |child| wrapper.add_child(child) }
-    root.add_child(wrapper)
 
     doc.to_xml
   end

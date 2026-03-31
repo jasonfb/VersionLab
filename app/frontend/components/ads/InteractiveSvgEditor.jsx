@@ -86,7 +86,7 @@ function getClipBounds(svg, clipPathRef) {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export default function InteractiveSvgEditor({ svgUrl, layers, onLayerOverridesChange, initialOverrides }) {
+export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers, onLayerOverridesChange, initialOverrides }) {
   const containerRef = useRef(null)
   const dragRef = useRef(null) // current drag state (non-reactive for perf)
   const layerOffsets = useRef({}) // { layerId: { x, y } }
@@ -172,6 +172,15 @@ export default function InteractiveSvgEditor({ svgUrl, layers, onLayerOverridesC
       rect.setAttribute('rx', '4')
       rect.setAttribute('data-layer-id', layerId)
       rect.style.cursor = 'move'
+
+      // Add role tooltip from classified layers
+      const classifiedLayer = classifiedLayers?.find((l) => l.id === layerId)
+      if (classifiedLayer?.role) {
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title')
+        const content = classifiedLayer.content ? ` — ${classifiedLayer.content}` : ''
+        title.textContent = `${classifiedLayer.role.toUpperCase()}${content}`
+        rect.appendChild(title)
+      }
 
       g.appendChild(rect)
 

@@ -1,6 +1,6 @@
 class Api::AdsController < Api::BaseController
   before_action :set_client
-  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version ]
+  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version, :classifications, :confirm_classifications ]
 
   def index
     ads = @client.ads.includes(:audiences, :campaign, :ai_service, :ai_model)
@@ -71,10 +71,40 @@ class Api::AdsController < Api::BaseController
     head :no_content
   end
 
+  # GET /api/clients/:client_id/ads/:id/classifications
+  def classifications
+    render json: {
+      classified_layers: @ad.classified_layers,
+      classifications_confirmed: @ad.classifications_confirmed
+    }
+  end
+
+  # POST /api/clients/:client_id/ads/:id/confirm_classifications
+  def confirm_classifications
+    layers = params[:classified_layers]
+    unless layers.is_a?(Array) && layers.any?
+      return render json: { error: "classified_layers is required" }, status: :unprocessable_entity
+    end
+
+    @ad.update!(
+      classified_layers: layers.map { |l| l.permit!.to_h },
+      classifications_confirmed: true
+    )
+
+    render json: {
+      classified_layers: @ad.classified_layers,
+      classifications_confirmed: @ad.classifications_confirmed
+    }
+  end
+
   # POST /api/clients/:client_id/ads/:id/resize
   def resize
     unless @ad.setup? || @ad.resizing?
       return render json: { error: "Ad must be in setup or resizing state to resize" }, status: :unprocessable_entity
+    end
+
+    unless @ad.classifications_confirmed?
+      return render json: { error: "Element classifications must be confirmed before resizing" }, status: :unprocessable_entity
     end
 
     platforms = params[:platforms]
@@ -332,6 +362,8 @@ class Api::AdsController < Api::BaseController
       height: ad.height,
       aspect_ratio: ad.aspect_ratio,
       parsed_layers: ad.parsed_layers,
+      classified_layers: ad.classified_layers,
+      classifications_confirmed: ad.classifications_confirmed,
       file_warnings: ad.file_warnings,
       audience_ids: ad.audiences.map(&:id),
       audience_names: ad.audiences.map(&:name),

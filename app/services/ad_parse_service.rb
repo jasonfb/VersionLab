@@ -41,6 +41,8 @@ class AdParseService
       aspect_ratio: result[:aspect_ratio]
     )
 
+    AdClassifyService.new(@ad).call if result[:layers].any?
+
     result
   end
 
@@ -159,6 +161,9 @@ class AdParseService
         message: "This PDF has #{reader.page_count} pages. Only the first page will be used."
       }
     end
+
+    # Extract and store embedded fonts
+    extract_fonts(reader)
 
     # Convert PDF to SVG using pdftocairo (poppler)
     svg_data = convert_pdf_to_svg(data)
@@ -304,6 +309,47 @@ class AdParseService
       }.join(" ")
 
       layer[:content] = text.strip
+    end
+  end
+
+  def extract_fonts(reader)
+    @ad.ad_fonts.destroy_all
+
+    font_descriptors = []
+    reader.objects.each do |_ref, obj|
+      next unless obj.is_a?(Hash) && obj[:Type] == :FontDescriptor && obj[:FontFile2]
+      font_descriptors << obj
+    end
+
+    if font_descriptors.empty?
+      warnings = @ad.file_warnings || []
+      warnings << {
+        "type" => "missing_embedded_fonts",
+        "message" => "This PDF has no embedded fonts. Please re-export with fonts embedded and re-upload."
+      }
+      @ad.update!(file_warnings: warnings)
+      return
+    end
+
+    font_descriptors.each do |descriptor|
+      font_name = descriptor[:FontName].to_s.sub(/\A[A-Z]{6}\+/, "")
+      postscript_name = descriptor[:FontName].to_s
+      stream = reader.objects.deref(descriptor[:FontFile2])
+      next unless stream.is_a?(PDF::Reader::Stream)
+
+      data = stream.unfiltered_data
+      next if data.blank?
+
+      ad_font = @ad.ad_fonts.create!(
+        font_name: font_name,
+        postscript_name: postscript_name
+      )
+
+      ad_font.font_file.attach(
+        io: StringIO.new(data),
+        filename: "#{font_name.parameterize}.ttf",
+        content_type: "font/ttf"
+      )
     end
   end
 

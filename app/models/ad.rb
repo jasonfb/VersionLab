@@ -11,6 +11,7 @@ class Ad < ApplicationRecord
   has_many :audiences, through: :ad_audiences
   has_many :ad_versions, dependent: :destroy
   has_many :ad_resizes, dependent: :destroy
+  has_many :ad_fonts, dependent: :destroy
 
   enum :state, { setup: "setup", resizing: "resizing", pending: "pending", merged: "merged", regenerating: "regenerating" }
   enum :background_type, { solid_color: "solid_color", image: "image" }

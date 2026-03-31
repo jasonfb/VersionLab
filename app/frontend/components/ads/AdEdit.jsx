@@ -6,6 +6,7 @@ import { useAccount } from '../layout/AccountContext'
 import AdStyleGuideModal from './AdStyleGuideModal'
 import InteractiveSvgEditor from './InteractiveSvgEditor'
 import AdResizePicker from './AdResizePicker'
+import AdElementClassifier from './AdElementClassifier'
 
 // Platform aspect ratio hints (for original ad display)
 const PLATFORM_HINTS = {
@@ -38,8 +39,8 @@ export default function AdEdit() {
   const [styleGuideOpen, setStyleGuideOpen] = useState(false)
   const [layerOverrides, setLayerOverrides] = useState({})
 
-  // Three-step flow state
-  const [step, setStep] = useState(1) // 1 = resize, 2 = style, 3 = version
+  // Four-step flow state: 1 = classify, 2 = resize, 3 = style, 4 = version
+  const [step, setStep] = useState(1)
   const [selectedPlatforms, setSelectedPlatforms] = useState([])
   const [resizes, setResizes] = useState([])
   const [resizing, setResizing] = useState(false)
@@ -83,16 +84,25 @@ export default function AdEdit() {
         play_button_color: a.play_button_color || '#FFFFFF',
       })
 
-      // If ad already has resizes (resuming), load them and go to appropriate step
-      if (a.has_resizes || a.state === 'resizing') {
+      // Determine initial step based on ad state
+      if (['pending', 'merged', 'regenerating'].includes(a.state)) {
+        // Already versioning — go to step 4
+        setStep(4)
+        if (a.has_resizes) {
+          apiFetch(`/api/clients/${clientId}/ads/${adId}/resizes`).then((r) => setResizes(r))
+        }
+      } else if (a.has_resizes || a.state === 'resizing') {
+        // Has resizes — go to step 2 (resize)
         apiFetch(`/api/clients/${clientId}/ads/${adId}/resizes`).then((r) => {
           setResizes(r)
-          if (r.length > 0) setStep(1)
+          if (r.length > 0) setStep(2)
         })
-      }
-      // If ad is already in versioning states, go to step 3
-      if (['pending', 'merged', 'regenerating'].includes(a.state)) {
-        setStep(3)
+      } else if (a.classifications_confirmed) {
+        // Classifications confirmed but no resizes yet — go to step 2 (resize)
+        setStep(2)
+      } else {
+        // Start at step 1 (classify)
+        setStep(1)
       }
     }).catch(() => {}).finally(() => setLoading(false))
   }, [clientId, adId])
@@ -159,27 +169,36 @@ export default function AdEdit() {
     }
   }
 
-  const handleContinueToStyling = () => {
+  const handleClassificationsConfirmed = () => {
+    setAd((prev) => prev ? { ...prev, classifications_confirmed: true } : prev)
     setStep(2)
+  }
+
+  const handleContinueToStyling = () => {
+    setStep(3)
   }
 
   const handleSkipResizing = () => {
-    setStep(2)
+    setStep(3)
   }
 
   const handleContinueToVersioning = () => {
-    save().then(() => setStep(3))
+    save().then(() => setStep(4))
+  }
+
+  const handleBackToClassify = () => {
+    setStep(1)
   }
 
   const handleBackToResize = () => {
-    setStep(1)
+    setStep(2)
   }
 
   const handleBackToStyle = () => {
     if (ad.state === 'merged' || ad.state === 'regenerating') {
       if (!confirm('Going back will discard all generated versions. Continue?')) return
     }
-    setStep(2)
+    setStep(3)
   }
 
   const handleEditResize = (resize) => {
@@ -297,12 +316,14 @@ export default function AdEdit() {
 
       {/* Step indicator */}
       <div className="d-flex align-items-center gap-3 mb-4">
-        <StepIndicator number={1} label="Resize" active={step === 1} completed={step > 1 && resizes.length > 0} />
+        <StepIndicator number={1} label="Classify" active={step === 1} completed={step > 1} />
         <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
-        <StepIndicator number={2} label="Style" active={step === 2} completed={step > 2} />
+        <StepIndicator number={2} label="Resize" active={step === 2} completed={step > 2 && resizes.length > 0} />
         <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
-        <StepIndicator number={3} label="Version" active={step === 3} />
-        {step === 3 && resizes.length > 0 && (
+        <StepIndicator number={3} label="Style" active={step === 3} completed={step > 3} />
+        <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
+        <StepIndicator number={4} label="Version" active={step === 4} />
+        {step === 4 && resizes.length > 0 && (
           <small className="text-muted ms-2">
             Versioning {resizeCount} size{resizeCount !== 1 ? 's' : ''}
           </small>
@@ -324,23 +345,39 @@ export default function AdEdit() {
         </div>
       )}
 
-      {/* Step 1: Resize */}
+      {/* Step 1: Classify */}
       {step === 1 && (
-        <AdResizePicker
+        <AdElementClassifier
           ad={ad}
-          selectedPlatforms={selectedPlatforms}
-          onPlatformsChange={setSelectedPlatforms}
-          resizes={resizes}
-          onGenerateResizes={generateResizes}
-          onEditResize={handleEditResize}
-          onContinue={handleContinueToStyling}
-          onSkip={handleSkipResizing}
-          resizing={resizing}
+          clientId={clientId}
+          onConfirm={handleClassificationsConfirmed}
         />
       )}
 
-      {/* Step 2: Style settings + preview */}
+      {/* Step 2: Resize */}
       {step === 2 && (
+        <>
+          <div className="mb-3">
+            <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToClassify}>
+              <i className="bi bi-arrow-left me-1"></i>Back to Classify
+            </button>
+          </div>
+          <AdResizePicker
+            ad={ad}
+            selectedPlatforms={selectedPlatforms}
+            onPlatformsChange={setSelectedPlatforms}
+            resizes={resizes}
+            onGenerateResizes={generateResizes}
+            onEditResize={handleEditResize}
+            onContinue={handleContinueToStyling}
+            onSkip={handleSkipResizing}
+            resizing={resizing}
+          />
+        </>
+      )}
+
+      {/* Step 3: Style settings + preview */}
+      {step === 3 && (
         <>
           {/* Back to resize button */}
           <div className="mb-3">
@@ -578,6 +615,7 @@ export default function AdEdit() {
                     <InteractiveSvgEditor
                       svgUrl={ad.svg_url}
                       layers={ad.parsed_layers}
+                      classifiedLayers={ad.classified_layers}
                       onLayerOverridesChange={handleLayerOverride}
                       initialOverrides={layerOverrides}
                     />
@@ -611,8 +649,8 @@ export default function AdEdit() {
         </>
       )}
 
-      {/* Step 3: Version settings + preview */}
-      {step === 3 && (
+      {/* Step 4: Version settings + preview */}
+      {step === 4 && (
         <>
           {/* Back to style button */}
           <div className="mb-3">
@@ -789,6 +827,7 @@ export default function AdEdit() {
                     <InteractiveSvgEditor
                       svgUrl={ad.svg_url}
                       layers={ad.parsed_layers}
+                      classifiedLayers={ad.classified_layers}
                       onLayerOverridesChange={handleLayerOverride}
                       initialOverrides={layerOverrides}
                     />
@@ -857,6 +896,7 @@ export default function AdEdit() {
                   <InteractiveSvgEditor
                     svgUrl={editingResize.resized_svg_url}
                     layers={editingResize.resized_layers}
+                    classifiedLayers={editingResize.resized_layers}
                     onLayerOverridesChange={handleResizeOverridesChange}
                     initialOverrides={editingResize.layer_overrides || {}}
                   />

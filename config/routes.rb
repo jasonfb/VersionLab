@@ -57,6 +57,8 @@ Rails.application.routes.draw do
           get  :resizes
           get  :results
           get  :download_version
+          get  :classifications
+          post :confirm_classifications
         end
         resources :ad_resizes, only: [:update], controller: "ad_resizes"
       end

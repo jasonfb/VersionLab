@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_30_173324) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_31_194310) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -30,6 +30,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_30_173324) do
   create_enum "autolink_mode", ["none", "link_relevant_text"]
   create_enum "campaign_ai_summary_state", ["idle", "generating", "generated", "failed"]
   create_enum "campaign_status", ["draft", "active", "completed", "archived"]
+  create_enum "element_role", ["headline", "subhead", "body", "cta", "logo", "background", "decoration"]
   create_enum "email_state", ["setup", "pending", "merged", "regenerating"]
   create_enum "email_version_state", ["generating", "active", "rejected"]
   create_enum "payment_status", ["succeeded", "failed", "pending", "refunded"]
@@ -94,6 +95,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_30_173324) do
     t.index ["ad_id", "audience_id"], name: "index_ad_audiences_on_ad_id_and_audience_id", unique: true
   end
 
+  create_table "ad_fonts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ad_id", null: false
+    t.datetime "created_at", null: false
+    t.string "font_name", null: false
+    t.string "postscript_name"
+    t.datetime "updated_at", null: false
+    t.index ["ad_id"], name: "index_ad_fonts_on_ad_id"
+  end
+
   create_table "ad_resizes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "ad_id", null: false
     t.string "aspect_ratio"
@@ -133,6 +143,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_30_173324) do
     t.string "background_color", default: "#000000"
     t.enum "background_type", default: "solid_color", enum_type: "ad_background_type"
     t.uuid "campaign_id"
+    t.boolean "classifications_confirmed", default: false, null: false
+    t.jsonb "classified_layers", default: [], null: false
     t.uuid "client_id", null: false
     t.datetime "created_at", null: false
     t.jsonb "file_warnings", default: []
@@ -719,6 +731,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_30_173324) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "ad_audiences", "ads"
   add_foreign_key "ad_audiences", "audiences"
+  add_foreign_key "ad_fonts", "ads"
   add_foreign_key "ad_resizes", "ads"
   add_foreign_key "ad_versions", "ad_resizes"
   add_foreign_key "ad_versions", "ads"
