@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { apiFetch } from '~/lib/api'
 
 const ROLE_OPTIONS = [
@@ -27,7 +27,10 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
   const [layers, setLayers] = useState([])
   const [loading, setLoading] = useState(true)
   const [confirming, setConfirming] = useState(false)
-  const [hoveredLayerId, setHoveredLayerId] = useState(null)
+  const [selectedLayerId, setSelectedLayerId] = useState(null)
+  const [svgMarkup, setSvgMarkup] = useState(null)
+  const [viewMode, setViewMode] = useState('fit') // 'fit' or 'natural'
+  const svgContainerRef = useRef(null)
 
   useEffect(() => {
     if (!ad?.id) return
@@ -38,6 +41,40 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [ad?.id, clientId])
+
+  // Fetch raw SVG content once
+  const [rawSvg, setRawSvg] = useState(null)
+  useEffect(() => {
+    if (!ad?.svg_url) return
+    fetch(ad.svg_url)
+      .then((res) => res.text())
+      .then((text) => setRawSvg(text))
+      .catch(() => {})
+  }, [ad?.svg_url])
+
+  // Pre-process SVG markup string to set sizing before it hits the DOM.
+  // This avoids the race condition where dangerouslySetInnerHTML renders
+  // the SVG at native size before a useEffect can adjust attributes.
+  useEffect(() => {
+    if (!rawSvg) return
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(rawSvg, 'image/svg+xml')
+    const svg = doc.querySelector('svg')
+    if (!svg) { setSvgMarkup(rawSvg); return }
+
+    svg.style.display = 'block'
+    svg.style.opacity = '0.4'
+
+    if (viewMode === 'fit') {
+      svg.setAttribute('width', '100%')
+      svg.removeAttribute('height')
+    } else {
+      svg.setAttribute('width', ad.width || svg.getAttribute('viewBox')?.split(' ')[2] || '100%')
+      svg.setAttribute('height', ad.height || svg.getAttribute('viewBox')?.split(' ')[3] || 'auto')
+    }
+
+    setSvgMarkup(svg.outerHTML)
+  }, [rawSvg, viewMode])
 
   const updateRole = (index, newRole) => {
     setLayers((prev) => prev.map((l, i) =>
@@ -89,52 +126,83 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
     <div className="row g-4">
       {/* Left: SVG preview with highlighted elements */}
       <div className="col-lg-6">
-        <label className="form-label fw-semibold small text-uppercase text-muted mb-2">
-          Element Preview
-        </label>
+        <div className="d-flex align-items-center justify-content-between mb-2">
+          <label className="form-label fw-semibold small text-uppercase text-muted mb-0">
+            Element Preview
+          </label>
+          <div className="btn-group btn-group-sm">
+            <button
+              className={`btn ${viewMode === 'fit' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setViewMode('fit')}
+            >
+              Fit
+            </button>
+            <button
+              className={`btn ${viewMode === 'natural' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setViewMode('natural')}
+            >
+              100%
+            </button>
+          </div>
+        </div>
         {ad.svg_url ? (
-          <div className="position-relative border rounded overflow-hidden" style={{ background: '#1a1a1a' }}>
-            <img
-              src={ad.svg_url}
-              alt={ad.name}
-              style={{ display: 'block', width: '100%', height: 'auto', opacity: 0.4 }}
-            />
+          <div
+            className="position-relative border rounded"
+            style={{
+              background: '#1a1a1a',
+              ...(viewMode === 'natural'
+                ? { overflow: 'auto', maxHeight: 600 }
+                : { overflow: 'hidden' }),
+            }}
+          >
+            <div ref={svgContainerRef} dangerouslySetInnerHTML={{ __html: svgMarkup || '' }} />
             {/* Overlay layer highlights */}
             <svg
               viewBox={`0 0 ${ad.width || 100} ${ad.height || 100}`}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                ...(viewMode === 'fit'
+                  ? { width: '100%', height: '100%' }
+                  : { width: ad.width || 100, height: ad.height || 100 }),
+              }}
             >
               {textLayers.map((layer, i) => {
                 const x = parseFloat(layer.x) || 0
                 const y = parseFloat(layer.y) || 0
                 const w = parseFloat(layer.width) || (ad.width * 0.4)
                 const h = parseFloat(layer.height) || (parseFloat(layer.font_size) || 20) * 1.5
-                const isHovered = hoveredLayerId === layer.id
-                const color = roleColor(layer.role)
+                const isSelected = selectedLayerId === layer.id
                 return (
-                  <g key={layer.id || i}>
+                  <g
+                    key={layer.id || i}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
+                  >
                     <rect
                       x={x}
-                      y={y - h + (parseFloat(layer.font_size) || 20) * 0.3}
+                      y={y}
                       width={w}
                       height={h}
-                      fill={color}
-                      fillOpacity={isHovered ? 0.4 : 0.2}
-                      stroke={color}
-                      strokeWidth={isHovered ? 3 : 1.5}
-                      strokeDasharray={isHovered ? 'none' : '4 2'}
+                      fill="#00b4d8"
+                      fillOpacity={isSelected ? 0.35 : 0.12}
+                      stroke={isSelected ? '#00b4d8' : 'rgba(255,255,255,0.6)'}
+                      strokeWidth={isSelected ? 3 : 1.5}
+                      strokeDasharray={isSelected ? 'none' : '6 3'}
                       rx={3}
                     />
-                    <text
-                      x={x + 4}
-                      y={y - h + (parseFloat(layer.font_size) || 20) * 0.3 + 12}
-                      fill={color}
-                      fontSize="11"
-                      fontWeight="600"
-                      fontFamily="sans-serif"
-                    >
-                      {layer.role?.toUpperCase()}
-                    </text>
+                    {isSelected && (
+                      <text
+                        x={x + 4}
+                        y={y + 14}
+                        fill="#00b4d8"
+                        fontSize="11"
+                        fontWeight="600"
+                        fontFamily="sans-serif"
+                      >
+                        {layer.role?.toUpperCase()}
+                      </text>
+                    )}
                   </g>
                 )
               })}
@@ -168,20 +236,19 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
           {textLayers.map((layer, i) => {
             const globalIndex = layers.indexOf(layer)
             const conf = confidenceLabel(layer.confidence || 0)
+            const isSelected = selectedLayerId === layer.id
             return (
               <div
                 key={layer.id || i}
                 className={`d-flex align-items-start gap-3 p-3 ${i < textLayers.length - 1 ? 'border-bottom' : ''}`}
-                style={{ cursor: 'pointer' }}
-                onMouseEnter={() => setHoveredLayerId(layer.id)}
-                onMouseLeave={() => setHoveredLayerId(null)}
+                style={{
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? 'rgba(0, 180, 216, 0.08)' : 'transparent',
+                  borderLeft: isSelected ? '3px solid #00b4d8' : '3px solid transparent',
+                  transition: 'background-color 0.15s, border-color 0.15s',
+                }}
+                onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
               >
-                {/* Role color indicator */}
-                <div
-                  className="rounded-circle flex-shrink-0 mt-1"
-                  style={{ width: 12, height: 12, backgroundColor: roleColor(layer.role) }}
-                />
-
                 {/* Content + metadata */}
                 <div className="flex-grow-1 min-width-0">
                   <div className="d-flex align-items-center gap-2 mb-1">
@@ -206,9 +273,9 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                 {/* Role dropdown */}
                 <select
                   className="form-select form-select-sm flex-shrink-0"
-                  style={{ width: 130, borderColor: roleColor(layer.role) }}
+                  style={{ width: 130 }}
                   value={layer.role || ''}
-                  onChange={(e) => updateRole(globalIndex, e.target.value)}
+                  onChange={(e) => { e.stopPropagation(); updateRole(globalIndex, e.target.value) }}
                 >
                   {ROLE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
