@@ -2,7 +2,7 @@
 
 class Admin::AiKeysController < Admin::BaseController
   # regenerate this controller with
-  # bin/rails generate hot_glue:scaffold AiKey --namespace='admin' --gd --include='ai_service_id,-api_key,**name:'
+  # bin/rails generate hot_glue:scaffold AiKey --namespace='admin' --gd --include='ai_service_id:-api_key:**name:'
 
   helper :hot_glue
   include HotGlue::ControllerHelper

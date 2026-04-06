@@ -1,7 +1,7 @@
 PATH
   remote: /Users/jason/Work/Hot_Glue/hot-glue-private
   specs:
-    hot-glue (0.7.6)
+    hot-glue (0.7.6.1)
       ffaker (~> 2.16)
       rails (> 5.1)
 

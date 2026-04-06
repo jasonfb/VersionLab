@@ -1,7 +1,7 @@
-<div class='hg-col col-sm-10 ai_key--ai_service_id--api_key-**name'> <%= ai_key.ai_service.try(:name) || '<span class="content ">MISSING</span>'.html_safe %>
-<br />
-<br />
-<%= render partial: 'name', locals: {ai_key: ai_key } %></div>
+<div class='hg-col col-sm-4 ai_key--ai_service_id'> <%= ai_key.ai_service.try(:name) || '<span class="content ">MISSING</span>'.html_safe %>
+</div>
+<div class='hg-col col-sm-3 ai_key---api_key'> </div>
+<div class='hg-col col-sm-3 ai_key--**name'> <%= render partial: 'name', locals: {ai_key: ai_key } %></div>
 
 
 
