@@ -1,0 +1,21 @@
+<div class="row">
+  <div class='col-md-10 cell--ai_key--ai_service_id--api_key-**name' >  
+    <div class='<%= "alert alert-danger" if ai_key.errors.details.keys.include?(:ai_service) %>'  >
+        <%= f.collection_select(:ai_service_id, AiService.all, :id, :name, { prompt: true, selected: ai_key.ai_service_id }, class: 'form-control') %>
+      <br />
+      
+      <label class='text-muted small form-text' for=''>Ai service</label>
+    </div>
+     
+    <div class='<%= "alert alert-danger" if ai_key.errors.details.keys.include?(:api_key) %>'  >
+      <%= f.text_area :api_key, class: 'form-control', autocomplete: 'off', cols: 40, rows: '5' %>
+      <label class='text-muted small form-text' for=''>Api key</label>
+    </div>
+   <%= render partial: 'name', locals: {ai_key: ai_key } %>
+  </div>
+
+  <div class="col-md-2">
+    <%= link_to "Cancel", admin_ai_keys_path + (params[:page] ? "?page=" + params[:page] : ""),  {class: "btn btn-secondary"} %>
+    <%= f.submit "Save", class: "btn btn-primary pull-right" %>
+  </div>
+</div>

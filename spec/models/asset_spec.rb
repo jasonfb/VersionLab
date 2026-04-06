@@ -1,3 +1,26 @@
+# == Schema Information
+#
+# Table name: assets
+# Database name: primary
+#
+#  id                 :uuid             not null, primary key
+#  folder             :string
+#  height             :integer
+#  name               :string
+#  standardized_ratio :enum
+#  width              :integer
+#  created_at         :datetime         not null
+#  updated_at         :datetime         not null
+#  client_id          :uuid             not null
+#
+# Indexes
+#
+#  index_assets_on_client_id  (client_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (client_id => clients.id)
+#
 require 'rails_helper'
 
 RSpec.describe Asset, type: :model do

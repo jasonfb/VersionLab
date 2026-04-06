@@ -1,3 +1,15 @@
+# == Schema Information
+#
+# Table name: clients
+# Database name: primary
+#
+#  id         :uuid             not null, primary key
+#  hidden     :boolean          default(FALSE), not null
+#  name       :string           not null
+#  created_at :datetime         not null
+#  updated_at :datetime         not null
+#  account_id :uuid             not null
+#
 class Client < ApplicationRecord
   belongs_to :account
   has_many :ads, dependent: :destroy

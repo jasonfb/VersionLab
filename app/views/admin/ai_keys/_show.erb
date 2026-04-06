@@ -1,0 +1,24 @@
+<div class='hg-col col-sm-10 ai_key--ai_service_id--api_key-**name'> <%= ai_key.ai_service.try(:name) || '<span class="content ">MISSING</span>'.html_safe %>
+<br />
+<br />
+<%= render partial: 'name', locals: {ai_key: ai_key } %></div>
+
+
+
+
+
+
+
+<div class=" scaffold-line-buttons col-md-2" >
+  
+
+  
+    <%= form_with url: admin_ai_key_path(ai_key), html: {data: {'turbo-confirm': "Are you sure you want to delete #{ ai_key.to_label }?" }, style: "display: inline-block;"}, method: :delete do |f| %>
+      <%= f.submit "Delete".html_safe,  class: "delete-ai_key-button btn btn-primary btn-sm", disabled: (ai_key.respond_to?(:delete_able?) && ! ai_key.delete_able? ) %>
+    <% end %>
+  
+
+  
+  <%= link_to "Edit ".html_safe, edit_admin_ai_key_path(ai_key) + (params[:page] ? "?page=#{params[:page]}" : ""), disable_with: "Loading...", class: "edit-ai_key-button btn btn-primary btn-sm" %>
+  
+</div>

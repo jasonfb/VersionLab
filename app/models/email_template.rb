@@ -1,3 +1,16 @@
+# == Schema Information
+#
+# Table name: email_templates
+# Database name: primary
+#
+#  id                       :uuid             not null, primary key
+#  name                     :string
+#  original_raw_source_html :text
+#  raw_source_html          :text
+#  created_at               :datetime         not null
+#  updated_at               :datetime         not null
+#  client_id                :uuid             not null
+#
 class EmailTemplate < ApplicationRecord
   belongs_to :client
   has_many :sections, class_name: "EmailTemplateSection", dependent: :destroy

@@ -1,0 +1,3 @@
+<%= turbo_stream.replace "admin__#{dom_id(@ai_key)}" do %>
+  <%= render 'edit', locals: { ai_key: @ai_key } %>
+<% end %>

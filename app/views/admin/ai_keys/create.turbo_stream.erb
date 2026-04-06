@@ -1,0 +1,24 @@
+<% if @ai_key.errors.none? %>
+  <%= turbo_stream.replace "admin__ai_keys-list" + "" do %>
+  <%= render partial: "list", locals: {ai_keys: @ai_keys,
+  
+} %>
+
+<% end %>
+  <% end %>
+<!-- parental updated -->
+
+<!-- errors -->
+  <%= turbo_stream.replace "admin__ai_key-new" do %>
+  <% if @ai_key.errors.none? %>
+  <%= render partial: "new_button", locals: {
+
+
+} %>
+  <% else %>
+  <%= render partial: "new_form", locals: {ai_key: @ai_key,  } %>
+  <% end %>
+  <% end %>
+  <%= turbo_stream.replace "flash_notices" do %>
+  <%= render partial: "layouts/flash_notices", locals: {resource: @ai_key} %>
+<% end %>

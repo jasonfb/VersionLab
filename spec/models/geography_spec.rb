@@ -1,3 +1,14 @@
+# == Schema Information
+#
+# Table name: geographies
+# Database name: primary
+#
+#  id         :uuid             not null, primary key
+#  name       :string           not null
+#  position   :integer          default(0), not null
+#  created_at :datetime         not null
+#  updated_at :datetime         not null
+#
 require 'rails_helper'
 
 RSpec.describe Geography, type: :model do

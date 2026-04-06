@@ -1,0 +1,16 @@
+<%= turbo_frame_tag "admin__ai_key-new" do %>
+  <h3>
+    New Ai Key
+  </h3>
+  <%= form_with model:  ai_key,
+         url: admin_ai_keys_path, method: :post do  |f| %>
+  <%=  render partial: "admin/ai_keys/form", locals: {
+    ai_key: ai_key,
+    f: f,
+    
+} %>
+
+
+<% end %>
+
+<% end %>

@@ -1,9 +1,10 @@
 module AiProviders
   module Factory
     TEXT_PROVIDERS = {
-      "openai"    => AiProviders::Openai,
-      "anthropic" => AiProviders::Anthropic,
-      "google"    => AiProviders::Gemini
+      "openai"      => AiProviders::Openai,
+      "anthropic"   => AiProviders::Anthropic,
+      "google"      => AiProviders::Gemini,
+      "perplexity"  => AiProviders::Perplexity
     }.freeze
 
     IMAGE_PROVIDERS = {

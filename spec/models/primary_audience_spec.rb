@@ -1,3 +1,14 @@
+# == Schema Information
+#
+# Table name: primary_audiences
+# Database name: primary
+#
+#  id         :uuid             not null, primary key
+#  name       :string           not null
+#  position   :integer          default(0), not null
+#  created_at :datetime         not null
+#  updated_at :datetime         not null
+#
 require 'rails_helper'
 
 RSpec.describe PrimaryAudience, type: :model do

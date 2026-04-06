@@ -1,3 +1,23 @@
+# == Schema Information
+#
+# Table name: ad_fonts
+# Database name: primary
+#
+#  id              :uuid             not null, primary key
+#  font_name       :string           not null
+#  postscript_name :string
+#  created_at      :datetime         not null
+#  updated_at      :datetime         not null
+#  ad_id           :uuid             not null
+#
+# Indexes
+#
+#  index_ad_fonts_on_ad_id  (ad_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (ad_id => ads.id)
+#
 class AdFont < ApplicationRecord
   belongs_to :ad
 

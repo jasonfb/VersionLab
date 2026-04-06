@@ -63,26 +63,28 @@ end
 gem "vite_rails", "~> 3.0"
 gem "turbo-rails"
 
-gem "rspec-rails", "~> 8.0", groups: [:development, :test]
-gem "rspec-wait", "~> 1.0", groups: [:development, :test]
-gem "factory_bot_rails", "~> 6.5", groups: [:development, :test]
-gem "ffaker", "~> 2.25", groups: [:development, :test]
-gem "vcr", "~> 6.4", groups: [:development, :test]
-gem "simplecov", "~> 0.22.0", groups: [:development, :test]
-gem "dotenv-rails", "~> 3.2", groups: [:development, :test]
-gem "webmock", "~> 3.26", groups: [:development, :test]
+gem "rspec-rails", "~> 8.0", groups: [ :development, :test ]
+gem "rspec-wait", "~> 1.0", groups: [ :development, :test ]
+gem "factory_bot_rails", "~> 6.5", groups: [ :development, :test ]
+gem "ffaker", "~> 2.25", groups: [ :development, :test ]
+gem "vcr", "~> 6.4", groups: [ :development, :test ]
+gem "simplecov", "~> 0.22.0", groups: [ :development, :test ]
+gem "dotenv-rails", "~> 3.2", groups: [ :development, :test ]
+gem "webmock", "~> 3.26", groups: [ :development, :test ]
 
 gem "simplecov-rcov", "~> 0.3.7", group: :test
 gem "launchy", "~> 3.1", group: :test
 
-gem "bullet", "~> 8.1", groups: [:development, :test]
-gem "active_record_query_trace", "~> 1.9", groups: [:development, :test]
-gem "byebug", "~> 13.0", groups: [:development, :test]
-gem "annotaterb", "~> 4.21", groups: [:development, :test]
+gem "bullet", "~> 8.1", groups: [ :development, :test ]
+gem "active_record_query_trace", "~> 1.9", groups: [ :development, :test ]
+gem "byebug", "~> 13.0", groups: [ :development, :test ]
+gem "annotaterb", "~> 4.21", groups: [ :development, :test ]
 
 gem "rubycritic", "~> 5.0", group: :dev
 
-gem "hot-glue", "~> 0.7.5"
+# gem "hot-glue", "~> 0.7.6"
+gem "hot-glue", path: "/Users/jason/Work/Hot_Glue/hot-glue-private"
+
 
 gem "cssbundling-rails", "~> 1.4"
 

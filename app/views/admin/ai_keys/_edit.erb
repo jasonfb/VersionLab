@@ -1,0 +1,18 @@
+<%= turbo_frame_tag "admin__#{dom_id(ai_key)}" do  %>
+<div class="cell editable" style="position: relative;">
+  <% if ai_key.errors.any? %>
+  <%= render(partial: "admin/errors", locals: {resource: ai_key }) %>
+  <% end %>
+  <h2>Editing <%= ai_key.to_label %></h2>
+  <%= form_with model: ai_key,
+   url: admin_ai_key_path(ai_key) do |f| %>
+    <%=  render partial: "admin/ai_keys/form", locals: {
+      ai_key: ai_key,
+      f: f,
+      
+  } %>
+  
+  <% end %>
+  
+</div>
+<% end %>
