@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { apiFetch } from '~/lib/api'
+import ReactDOM from 'react-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { apiFetch, apiUpload } from '~/lib/api'
 import { subscribeAdChannel } from '~/lib/cable'
 import { useAccount } from '../layout/AccountContext'
 import AdStyleGuideModal from './AdStyleGuideModal'
 import InteractiveSvgEditor from './InteractiveSvgEditor'
+import CompositePreview from './CompositePreview'
 import AdResizePicker from './AdResizePicker'
 import AdElementClassifier from './AdElementClassifier'
 
@@ -24,6 +26,7 @@ const PLATFORM_HINTS = {
 export default function AdEdit() {
   const { clientId, adId } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const ctx = useAccount()
 
   const [ad, setAd] = useState(null)
@@ -40,11 +43,22 @@ export default function AdEdit() {
   const [layerOverrides, setLayerOverrides] = useState({})
 
   // Four-step flow state: 1 = classify, 2 = resize, 3 = style, 4 = version
-  const [step, setStep] = useState(1)
+  // Synced with ?step= query param so reloads preserve position
+  const STEP_NAMES = { 1: 'classify', 2: 'resize', 3: 'style', 4: 'version' }
+  const STEP_FROM_NAME = { classify: 1, resize: 2, style: 3, version: 4 }
+  const stepParam = searchParams.get('step')
+  const [step, setStepRaw] = useState(STEP_FROM_NAME[stepParam] || 1)
+  const setStep = (n) => {
+    setStepRaw(n)
+    setSearchParams({ step: STEP_NAMES[n] || 'classify' }, { replace: true })
+  }
   const [selectedPlatforms, setSelectedPlatforms] = useState([])
   const [resizes, setResizes] = useState([])
   const [resizing, setResizing] = useState(false)
   const [editingResize, setEditingResize] = useState(null)
+  const [stylePreviewResizeId, setStylePreviewResizeId] = useState(null) // null = original, or resize ID
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false)
+  const [styleEditingLayer, setStyleEditingLayer] = useState(null) // layer being edited in style step
 
   useEffect(() => {
     if (!clientId || !adId) return
@@ -84,26 +98,30 @@ export default function AdEdit() {
         play_button_color: a.play_button_color || '#FFFFFF',
       })
 
-      // Determine initial step based on ad state
-      if (['pending', 'merged', 'regenerating'].includes(a.state)) {
-        // Already versioning — go to step 4
-        setStep(4)
-        if (a.has_resizes) {
-          apiFetch(`/api/clients/${clientId}/ads/${adId}/resizes`).then((r) => setResizes(r))
+      // Load resizes if they exist
+      const resizePromise = (a.has_resizes || a.state === 'resizing')
+        ? apiFetch(`/api/clients/${clientId}/ads/${adId}/resizes`).then((r) => { setResizes(r); return r })
+        : Promise.resolve([])
+
+      resizePromise.then((loadedResizes) => {
+        // If URL has a step param, respect it (user reloaded or navigated back)
+        const urlStep = STEP_FROM_NAME[new URLSearchParams(window.location.search).get('step')]
+        if (urlStep) {
+          setStep(urlStep)
+          return
         }
-      } else if (a.has_resizes || a.state === 'resizing') {
-        // Has resizes — go to step 2 (resize)
-        apiFetch(`/api/clients/${clientId}/ads/${adId}/resizes`).then((r) => {
-          setResizes(r)
-          if (r.length > 0) setStep(2)
-        })
-      } else if (a.classifications_confirmed) {
-        // Classifications confirmed but no resizes yet — go to step 2 (resize)
-        setStep(2)
-      } else {
-        // Start at step 1 (classify)
-        setStep(1)
-      }
+
+        // Otherwise determine initial step from ad state
+        if (['pending', 'merged', 'regenerating'].includes(a.state)) {
+          setStep(4)
+        } else if (loadedResizes.length > 0) {
+          setStep(2)
+        } else if (a.classifications_confirmed) {
+          setStep(2)
+        } else {
+          setStep(1)
+        }
+      })
     }).catch(() => {}).finally(() => setLoading(false))
   }, [clientId, adId])
 
@@ -205,22 +223,25 @@ export default function AdEdit() {
     setEditingResize(resize)
   }
 
-  const handleResizeOverridesChange = async (layerId, overrides) => {
-    if (!editingResize) return
+  const handleResizeOverridesChange = async (layerId, overrides, resizeId) => {
+    const targetId = resizeId || editingResize?.id
+    if (!targetId) return
+    const targetResize = resizes.find((r) => r.id === targetId)
+    if (!targetResize) return
     const updatedOverrides = {
-      ...editingResize.layer_overrides,
-      [layerId]: { ...(editingResize.layer_overrides?.[layerId] || {}), ...overrides },
+      ...targetResize.layer_overrides,
+      [layerId]: { ...(targetResize.layer_overrides?.[layerId] || {}), ...overrides },
     }
     try {
       const updated = await apiFetch(
-        `/api/clients/${clientId}/ads/${adId}/ad_resizes/${editingResize.id}`,
+        `/api/clients/${clientId}/ads/${adId}/ad_resizes/${targetId}`,
         {
           method: 'PATCH',
           body: JSON.stringify({ layer_overrides: updatedOverrides }),
         }
       )
       setResizes((prev) => prev.map((r) => r.id === updated.id ? updated : r))
-      setEditingResize(updated)
+      if (editingResize?.id === targetId) setEditingResize(updated)
     } catch (e) {
       console.error('Failed to save resize overrides:', e)
     }
@@ -241,11 +262,20 @@ export default function AdEdit() {
     setForm({ ...form, audience_ids: ids })
   }
 
+  const saveOverridesTimer = useRef(null)
   const handleLayerOverride = (layerId, overrides) => {
-    setLayerOverrides((prev) => ({
-      ...prev,
-      [layerId]: { ...(prev[layerId] || {}), ...overrides },
-    }))
+    setLayerOverrides((prev) => {
+      const updated = { ...prev, [layerId]: { ...(prev[layerId] || {}), ...overrides } }
+      // Debounced auto-save to server
+      clearTimeout(saveOverridesTimer.current)
+      saveOverridesTimer.current = setTimeout(() => {
+        apiFetch(`/api/clients/${clientId}/ads/${adId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ ad: { layer_overrides: updated } }),
+        }).catch((e) => console.error('Auto-save layer overrides failed:', e))
+      }, 500)
+      return updated
+    })
   }
 
   const stateBadge = (state) => {
@@ -433,18 +463,29 @@ export default function AdEdit() {
                     />
                   </div>
                 )}
-                {form.background_type === 'image' && (
-                  <select
-                    className="form-select form-select-sm"
-                    value={form.background_asset_id}
-                    onChange={(e) => setForm({ ...form, background_asset_id: e.target.value })}
-                  >
-                    <option value="">Select an asset…</option>
-                    {assets.filter((a) => a.file_url).map((a) => (
-                      <option key={a.id} value={a.id}>{a.name}</option>
-                    ))}
-                  </select>
-                )}
+                {form.background_type === 'image' && (() => {
+                  const selectedAsset = assets.find((a) => a.id === form.background_asset_id)
+                  return (
+                    <div>
+                      {selectedAsset ? (
+                        <div className="d-flex align-items-center gap-2 mb-2">
+                          <img src={selectedAsset.url} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4 }} />
+                          <div className="flex-grow-1 min-width-0">
+                            <small className="d-block text-truncate fw-semibold">{selectedAsset.name}</small>
+                            <small className="text-muted">{selectedAsset.width}x{selectedAsset.height}</small>
+                          </div>
+                          <button className="btn btn-sm btn-outline-secondary" onClick={() => setForm({ ...form, background_asset_id: '' })}>
+                            <i className="bi bi-x"></i>
+                          </button>
+                        </div>
+                      ) : null}
+                      <button className="btn btn-sm btn-outline-danger" onClick={() => setAssetPickerOpen(true)}>
+                        <i className="bi bi-image me-1"></i>
+                        {selectedAsset ? 'Change Image' : 'Choose from Library'}
+                      </button>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Overlay */}
@@ -606,48 +647,133 @@ export default function AdEdit() {
               </div>
             </div>
 
-            {/* Right panel: preview */}
+            {/* Right panel: size selector + preview */}
             <div className="col-lg-7">
               <div className="sticky-top" style={{ top: '1rem' }}>
-                <label className="form-label fw-semibold small text-uppercase text-muted mb-2">Preview</label>
-                {hasSvg ? (
-                  <div className="position-relative rounded overflow-hidden border" style={{ ...( form.background_type === 'solid_color' ? { backgroundColor: form.background_color } : {} ), maxWidth: '100%' }}>
-                    <InteractiveSvgEditor
-                      svgUrl={ad.svg_url}
-                      layers={ad.parsed_layers}
-                      classifiedLayers={ad.classified_layers}
-                      onLayerOverridesChange={handleLayerOverride}
-                      initialOverrides={layerOverrides}
-                    />
-                    {form.overlay_enabled && (
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: form.overlay_type === 'gradient'
-                          ? `linear-gradient(to bottom, transparent, ${form.overlay_color}${Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0')})`
-                          : form.overlay_color + Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0'),
-                        pointerEvents: 'none',
-                      }} />
-                    )}
-                    {form.play_button_enabled && (
-                      <div className="position-absolute top-50 start-50 translate-middle" style={{ pointerEvents: 'none' }}>
-                        <PlayButtonIcon style={form.play_button_style} color={form.play_button_color} />
+                {/* Size selector pills */}
+                {(() => {
+                  const readyResizes = resizes.filter((r) => r.state === 'resized' && r.resized_svg_url)
+                  const activeResize = readyResizes.find((r) => r.id === stylePreviewResizeId)
+                  const bgAsset = assets.find((a) => a.id === form.background_asset_id)
+                  const bgAssetUrl = bgAsset?.file_url || bgAsset?.url
+
+                  // Determine preview dimensions
+                  const previewW = activeResize ? activeResize.width : (ad.width || 1080)
+                  const previewH = activeResize ? activeResize.height : (ad.height || 1080)
+
+                  return (
+                    <>
+                      <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                        <span className="small text-muted fw-semibold text-uppercase me-1">Preview:</span>
+                        <button
+                          className={`btn btn-sm ${!stylePreviewResizeId ? 'btn-dark' : 'btn-outline-secondary'}`}
+                          onClick={() => setStylePreviewResizeId(null)}
+                        >
+                          Original ({ad.width}x{ad.height})
+                        </button>
+                        {readyResizes.map((r) => (
+                          <button
+                            key={r.id}
+                            className={`btn btn-sm ${stylePreviewResizeId === r.id ? 'btn-dark' : 'btn-outline-secondary'}`}
+                            onClick={() => setStylePreviewResizeId(r.id)}
+                          >
+                            {r.width}x{r.height}
+                          </button>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <AdPreview
-                    ad={ad}
-                    form={form}
-                    isPdf={isPdf}
-                    isSvg={isSvg}
-                  />
-                )}
+                      {activeResize && (
+                        <small className="text-muted d-block mb-2">
+                          {activeResize.platform_labels?.map((l) => typeof l === 'string' ? l : `${l.platform} ${l.size_name}`).join(', ')}
+                        </small>
+                      )}
+
+                      {/* Preview container with background + SVG overlay */}
+                      <div
+                        className="position-relative rounded overflow-hidden border"
+                        style={{ maxWidth: '100%', aspectRatio: `${previewW} / ${previewH}`, maxHeight: 600, background: '#1a1a1a' }}
+                      >
+                        {/* Background layer */}
+                        {form.background_type === 'image' && bgAssetUrl ? (
+                          <img
+                            src={bgAssetUrl}
+                            alt=""
+                            style={{
+                              position: 'absolute', inset: 0,
+                              width: '100%', height: '100%',
+                              objectFit: 'cover', objectPosition: 'center',
+                              zIndex: 0,
+                            }}
+                          />
+                        ) : form.background_type === 'solid_color' ? (
+                          <div style={{ position: 'absolute', inset: 0, backgroundColor: form.background_color, zIndex: 0 }} />
+                        ) : null}
+
+                        {/* Composite preview layer — always reconstructed from metadata */}
+                        <div style={{ position: 'relative', zIndex: 1 }}>
+                          <CompositePreview
+                            width={previewW}
+                            height={previewH}
+                            layers={activeResize ? activeResize.resized_layers : (ad.classified_layers || ad.parsed_layers)}
+                            fonts={ad.fonts}
+                            layerOverrides={activeResize ? activeResize.layer_overrides : layerOverrides}
+                            onLayerOverridesChange={activeResize
+                              ? (layerId, overrides) => handleResizeOverridesChange(layerId, overrides, activeResize.id)
+                              : handleLayerOverride
+                            }
+                            onEditLayer={(layer) => setStyleEditingLayer(layer)}
+                          />
+                        </div>
+
+                        {/* Overlay layer */}
+                        {form.overlay_enabled && (
+                          <div style={{
+                            position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none',
+                            background: form.overlay_type === 'gradient'
+                              ? `linear-gradient(to bottom, transparent, ${form.overlay_color}${Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0')})`
+                              : form.overlay_color + Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0'),
+                          }} />
+                        )}
+
+                        {/* Play button layer */}
+                        {form.play_button_enabled && (
+                          <div className="position-absolute top-50 start-50 translate-middle" style={{ zIndex: 3, pointerEvents: 'none' }}>
+                            <PlayButtonIcon style={form.play_button_style} color={form.play_button_color} />
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           </div>
         </>
       )}
+
+      {/* Style step inline text editor */}
+      {styleEditingLayer && (() => {
+        const layer = styleEditingLayer
+        const overrides = layerOverrides?.[layer.id] || {}
+        const fontName = (overrides.font_family || layer.font_family || '').toLowerCase()
+        const initial = {
+          content: overrides.content || layer.content || '',
+          font_family: overrides.font_family || layer.font_family || 'sans-serif',
+          font_size: overrides.font_size || layer.font_size || '24',
+          is_bold: overrides.is_bold ?? layer.is_bold ?? /bold|black|heavy/.test(fontName),
+          is_italic: overrides.is_italic ?? layer.is_italic ?? /italic|oblique/.test(fontName),
+          is_underline: overrides.is_underline ?? false,
+          fill: overrides.fill || layer.fill || layer.color || '#FFFFFF',
+          letter_spacing: overrides.letter_spacing || '0',
+          line_height: overrides.line_height || '1.3',
+          text_align: overrides.text_align || layer.text_align || layer.align || 'left',
+        }
+        return <StyleLayerEditor
+          key={layer.id}
+          initial={initial}
+          onChange={(updated) => handleLayerOverride(layer.id, updated)}
+          onClose={() => setStyleEditingLayer(null)}
+        />
+      })()}
 
       {/* Step 4: Version settings + preview */}
       {step === 4 && (
@@ -912,6 +1038,112 @@ export default function AdEdit() {
         </div>
       )}
 
+      {/* Background asset picker modal */}
+      {assetPickerOpen && (() => {
+        const maxW = Math.max(ad.width || 0, ...resizes.map((r) => r.width || 0))
+        const maxH = Math.max(ad.height || 0, ...resizes.map((r) => r.height || 0))
+        const imageAssets = assets.filter((a) => a.url && a.width && a.height)
+        const eligible = imageAssets.filter((a) => a.width >= maxW && a.height >= maxH)
+        const tooSmall = imageAssets.filter((a) => a.width < maxW || a.height < maxH)
+
+        return (
+          <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }} onClick={() => setAssetPickerOpen(false)}>
+            <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Select Background Image</h5>
+                  <button className="btn-close" onClick={() => setAssetPickerOpen(false)} />
+                </div>
+                <div className="modal-body">
+                  {eligible.length > 0 && (
+                    <div className="mb-4">
+                      <small className="text-muted fw-semibold d-block mb-2">
+                        Images {maxW}x{maxH}px or larger
+                      </small>
+                      <div className="row g-3">
+                        {eligible.map((a) => (
+                          <div key={a.id} className="col-4 col-md-3">
+                            <div
+                              className="border rounded overflow-hidden"
+                              style={{
+                                cursor: 'pointer',
+                                borderColor: form.background_asset_id === a.id ? '#dc3545' : undefined,
+                                borderWidth: form.background_asset_id === a.id ? 3 : 1,
+                              }}
+                              onClick={() => {
+                                setForm({ ...form, background_asset_id: a.id })
+                                setAssetPickerOpen(false)
+                              }}
+                            >
+                              <img src={a.url} alt={a.name} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover' }} />
+                              <div className="p-1">
+                                <small className="d-block text-truncate fw-semibold" style={{ fontSize: '0.7rem' }}>{a.name}</small>
+                                <small className="text-muted" style={{ fontSize: '0.65rem' }}>{a.width}x{a.height}</small>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {tooSmall.length > 0 && (
+                    <div>
+                      <small className="text-muted fw-semibold d-block mb-2">Too small for your sizes</small>
+                      <div className="row g-3">
+                        {tooSmall.map((a) => (
+                          <div key={a.id} className="col-4 col-md-3" style={{ opacity: 0.4 }}>
+                            <div className="border rounded overflow-hidden" title={`${a.width}x${a.height} — needs at least ${maxW}x${maxH}`}>
+                              <img src={a.url} alt={a.name} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover' }} />
+                              <div className="p-1">
+                                <small className="d-block text-truncate" style={{ fontSize: '0.7rem' }}>{a.name}</small>
+                                <small className="text-muted" style={{ fontSize: '0.65rem' }}>{a.width}x{a.height}</small>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {imageAssets.length === 0 && (
+                    <div className="text-center text-muted py-4">
+                      <i className="bi bi-image fs-2 d-block mb-2"></i>
+                      No images in your asset library yet.
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <label className="btn btn-outline-secondary" style={{ cursor: 'pointer' }}>
+                    <i className="bi bi-upload me-1"></i>Upload New Image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="d-none"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const fd = new FormData()
+                        fd.append('file', file)
+                        try {
+                          const newAsset = await apiUpload('/api/assets', fd)
+                          setAssets((prev) => [newAsset, ...prev])
+                          if (newAsset.width >= maxW && newAsset.height >= maxH) {
+                            setForm((f) => ({ ...f, background_asset_id: newAsset.id }))
+                            setAssetPickerOpen(false)
+                          }
+                        } catch (err) {
+                          console.error('Upload failed:', err)
+                        }
+                      }}
+                    />
+                  </label>
+                  <button className="btn btn-secondary" onClick={() => setAssetPickerOpen(false)}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       <AdStyleGuideModal
         open={styleGuideOpen}
         warnings={ad.file_warnings || []}
@@ -1009,6 +1241,86 @@ function AdPreview({ ad, form, isPdf, isSvg }) {
         </div>
       )}
     </div>
+  )
+}
+
+function StyleLayerEditor({ initial, onChange, onClose }) {
+  const [form, setForm] = React.useState(initial)
+  const posRef = React.useRef({ x: Math.min(window.innerWidth - 360, 100), y: 120 })
+  const [pos, setPos] = React.useState(posRef.current)
+  const dragRef = React.useRef(null)
+
+  const emit = (updated) => { setForm(updated); onChange?.(updated) }
+  const set = (key, val) => emit({ ...form, [key]: val })
+  const toggle = (key) => emit({ ...form, [key]: !form[key] })
+
+  const onDragStart = (e) => {
+    e.preventDefault()
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y }
+    const onMove = (ev) => {
+      const dx = ev.clientX - dragRef.current.startX, dy = ev.clientY - dragRef.current.startY
+      const np = { x: dragRef.current.origX + dx, y: dragRef.current.origY + dy }
+      posRef.current = np; setPos(np)
+    }
+    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp)
+  }
+
+  return ReactDOM.createPortal(
+    <div
+      className="bg-white shadow-lg rounded border"
+      style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, width: 340, maxHeight: '80vh', overflowY: 'auto', lineHeight: 'normal' }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-light" style={{ cursor: 'grab' }} onMouseDown={onDragStart}>
+        <span className="fw-semibold small text-uppercase" style={{ letterSpacing: '0.06em' }}>Edit Text</span>
+        <button className="btn btn-sm btn-link p-0 text-muted" onClick={onClose} onMouseDown={(e) => e.stopPropagation()}>
+          <i className="bi bi-x-lg"></i>
+        </button>
+      </div>
+      <div className="p-3" style={{ fontSize: '0.82rem' }}>
+        <div className="mb-3">
+          <label className="form-label text-uppercase text-muted fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>Font Family</label>
+          <input type="text" className="form-control form-control-sm" value={form.font_family} onChange={(e) => set('font_family', e.target.value)} />
+        </div>
+        <div className="row g-2 mb-3">
+          <div className="col-5">
+            <label className="form-label text-uppercase text-muted fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>Size</label>
+            <input type="number" className="form-control form-control-sm" value={form.font_size} onChange={(e) => set('font_size', e.target.value)} min={1} />
+          </div>
+          <div className="col-7">
+            <label className="form-label text-uppercase text-muted fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>Style</label>
+            <div className="btn-group btn-group-sm w-100">
+              <button className={`btn ${form.is_bold ? 'btn-danger' : 'btn-outline-secondary'}`} onClick={() => toggle('is_bold')} style={{ fontWeight: 'bold' }}>B</button>
+              <button className={`btn ${form.is_italic ? 'btn-danger' : 'btn-outline-secondary'}`} onClick={() => toggle('is_italic')} style={{ fontStyle: 'italic' }}>I</button>
+              <button className={`btn ${form.is_underline ? 'btn-danger' : 'btn-outline-secondary'}`} onClick={() => toggle('is_underline')} style={{ textDecoration: 'underline' }}>U</button>
+            </div>
+          </div>
+        </div>
+        <div className="mb-3">
+          <label className="form-label text-uppercase text-muted fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>Color</label>
+          <div className="d-flex align-items-center gap-2">
+            <input type="color" className="form-control form-control-color form-control-sm" style={{ width: 36, height: 32, padding: 2 }} value={form.fill} onChange={(e) => set('fill', e.target.value)} />
+            <input type="text" className="form-control form-control-sm" value={form.fill} onChange={(e) => set('fill', e.target.value)} />
+          </div>
+        </div>
+        <div className="mb-3">
+          <label className="form-label text-uppercase text-muted fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>Alignment</label>
+          <div className="btn-group btn-group-sm w-100">
+            {[{ val: 'left', icon: 'bi-text-left' }, { val: 'center', icon: 'bi-text-center' }, { val: 'right', icon: 'bi-text-right' }].map(({ val, icon }) => (
+              <button key={val} className={`btn ${form.text_align === val ? 'btn-danger' : 'btn-outline-secondary'}`} onClick={() => set('text_align', val)}>
+                <i className={`bi ${icon}`}></i>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mb-2">
+          <label className="form-label text-uppercase text-muted fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>Content</label>
+          <textarea className="form-control form-control-sm" rows={3} value={form.content} onChange={(e) => set('content', e.target.value)} />
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
 

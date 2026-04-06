@@ -40,7 +40,7 @@ describe 'Ad upload and versioning', type: :feature, js: true do
     let!(:audience) { Audience.create!(name: 'Cold Lapsed', client: client) }
     let!(:ai_service) { AiService.first || AiService.create!(name: 'OpenAI', slug: 'openai') }
     let!(:ai_model) { ai_service.ai_models.first || ai_service.ai_models.create!(name: 'GPT-4o', api_identifier: 'gpt-4o', for_text: true, for_image: false) }
-    let!(:ai_key) { AiKey.create!(account: account, ai_service: ai_service, api_key: 'sk-test-key-1234567890') }
+    let!(:ai_key) { AiKey.find_by(ai_service: ai_service) || AiKey.create!(ai_service: ai_service, api_key: 'sk-test-key-1234567890') }
 
     # Create an ad with a pre-parsed PDF so we can test the generation flow
     let!(:ad) do

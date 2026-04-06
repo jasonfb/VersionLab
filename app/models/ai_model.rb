@@ -1,5 +1,6 @@
 class AiModel < ApplicationRecord
   belongs_to :ai_service
+  has_many :ai_usage_summaries, dependent: :destroy
 
   validates :name, presence: true
   validates :api_identifier, presence: true

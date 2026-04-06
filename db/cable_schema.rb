@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_31_194310) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_02_125113) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -170,16 +170,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_31_194310) do
   end
 
   create_table "ai_keys", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "account_id", null: false
     t.uuid "ai_service_id", null: false
     t.text "api_key", null: false
     t.datetime "created_at", null: false
     t.string "label"
     t.datetime "updated_at", null: false
-    t.index ["account_id", "ai_service_id"], name: "index_ai_keys_on_account_id_and_ai_service_id", unique: true
+    t.index ["ai_service_id"], name: "index_ai_keys_on_ai_service_id", unique: true
   end
 
   create_table "ai_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "_cost_to_us_cents"
     t.uuid "account_id", null: false
     t.uuid "ai_model_id"
     t.uuid "ai_service_id"
@@ -204,7 +204,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_31_194310) do
     t.datetime "created_at", null: false
     t.boolean "for_image", default: false, null: false
     t.boolean "for_text", default: false, null: false
+    t.integer "input_cost_per_mtok_cents"
     t.string "name", null: false
+    t.integer "output_cost_per_mtok_cents"
     t.datetime "updated_at", null: false
     t.index ["ai_service_id"], name: "index_ai_models_on_ai_service_id"
   end
@@ -215,6 +217,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_31_194310) do
     t.string "slug", null: false
     t.datetime "updated_at", null: false
     t.index ["slug"], name: "index_ai_services_on_slug", unique: true
+  end
+
+  create_table "ai_usage_summaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "_cost_to_us_cents", default: 0, null: false
+    t.bigint "_input_tokens", default: 0, null: false
+    t.bigint "_output_tokens", default: 0, null: false
+    t.bigint "_total_tokens", default: 0, null: false
+    t.uuid "account_id", null: false
+    t.uuid "ai_model_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.date "usage_month", null: false
+    t.index ["account_id", "ai_model_id", "usage_month"], name: "idx_ai_usage_summaries_account_model_month", unique: true
   end
 
   create_table "assets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -738,6 +753,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_31_194310) do
   add_foreign_key "ad_versions", "audiences"
   add_foreign_key "ads", "clients"
   add_foreign_key "ai_logs", "accounts"
+  add_foreign_key "ai_usage_summaries", "accounts"
+  add_foreign_key "ai_usage_summaries", "ai_models"
   add_foreign_key "assets", "clients"
   add_foreign_key "brand_profile_geographies", "brand_profiles"
   add_foreign_key "brand_profile_geographies", "geographies"

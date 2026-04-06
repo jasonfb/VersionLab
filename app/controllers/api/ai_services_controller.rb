@@ -3,7 +3,7 @@ class Api::AiServicesController < Api::BaseController
     services = if params[:all]
       AiService.includes(:ai_models).order(:name)
     else
-      configured_ids = @current_account.ai_keys.pluck(:ai_service_id)
+      configured_ids = AiKey.pluck(:ai_service_id)
       AiService.where(id: configured_ids).includes(:ai_models).order(:name)
     end
 

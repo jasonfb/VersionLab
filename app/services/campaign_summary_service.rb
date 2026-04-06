@@ -23,8 +23,8 @@ class CampaignSummaryService
 
   def call
     account = @campaign.client.account
-    ai_key, ai_model = find_ai_credentials(account)
-    raise Error, "No text-capable AI key configured on this account" unless ai_key && ai_model
+    ai_service, ai_model = find_ai_credentials
+    raise Error, "No text-capable AI service configured" unless ai_service && ai_model
 
     document_texts = collect_document_texts
     link_summaries = collect_link_summaries
@@ -36,7 +36,7 @@ class CampaignSummaryService
       { role: "user", content: prompt }
     ]
 
-    result = AiProviders::Factory.for_text(ai_key).complete(
+    result = AiProviders::Factory.for_text(ai_service).complete(
       model: ai_model.api_identifier,
       messages: messages,
       temperature: 0.3
@@ -45,18 +45,18 @@ class CampaignSummaryService
     summary = result[:content]
     raise Error, "Empty response from AI" if summary.blank?
 
-    log_ai_call(account, ai_key, ai_model, messages, result, summary)
+    log_ai_call(account, ai_model, messages, result, summary)
 
     summary
   end
 
   private
 
-  def log_ai_call(account, ai_key, ai_model, messages, result, summary)
+  def log_ai_call(account, ai_model, messages, result, summary)
     AiLog.create!(
       account: account,
       call_type: :campaign_summary,
-      ai_service_id: ai_key.ai_service_id,
+      ai_service_id: ai_model.ai_service_id,
       ai_model: ai_model,
       loggable: @campaign,
       prompt: messages.to_json,
@@ -69,10 +69,10 @@ class CampaignSummaryService
     Rails.logger.error("AiLog failed to save for campaign #{@campaign.id}: #{e.message}")
   end
 
-  def find_ai_credentials(account)
-    account.ai_keys.includes(ai_service: :ai_models).each do |key|
+  def find_ai_credentials
+    AiKey.includes(ai_service: :ai_models).find_each do |key|
       model = key.ai_service.ai_models.find { |m| m.for_text? }
-      return [ key, model ] if model
+      return [ key.ai_service, model ] if model
     end
     [ nil, nil ]
   end

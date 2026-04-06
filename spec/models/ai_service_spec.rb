@@ -8,9 +8,9 @@ RSpec.describe AiService, type: :model do
       expect(assoc.options[:dependent]).to eq(:destroy)
     end
 
-    it "has many ai_keys with dependent destroy" do
-      assoc = described_class.reflect_on_association(:ai_keys)
-      expect(assoc.macro).to eq(:has_many)
+    it "has one ai_key with dependent destroy" do
+      assoc = described_class.reflect_on_association(:ai_key)
+      expect(assoc.macro).to eq(:has_one)
       expect(assoc.options[:dependent]).to eq(:destroy)
     end
   end

@@ -12,7 +12,7 @@ export default function SettingsPage() {
 
   const tabs = [
     { key: 'account', label: 'Account' },
-    { key: 'ai_keys', label: 'AI Keys' },
+    { key: 'usage', label: 'AI Usage' },
     { key: 'users', label: 'Users' },
     ...(hasBillingAccess ? [{ key: 'subscription', label: 'Subscription' }] : []),
   ]
@@ -34,7 +34,7 @@ export default function SettingsPage() {
       </ul>
 
       {tab === 'account' && <AccountTab />}
-      {tab === 'ai_keys' && <AiKeysTab />}
+      {tab === 'usage' && <UsageTab />}
       {tab === 'users' && <UsersTab />}
       {tab === 'subscription' && <SubscriptionTab />}
     </div>
@@ -146,165 +146,140 @@ function AccountTab() {
   )
 }
 
-// ─── AI Keys Tab ─────────────────────────────────────────────────────────────
+// ─── AI Usage Tab ────────────────────────────────────────────────────────────
 
-function AiKeysTab() {
-  const [services, setServices] = useState([])
-  const [keys, setKeys] = useState([])
+function UsageTab() {
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ ai_service_id: '', api_key: '', label: '' })
-  const [editingId, setEditingId] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
+  const [page, setPage] = useState(1)
+  const [expandedMonth, setExpandedMonth] = useState(null)
 
-  useEffect(() => {
-    Promise.all([
-      apiFetch('/api/ai_services?all=true'),
-      apiFetch('/api/ai_keys'),
-    ]).then(([s, k]) => {
-      setServices(s)
-      setKeys(k)
-    }).finally(() => setLoading(false))
-  }, [])
-
-  const resetForm = () => {
-    setForm({ ai_service_id: '', api_key: '', label: '' })
-    setEditingId(null)
-    setError(null)
+  const fetchUsage = (p) => {
+    setLoading(true)
+    apiFetch(`/api/ai_usage_summaries?page=${p}`)
+      .then((res) => {
+        setData(res)
+        if (p === 1 && res.usage.length > 0) {
+          setExpandedMonth(res.usage[0].month)
+        }
+      })
+      .finally(() => setLoading(false))
   }
 
-  const startEditing = (key) => {
-    setEditingId(key.id)
-    setForm({ ai_service_id: key.ai_service_id, api_key: '', label: key.label || '' })
-    setError(null)
+  useEffect(() => { fetchUsage(page) }, [page])
+
+  const formatTokens = (n) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+    return n.toLocaleString()
   }
 
-  const save = async () => {
-    setSaving(true)
-    setError(null)
-    try {
-      if (editingId) {
-        const body = { ai_key: { label: form.label } }
-        if (form.api_key) body.ai_key.api_key = form.api_key
-        const updated = await apiFetch(`/api/ai_keys/${editingId}`, {
-          method: 'PATCH',
-          body: JSON.stringify(body),
-        })
-        setKeys((prev) => prev.map((k) => (k.id === editingId ? updated : k)))
-      } else {
-        const created = await apiFetch('/api/ai_keys', {
-          method: 'POST',
-          body: JSON.stringify({ ai_key: form }),
-        })
-        setKeys((prev) => [created, ...prev])
-      }
-      resetForm()
-    } catch (err) {
-      setError(err.message || 'Failed to save')
-    } finally {
-      setSaving(false)
-    }
+  const formatMonth = (m) => {
+    const [year, month] = m.split('-')
+    const date = new Date(year, month - 1)
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
   }
 
-  const deleteKey = async (id) => {
-    if (!confirm('Delete this API key?')) return
-    await apiFetch(`/api/ai_keys/${id}`, { method: 'DELETE' })
-    setKeys((prev) => prev.filter((k) => k.id !== id))
-    if (editingId === id) resetForm()
-  }
+  if (loading && !data) return <Spinner />
 
-  const usedServiceIds = keys.map((k) => k.ai_service_id)
-  const availableServices = editingId
-    ? services
-    : services.filter((s) => !usedServiceIds.includes(s.id))
-
-  if (loading) return <Spinner />
-
-  return (
-    <div style={{ maxWidth: 600 }}>
-      <div className="card mb-4">
-        <div className="card-header fw-semibold">
-          {editingId ? 'Edit API Key' : 'Add API Key'}
-        </div>
-        <div className="card-body">
-          {error && <div className="alert alert-danger py-2 small">{error}</div>}
-          <div className="mb-3">
-            <label className="form-label fw-semibold">AI Service</label>
-            <select
-              className="form-select"
-              value={form.ai_service_id}
-              onChange={(e) => setForm({ ...form, ai_service_id: e.target.value })}
-              disabled={!!editingId}
-            >
-              <option value="">Select a service...</option>
-              {availableServices.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="mb-3">
-            <label className="form-label fw-semibold">API Key</label>
-            <input
-              type="password"
-              className="form-control"
-              value={form.api_key}
-              onChange={(e) => setForm({ ...form, api_key: e.target.value })}
-              placeholder={editingId ? 'Leave blank to keep current key' : 'Enter your API key'}
-            />
-          </div>
-          <div className="mb-3">
-            <label className="form-label fw-semibold">Label <span className="text-muted fw-normal">(optional)</span></label>
-            <input
-              type="text"
-              className="form-control"
-              value={form.label}
-              onChange={(e) => setForm({ ...form, label: e.target.value })}
-              placeholder="e.g. Production, Personal"
-            />
-          </div>
-          <div className="d-flex gap-2">
-            <button
-              className="btn btn-danger btn-sm"
-              onClick={save}
-              disabled={saving || (!editingId && (!form.ai_service_id || !form.api_key))}
-            >
-              {saving ? 'Saving...' : editingId ? 'Update' : 'Save'}
-            </button>
-            {editingId && (
-              <button className="btn btn-outline-secondary btn-sm" onClick={resetForm}>
-                Cancel
-              </button>
-            )}
-          </div>
+  if (!data || data.usage.length === 0) {
+    return (
+      <div style={{ maxWidth: 700 }}>
+        <div className="text-center text-muted py-5">
+          <i className="bi bi-bar-chart fs-1 d-block mb-3"></i>
+          <p>No AI usage recorded yet. Usage will appear here once AI features are used.</p>
         </div>
       </div>
+    )
+  }
 
-      {keys.length === 0 ? (
-        <div className="text-center text-muted py-4">
-          <i className="bi bi-key fs-1 d-block mb-3"></i>
-          <p>No API keys configured yet. Add one above to get started.</p>
-        </div>
-      ) : (
-        <div className="list-group">
-          {keys.map((k) => (
-            <div key={k.id} className="list-group-item d-flex justify-content-between align-items-start">
-              <div>
-                <div className="fw-semibold">{k.ai_service_name}</div>
-                <small className="text-muted">
-                  {k.masked_key}
-                  {k.label && <span className="ms-2 badge bg-secondary">{k.label}</span>}
-                </small>
+  // Group models by service within each month
+  const groupByService = (models) => {
+    const grouped = {}
+    models.forEach((m) => {
+      if (!grouped[m.ai_service_name]) grouped[m.ai_service_name] = []
+      grouped[m.ai_service_name].push(m)
+    })
+    return grouped
+  }
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      {data.usage.map((monthData, idx) => {
+        const isExpanded = expandedMonth === monthData.month
+        const isCurrentMonth = idx === 0 && page === 1
+        const serviceGroups = groupByService(monthData.models)
+        const monthTotal = monthData.models.reduce((sum, m) => sum + m.total_tokens, 0)
+
+        return (
+          <div key={monthData.month} className="card mb-3">
+            <div
+              className="card-header d-flex justify-content-between align-items-center"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setExpandedMonth(isExpanded ? null : monthData.month)}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <i className={`bi bi-chevron-${isExpanded ? 'down' : 'right'}`}></i>
+                <span className="fw-semibold">{formatMonth(monthData.month)}</span>
+                {isCurrentMonth && <span className="badge bg-danger">Current</span>}
               </div>
-              <div className="d-flex gap-2">
-                <button className="btn btn-outline-secondary btn-sm" onClick={() => startEditing(k)} title="Edit">
-                  <i className="bi bi-pencil"></i>
-                </button>
-                <button className="btn btn-outline-danger btn-sm" onClick={() => deleteKey(k.id)} title="Delete">
-                  <i className="bi bi-trash"></i>
-                </button>
-              </div>
+              <span className="text-muted small">{formatTokens(monthTotal)} tokens</span>
             </div>
-          ))}
+
+            {isExpanded && (
+              <div className="card-body p-0">
+                {Object.entries(serviceGroups).map(([serviceName, models]) => (
+                  <div key={serviceName}>
+                    <div className="px-3 py-2 bg-light border-bottom">
+                      <small className="fw-semibold text-muted text-uppercase" style={{ letterSpacing: '0.05em', fontSize: '0.75rem' }}>
+                        {serviceName}
+                      </small>
+                    </div>
+                    <table className="table table-sm mb-0">
+                      <thead>
+                        <tr>
+                          <th className="ps-3">Model</th>
+                          <th className="text-end">Input</th>
+                          <th className="text-end">Output</th>
+                          <th className="text-end pe-3">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {models.map((m) => (
+                          <tr key={m.id}>
+                            <td className="ps-3">{m.ai_model_name}</td>
+                            <td className="text-end text-muted">{formatTokens(m.input_tokens)}</td>
+                            <td className="text-end text-muted">{formatTokens(m.output_tokens)}</td>
+                            <td className="text-end pe-3 fw-semibold">{formatTokens(m.total_tokens)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {data.total_pages > 1 && (
+        <div className="d-flex justify-content-between align-items-center mt-3">
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage(page - 1)}
+          >
+            <i className="bi bi-chevron-left me-1"></i> Newer
+          </button>
+          <small className="text-muted">Page {page} of {data.total_pages}</small>
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            disabled={page >= data.total_pages || loading}
+            onClick={() => setPage(page + 1)}
+          >
+            Older <i className="bi bi-chevron-right ms-1"></i>
+          </button>
         </div>
       )}
     </div>

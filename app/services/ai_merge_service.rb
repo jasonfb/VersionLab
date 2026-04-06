@@ -10,7 +10,6 @@ class AiMergeService
   def call
     template = @merge.email_template
     account = template.client.account
-    ai_key = account.ai_keys.includes(:ai_service).find_by!(ai_service_id: @merge.ai_service_id)
     ai_model = @merge.ai_model
 
     variables = template.template_variables.where(variable_type: "text").order(:position)
@@ -42,12 +41,12 @@ class AiMergeService
                                 brand_profile: brand_profile, campaign: campaign,
                                 autolink_settings: autolink_settings)
       result = call_provider(
-        ai_key: ai_key,
+        ai_service_id: @merge.ai_service_id,
         model: ai_model.api_identifier,
         messages: messages
       )
 
-      log_ai_call(account, ai_key, ai_model, messages, result)
+      log_ai_call(account, ai_model, messages, result)
 
       content = result[:content]
       raise Error, "Empty response from AI" if content.blank?
@@ -68,8 +67,8 @@ class AiMergeService
     ]
   end
 
-  def call_provider(ai_key:, model:, messages:)
-    AiProviders::Factory.for_text(ai_key).complete(
+  def call_provider(ai_service_id:, model:, messages:)
+    AiProviders::Factory.for_text(AiService.find(ai_service_id)).complete(
       model: model,
       messages: messages,
       temperature: 0.7,
@@ -79,11 +78,11 @@ class AiMergeService
     raise Error, e.message
   end
 
-  def log_ai_call(account, ai_key, ai_model, messages, result)
+  def log_ai_call(account, ai_model, messages, result)
     AiLog.create!(
       account: account,
       call_type: :email,
-      ai_service_id: ai_key.ai_service_id,
+      ai_service_id: ai_model.ai_service_id,
       ai_model: ai_model,
       loggable: @merge,
       prompt: messages.to_json,

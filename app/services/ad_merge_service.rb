@@ -10,7 +10,6 @@ class AdMergeService
 
   def call
     account = @ad.client.account
-    ai_key = account.ai_keys.includes(:ai_service).find_by!(ai_service_id: @ad.ai_service_id)
     ai_model = @ad.ai_model
     campaign = @ad.campaign
 
@@ -25,8 +24,8 @@ class AdMergeService
 
       rejection_comment = @rejection_context[audience.id.to_s]
       messages = build_messages(text_layers, audience, rejection_comment, campaign: campaign)
-      result = call_provider(ai_key: ai_key, model: ai_model.api_identifier, messages: messages)
-      log_ai_call(account, ai_key, ai_model, messages, result)
+      result = call_provider(ai_service_id: @ad.ai_service_id, model: ai_model.api_identifier, messages: messages)
+      log_ai_call(account, ai_model, messages, result)
 
       content = result[:content]
       raise Error, "Empty response from AI" if content.blank?
@@ -123,8 +122,8 @@ class AdMergeService
     sections.join("\n\n")
   end
 
-  def call_provider(ai_key:, model:, messages:)
-    AiProviders::Factory.for_text(ai_key).complete(
+  def call_provider(ai_service_id:, model:, messages:)
+    AiProviders::Factory.for_text(AiService.find(ai_service_id)).complete(
       model: model,
       messages: messages,
       temperature: 0.7,
@@ -134,11 +133,11 @@ class AdMergeService
     raise Error, e.message
   end
 
-  def log_ai_call(account, ai_key, ai_model, messages, result)
+  def log_ai_call(account, ai_model, messages, result)
     AiLog.create!(
       account: account,
       call_type: :ad,
-      ai_service_id: ai_key.ai_service_id,
+      ai_service_id: ai_model.ai_service_id,
       ai_model: ai_model,
       loggable: @ad,
       prompt: messages.to_json,

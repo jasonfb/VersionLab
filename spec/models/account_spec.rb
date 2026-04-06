@@ -20,8 +20,8 @@ RSpec.describe Account, type: :model do
       expect(assoc.options[:through]).to eq(:account_users)
     end
 
-    it "has many ai_keys" do
-      assoc = described_class.reflect_on_association(:ai_keys)
+    it "has many ai_usage_summaries" do
+      assoc = described_class.reflect_on_association(:ai_usage_summaries)
       expect(assoc.macro).to eq(:has_many)
       expect(assoc.options[:dependent]).to eq(:destroy)
     end

@@ -53,8 +53,13 @@ module AdLayout
     def position_layer(layer, role_template, anchor_px, base_scale, font_lookup)
       result = layer.dup
 
-      if layer["type"] == "text" && layer["font_size"].present?
+      if layer["type"] == "text"
         original_size = layer["font_size"].to_f
+        # PDF-converted regions have no font_size — estimate from region height
+        if original_size <= 0 && layer["height"].to_f > 0
+          original_size = estimate_font_size(layer)
+        end
+
         scaled_size = (original_size * base_scale * role_template[:font_scale]).round(1)
         scaled_size = [scaled_size, 8.0].max # minimum readable size
 
@@ -87,6 +92,28 @@ module AdLayout
         approx_char_width = font_size * 0.55
         chars_per_line = [(max_width / approx_char_width).floor, 1].max
         simple_wrap(text, chars_per_line)
+      end
+    end
+
+    # Estimate font size for PDF-converted regions that lack font_size.
+    # Uses region height and content length to approximate a reasonable size.
+    def estimate_font_size(layer)
+      height = layer["height"].to_f
+      width = layer["width"].to_f
+      content = layer["content"] || ""
+
+      # Estimate line count from content length and region aspect ratio
+      if width > 0 && content.length > 0
+        # Approximate chars per line assuming average char width ~0.55 * font_size
+        # and font_size ~= height / line_count
+        # Start with single-line assumption and iterate once
+        estimated_size = height * 0.75 # assume single line, cap-height ratio
+        chars_per_line = [(width / (estimated_size * 0.55)).floor, 1].max
+        line_count = [(content.length.to_f / chars_per_line).ceil, 1].max
+        estimated_size = (height / (line_count * 1.3)) # 1.3 line-height
+        [estimated_size, 12.0].max
+      else
+        [height * 0.75, 12.0].max
       end
     end
 

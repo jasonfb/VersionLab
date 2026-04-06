@@ -78,8 +78,7 @@ class Api::EmailsController < Api::BaseController
       return render json: { error: "Email must have at least one audience" }, status: :unprocessable_entity
     end
 
-    ai_key = @current_account.ai_keys.find_by(ai_service_id: @email.ai_service_id)
-    unless ai_key
+    unless AiKey.exists?(ai_service_id: @email.ai_service_id)
       return render json: { error: "No API key configured for the selected AI service" }, status: :unprocessable_entity
     end
 

@@ -2,8 +2,8 @@ class Account < ApplicationRecord
   has_many :clients, dependent: :destroy
   has_many :account_users, dependent: :destroy
   has_many :users, through: :account_users
-  has_many :ai_keys, dependent: :destroy
   has_many :ai_logs, dependent: :destroy
+  has_many :ai_usage_summaries, dependent: :destroy
   has_many :subscriptions, dependent: :destroy
   has_many :payment_methods, dependent: :destroy
   has_many :payments, dependent: :destroy

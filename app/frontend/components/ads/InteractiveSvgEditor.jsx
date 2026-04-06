@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 
 // Maps text-anchor SVG attribute to alignment label
 const ANCHOR_TO_ALIGN = { start: 'left', middle: 'center', end: 'right' }
@@ -86,13 +87,13 @@ function getClipBounds(svg, clipPathRef) {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers, onLayerOverridesChange, initialOverrides }) {
+export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers, onLayerOverridesChange, initialOverrides, transparentBackground }) {
   const containerRef = useRef(null)
   const dragRef = useRef(null) // current drag state (non-reactive for perf)
   const layerOffsets = useRef({}) // { layerId: { x, y } }
   const [hoveredId, setHoveredId] = useState(null)
   const [editingLayer, setEditingLayer] = useState(null)
-  const [editingRegion, setEditingRegion] = useState(null) // { id, content }
+  const [editorClickPos, setEditorClickPos] = useState(null) // { x, y } screen coords of dblclick
   const [ready, setReady] = useState(false)
 
   const buildInteractiveLayer = useCallback(() => {
@@ -213,13 +214,58 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       rect.addEventListener('dblclick', (e) => {
         e.preventDefault()
         e.stopPropagation()
+        setEditorClickPos({ x: e.clientX, y: e.clientY })
         if (type === 'text') {
           openEditor(el, layerId, svg)
         } else {
-          // Region (PDF-converted): open content-only editor
-          const layerData = layers?.find((l) => l.id === layerId)
-          const existingContent = layerData?.content || ''
-          setEditingRegion({ id: layerId, content: existingContent })
+          // Region (PDF-converted): open full editor with layer data
+          const layerData = layers?.find((l) => l.id === layerId) || {}
+
+          // Estimate font size from region bounds if not already known.
+          // Iteratively solve: find the font size where the text fits the region.
+          let fontSize = layerData.font_size
+          if (!fontSize) {
+            const clipRef = el.getAttribute('clip-path')
+            const clipBounds = getClipBounds(svg, clipRef)
+            const regionH = clipBounds?.height || parseFloat(layerData.height) || 100
+            const regionW = clipBounds?.width || parseFloat(layerData.width) || 400
+            const content = layerData.content || ''
+            const charCount = content.length || 1
+
+            // Try sizes from large to small; first one that fits wins
+            let bestSize = 12
+            for (let size = Math.round(regionH * 0.8); size >= 10; size -= 1) {
+              const charW = size * 0.55
+              const charsPerLine = Math.max(1, Math.floor(regionW / charW))
+              const lines = Math.ceil(charCount / charsPerLine)
+              const totalH = lines * size * 1.3
+              if (totalH <= regionH * 1.05) { // 5% tolerance
+                bestSize = size
+                break
+              }
+            }
+            fontSize = String(bestSize)
+          }
+
+          // Detect bold/italic from font family name or overrides
+          const fontName = (layerData.font_family || '').toLowerCase()
+          const isBold = layerData.is_bold || /bold|black|heavy/i.test(fontName)
+          const isItalic = layerData.is_italic || /italic|oblique/i.test(fontName)
+
+          setEditingLayer({
+            id: layerId,
+            element: el,
+            content: layerData.content || '',
+            font_family: layerData.font_family || 'sans-serif',
+            font_size: fontSize,
+            is_bold: isBold,
+            is_italic: isItalic,
+            is_underline: false,
+            fill: layerData.fill || layerData.color || '#FFFFFF',
+            letter_spacing: '0',
+            line_height: '1.3',
+            text_align: layerData.text_align || layerData.align || 'left',
+          })
         }
       })
     })
@@ -246,6 +292,14 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         containerRef.current.innerHTML = text
         // Apply persisted transforms before building interactive layer
         const svg = containerRef.current.querySelector('svg')
+        // Make SVG background transparent so CSS background shows through
+        if (svg && transparentBackground) {
+          const firstRect = svg.querySelector(':scope > rect')
+          if (firstRect) firstRect.setAttribute('fill', 'transparent')
+          // Also handle PDF-converted SVGs with a background <use> element
+          const bgUse = svg.querySelector(':scope > use')
+          if (bgUse) bgUse.style.opacity = '0'
+        }
         if (svg) {
           Object.entries(layerOffsets.current).forEach(([id, { x, y }]) => {
             const el = svg.getElementById(id)
@@ -338,70 +392,122 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
 
   const saveEdit = (newStyles) => {
     const { element, id } = editingLayer
+    const isNativeText = element.tagName === 'text'
 
-    if (newStyles.font_size) element.setAttribute('font-size', newStyles.font_size)
-    if (newStyles.font_family) element.setAttribute('font-family', newStyles.font_family)
-    element.setAttribute('fill', newStyles.fill)
-    element.setAttribute('font-weight', newStyles.is_bold ? 'bold' : 'normal')
-    element.setAttribute('font-style', newStyles.is_italic ? 'italic' : 'normal')
-    element.setAttribute('text-decoration', newStyles.is_underline ? 'underline' : 'none')
-    element.setAttribute('letter-spacing', newStyles.letter_spacing)
-    element.setAttribute('text-anchor', ALIGN_TO_ANCHOR[newStyles.text_align] || 'start')
+    if (isNativeText) {
+      // Native <text> — mutate directly for live preview
+      if (newStyles.font_size) element.setAttribute('font-size', newStyles.font_size)
+      if (newStyles.font_family) element.setAttribute('font-family', newStyles.font_family)
+      element.setAttribute('fill', newStyles.fill)
+      element.setAttribute('font-weight', newStyles.is_bold ? 'bold' : 'normal')
+      element.setAttribute('font-style', newStyles.is_italic ? 'italic' : 'normal')
+      element.setAttribute('text-decoration', newStyles.is_underline ? 'underline' : 'none')
+      element.setAttribute('letter-spacing', newStyles.letter_spacing)
+      element.setAttribute('text-anchor', ALIGN_TO_ANCHOR[newStyles.text_align] || 'start')
 
-    // Update fill on tspans too
-    element.querySelectorAll('tspan').forEach((t) => {
-      if (t.getAttribute('fill') && t.getAttribute('fill') !== 'none') {
-        t.setAttribute('fill', newStyles.fill)
+      element.querySelectorAll('tspan').forEach((t) => {
+        if (t.getAttribute('fill') && t.getAttribute('fill') !== 'none') {
+          t.setAttribute('fill', newStyles.fill)
+        }
+      })
+
+      const tspans = element.querySelectorAll('tspan')
+      if (tspans.length > 0) {
+        tspans[0].textContent = newStyles.content
+        Array.from(tspans).slice(1).forEach((t) => t.remove())
+      } else {
+        element.textContent = newStyles.content
       }
-    })
 
-    // Update content — preserve first tspan structure if present
-    const tspans = element.querySelectorAll('tspan')
-    if (tspans.length > 0) {
-      tspans[0].textContent = newStyles.content
-      // Remove extra tspans if text was simplified
-      Array.from(tspans).slice(1).forEach((t) => t.remove())
+      buildInteractiveLayer()
     } else {
-      element.textContent = newStyles.content
+      // PDF region — hide original glyph paths, overlay a live <text> element
+      const svg = containerRef.current?.querySelector('svg')
+      if (svg) {
+        element.style.opacity = '0'
+
+        // Remove any previous overlay for this region
+        svg.querySelector(`[data-vl-overlay="${id}"]`)?.remove()
+
+        // Get region bounds from clip-path
+        const clipRef = element.getAttribute('clip-path')
+        const clipBounds = getClipBounds(svg, clipRef)
+        const bbox = clipBounds || element.getBBox()
+
+        const fontSize = parseFloat(newStyles.font_size) || 16
+        const anchor = ALIGN_TO_ANCHOR[newStyles.text_align] || 'start'
+        let textX = bbox.x
+        if (anchor === 'middle') textX = bbox.x + bbox.width / 2
+        else if (anchor === 'end') textX = bbox.x + bbox.width
+
+        const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+        textEl.setAttribute('data-vl-overlay', id)
+        textEl.setAttribute('x', textX)
+        textEl.setAttribute('y', bbox.y + fontSize)
+        textEl.setAttribute('fill', newStyles.fill)
+        textEl.setAttribute('font-size', fontSize)
+        textEl.setAttribute('font-family', newStyles.font_family || 'sans-serif')
+        textEl.setAttribute('font-weight', newStyles.is_bold ? 'bold' : 'normal')
+        textEl.setAttribute('font-style', newStyles.is_italic ? 'italic' : 'normal')
+        textEl.setAttribute('text-anchor', anchor)
+        textEl.setAttribute('letter-spacing', newStyles.letter_spacing || '0')
+        textEl.style.pointerEvents = 'none'
+
+        // Word-wrap content into tspans
+        const lineHeight = fontSize * (parseFloat(newStyles.line_height) || 1.3)
+        const approxCharsPerLine = Math.max(1, Math.floor(bbox.width / (fontSize * 0.55)))
+        const words = (newStyles.content || '').split(/\s+/)
+        const lines = []
+        let current = []
+        let currentLen = 0
+        words.forEach((w) => {
+          if (current.length === 0 || currentLen + 1 + w.length <= approxCharsPerLine) {
+            current.push(w)
+            currentLen += (current.length === 1 ? 0 : 1) + w.length
+          } else {
+            lines.push(current.join(' '))
+            current = [w]
+            currentLen = w.length
+          }
+        })
+        if (current.length) lines.push(current.join(' '))
+
+        lines.forEach((line, i) => {
+          const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan')
+          tspan.setAttribute('x', textX)
+          if (i > 0) tspan.setAttribute('dy', lineHeight)
+          tspan.textContent = line
+          textEl.appendChild(tspan)
+        })
+
+        // Insert before the interactive overlay group
+        const interactiveG = svg.querySelector('#vl-interactive')
+        if (interactiveG) svg.insertBefore(textEl, interactiveG)
+        else svg.appendChild(textEl)
+      }
     }
 
-    // Rebuild interactive layer to pick up new bounding box
-    buildInteractiveLayer()
-
+    // Always persist overrides (for both native text and PDF regions)
     onLayerOverridesChange?.(id, newStyles)
-    setEditingLayer(null)
   }
 
   return (
     <div style={{ position: 'relative', maxWidth: '100%', lineHeight: 0 }}>
-      {/* Hover tooltip */}
-      {hoveredId && ready && (
-        <HoverTooltip layerId={hoveredId} containerRef={containerRef} />
-      )}
 
       {/* Inline SVG container */}
       <div ref={containerRef} style={{ maxWidth: '100%', display: 'block' }} />
 
-      {/* Style editor popover (native text) */}
-      {editingLayer && (
+      {/* Style editor — rendered via portal to break free of overflow containers */}
+      {editingLayer && createPortal(
         <LayerStyleEditor
           layer={editingLayer}
-          onSave={saveEdit}
+          clickPos={editorClickPos}
+          onChange={saveEdit}
           onClose={() => setEditingLayer(null)}
-        />
+        />,
+        document.body
       )}
 
-      {/* Content editor popover (PDF-converted regions) */}
-      {editingRegion && (
-        <RegionContentEditor
-          region={editingRegion}
-          onSave={(content) => {
-            onLayerOverridesChange?.(editingRegion.id, { content })
-            setEditingRegion(null)
-          }}
-          onClose={() => setEditingRegion(null)}
-        />
-      )}
     </div>
   )
 }
@@ -445,8 +551,8 @@ function HoverTooltip({ layerId, containerRef }) {
 
 // ─── Layer Style Editor ───────────────────────────────────────────────────────
 
-function LayerStyleEditor({ layer, onSave, onClose }) {
-  const [form, setForm] = useState({
+function LayerStyleEditor({ layer, clickPos, onChange, onClose }) {
+  const formRef = useRef({
     content: layer.content || '',
     font_family: layer.font_family || '',
     font_size: layer.font_size || '16',
@@ -458,19 +564,61 @@ function LayerStyleEditor({ layer, onSave, onClose }) {
     line_height: layer.line_height || '1.3',
     text_align: layer.text_align || 'left',
   })
+  const [form, setForm] = useState(formRef.current)
 
-  const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }))
-  const toggle = (key) => setForm((prev) => ({ ...prev, [key]: !prev[key] }))
+  const emit = (updated) => {
+    formRef.current = updated
+    setForm(updated)
+    onChange?.(updated)
+  }
+
+  // Draggable position
+  const panelW = 340
+  const initialLeft = (() => {
+    if (!clickPos) return 100
+    // Place to the right of click if room, otherwise left
+    const rightSpace = window.innerWidth - clickPos.x - 20
+    if (rightSpace >= panelW + 10) return clickPos.x + 20
+    return Math.max(10, clickPos.x - panelW - 20)
+  })()
+  const initialTop = clickPos ? Math.max(10, Math.min(clickPos.y - 40, window.innerHeight - 500)) : 100
+
+  const [pos, setPos] = useState({ x: initialLeft, y: initialTop })
+  const dragRef = useRef(null)
+
+  const onDragStart = (e) => {
+    e.preventDefault()
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y }
+    const onMove = (ev) => {
+      const dx = ev.clientX - dragRef.current.startX
+      const dy = ev.clientY - dragRef.current.startY
+      setPos({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy })
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      dragRef.current = null
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  const set = (key, val) => emit({ ...formRef.current, [key]: val })
+  const toggle = (key) => emit({ ...formRef.current, [key]: !formRef.current[key] })
 
   return (
     <div
-      className="position-absolute bg-white shadow-lg rounded border"
-      style={{ top: 0, right: 0, zIndex: 100, width: 340, maxHeight: '90vh', overflowY: 'auto', lineHeight: 'normal' }}
+      className="bg-white shadow-lg rounded border"
+      style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, width: panelW, maxHeight: '80vh', overflowY: 'auto', lineHeight: 'normal' }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-light">
+      <div
+        className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-light"
+        style={{ cursor: 'grab' }}
+        onMouseDown={onDragStart}
+      >
         <span className="fw-semibold small text-uppercase" style={{ letterSpacing: '0.06em' }}>Edit Text</span>
-        <button className="btn btn-sm btn-link p-0 text-muted" onClick={onClose}>
+        <button className="btn btn-sm btn-link p-0 text-muted" onClick={onClose} onMouseDown={(e) => e.stopPropagation()}>
           <i className="bi bi-x-lg"></i>
         </button>
       </div>
@@ -618,49 +766,8 @@ function LayerStyleEditor({ layer, onSave, onClose }) {
           />
         </div>
 
-        {/* Actions */}
-        <div className="d-flex gap-2 justify-content-end">
-          <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-sm btn-danger" onClick={() => onSave(form)}>Save</button>
-        </div>
       </div>
     </div>
   )
 }
 
-// ─── Region Content Editor (PDF-converted layers) ────────────────────────────
-
-function RegionContentEditor({ region, onSave, onClose }) {
-  const [content, setContent] = useState(region.content || '')
-
-  return (
-    <div
-      className="position-absolute bg-white shadow-lg rounded border"
-      style={{ top: 0, right: 0, zIndex: 100, width: 340, lineHeight: 'normal' }}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-light">
-        <span className="fw-semibold small text-uppercase" style={{ letterSpacing: '0.06em' }}>Edit Region Text</span>
-        <button className="btn btn-sm btn-link p-0 text-muted" onClick={onClose}>
-          <i className="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div className="p-3">
-        <div className="text-muted small mb-2">Text content for <strong>{region.id}</strong> used by AI versioning.</div>
-        <textarea
-          className="form-control form-control-sm mb-3"
-          rows={4}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          autoFocus
-          placeholder="Enter the text for this region…"
-        />
-        <div className="d-flex gap-2 justify-content-end">
-          <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-sm btn-danger" onClick={() => onSave(content)}>Save</button>
-        </div>
-      </div>
-    </div>
-  )
-}

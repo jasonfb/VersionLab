@@ -155,8 +155,7 @@ class Api::AdsController < Api::BaseController
       return render json: { error: "No editable text layers found in this ad" }, status: :unprocessable_entity
     end
 
-    ai_key = @current_account.ai_keys.find_by(ai_service_id: @ad.ai_service_id)
-    unless ai_key
+    unless AiKey.exists?(ai_service_id: @ad.ai_service_id)
       return render json: { error: "No API key configured for the selected AI service" }, status: :unprocessable_entity
     end
 
@@ -373,7 +372,14 @@ class Api::AdsController < Api::BaseController
       file_content_type: ad.file_content_type,
       has_resizes: ad.ad_resizes.any?,
       resize_count: ad.ad_resizes.count,
-      updated_at: ad.updated_at
+      updated_at: ad.updated_at,
+      fonts: ad.ad_fonts.select { |f| f.font_file.attached? }.map { |f|
+        {
+          name: f.font_name,
+          postscript_name: f.postscript_name,
+          url: rails_blob_url(f.font_file, only_path: true),
+        }
+      }
     }
   end
 end

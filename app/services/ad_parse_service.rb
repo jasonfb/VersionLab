@@ -309,6 +309,38 @@ class AdParseService
       }.join(" ")
 
       layer[:content] = text.strip
+
+      # Capture the dominant font size from the matched runs
+      size_counts = matched.group_by { |r| r.font_size.round(1) }
+      dominant_size = size_counts.max_by { |_, rs| rs.length }&.first
+      layer[:font_size] = dominant_size.round.to_s if dominant_size
+
+      # Detect bold from content pattern (all-caps text is usually a bold headline)
+      if text.strip == text.strip.upcase && text.strip.length > 3
+        layer[:is_bold] = true
+      end
+    end
+
+    # Try to assign font families from embedded AdFont records
+    assign_font_families(layers)
+  end
+
+  def assign_font_families(layers)
+    fonts = @ad.ad_fonts.to_a
+    return if fonts.empty?
+
+    bold_font = fonts.find { |f| f.font_name =~ /bold|black|heavy/i }
+    light_font = fonts.find { |f| f.font_name =~ /light|regular|medium/i } || fonts.find { |f| f.font_name !~ /bold|black|heavy/i }
+
+    layers.each do |layer|
+      next unless layer[:font_size]
+      if layer[:is_bold] && bold_font
+        layer[:font_family] = bold_font.font_name
+      elsif light_font
+        layer[:font_family] = light_font.font_name
+      elsif fonts.first
+        layer[:font_family] = fonts.first.font_name
+      end
     end
   end
 
