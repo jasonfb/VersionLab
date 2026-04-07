@@ -21,7 +21,9 @@ module AdLayout
 
           # Text and other elements
           layout_result.layers.each do |layer|
-            if layer["type"] == "text" && layer["content"].present?
+            if layer["type"] == "image"
+              render_image_layer(xml, layer)
+            elsif layer["type"] == "text" && layer["content"].present?
               render_text_layer(xml, layer)
             end
           end
@@ -36,6 +38,16 @@ module AdLayout
     def render_background(xml, width, height)
       bg_color = @ad.background_color.presence || "#000000"
       xml.rect(width: width, height: height, fill: bg_color)
+    end
+
+    def render_image_layer(xml, layer)
+      xml.image(
+        href: layer["href"],
+        x: layer["x"].to_f.round,
+        y: layer["y"].to_f.round,
+        width: layer["width"].to_f.round,
+        height: layer["height"].to_f.round
+      )
     end
 
     def render_text_layer(xml, layer)

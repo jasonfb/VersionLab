@@ -120,8 +120,20 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       interactiveEls.push({ el: textEl, layerId: textEl.getAttribute('id'), type: 'text' })
     })
 
+    // Native SVG image elements (logos, icons, etc.)
+    Array.from(svg.querySelectorAll('image')).forEach((imgEl, i) => {
+      const layerId = imgEl.getAttribute('id') || `image_${i}`
+      if (!imgEl.getAttribute('id')) imgEl.setAttribute('id', layerId)
+      // Skip full-canvas background images
+      const imgW = parseFloat(imgEl.getAttribute('width')) || 0
+      const imgH = parseFloat(imgEl.getAttribute('height')) || 0
+      const vb = svg.getAttribute('viewBox')?.split(/\s+/).map(Number)
+      if (vb && vb.length === 4 && imgW >= vb[2] * 0.95 && imgH >= vb[3] * 0.95) return
+      interactiveEls.push({ el: imgEl, layerId, type: 'image' })
+    })
+
     // Clipped groups from PDF conversion (outer <g clip-path="..."> wrapping <g><use></g>)
-    if (interactiveEls.length === 0) {
+    if (interactiveEls.filter(e => e.type === 'text').length === 0) {
       const topGroups = Array.from(svg.children).filter(
         (n) => n.tagName === 'g' && n.getAttribute('clip-path')
       )
@@ -210,10 +222,11 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         }
       })
 
-      // Double-click to edit
+      // Double-click to edit (not for image layers — those are visual only)
       rect.addEventListener('dblclick', (e) => {
         e.preventDefault()
         e.stopPropagation()
+        if (type === 'image') return // Images can be dragged but not text-edited
         setEditorClickPos({ x: e.clientX, y: e.clientY })
         if (type === 'text') {
           openEditor(el, layerId, svg)

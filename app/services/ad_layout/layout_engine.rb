@@ -53,7 +53,22 @@ module AdLayout
     def position_layer(layer, role_template, anchor_px, base_scale, font_lookup)
       result = layer.dup
 
-      if layer["type"] == "text"
+      if layer["type"] == "image"
+        # Image layers: position within anchor region, scale to fit while preserving aspect ratio
+        result["x"] = anchor_px[:x].to_s
+        result["y"] = anchor_px[:y].to_s
+        orig_w = layer["width"].to_f
+        orig_h = layer["height"].to_f
+        if orig_w > 0 && orig_h > 0
+          scale = [ anchor_px[:w].to_f / orig_w, anchor_px[:h].to_f / orig_h ].min
+          result["width"] = (orig_w * scale).round.to_s
+          result["height"] = (orig_h * scale).round.to_s
+        else
+          result["width"] = anchor_px[:w].to_s
+          result["height"] = anchor_px[:h].to_s
+        end
+        return result
+      elsif layer["type"] == "text"
         original_size = layer["font_size"].to_f
         # PDF-converted regions have no font_size — estimate from region height
         if original_size <= 0 && layer["height"].to_f > 0

@@ -54,6 +54,7 @@ class AdParseService
 
     width, height = extract_svg_dimensions(root)
     layers = extract_svg_text_layers(doc)
+    layers += extract_svg_image_layers(doc, width, height)
     warnings = check_svg_warnings(layers, doc)
     aspect_ratio = compute_aspect_ratio(width, height)
 
@@ -105,6 +106,39 @@ class AdParseService
         font_family: font_family,
         x: x,
         y: y
+      }
+      index += 1
+    end
+
+    layers
+  end
+
+  def extract_svg_image_layers(doc, canvas_width, canvas_height)
+    layers = []
+    index = 0
+
+    doc.css("image").each do |node|
+      href = node["href"] || node["xlink:href"]
+      next if href.blank?
+
+      x = node["x"].to_f
+      y = node["y"].to_f
+      w = node["width"].to_f
+      h = node["height"].to_f
+
+      # Skip images that cover the full canvas (likely background fills, not logos)
+      next if canvas_width && canvas_height && w >= canvas_width * 0.95 && h >= canvas_height * 0.95
+
+      layer_id = node["id"].presence || "image_#{index}"
+
+      layers << {
+        id: layer_id,
+        type: "image",
+        href: href,
+        x: x.round.to_s,
+        y: y.round.to_s,
+        width: w.round.to_s,
+        height: h.round.to_s
       }
       index += 1
     end
@@ -195,6 +229,7 @@ class AdParseService
       # For clipped layers (outlined text), use pdf-reader to extract text content
       fill_clipped_layer_text(layers, reader.pages.first, height) if layers.any?
     end
+    layers += extract_svg_image_layers(doc, width, height)
     warnings += check_svg_warnings(layers, doc) if layers.any? { |l| l[:type] == "text" && l[:content].present? }
 
     if layers.empty?

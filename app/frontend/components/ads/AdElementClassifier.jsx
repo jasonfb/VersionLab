@@ -98,7 +98,8 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
   }
 
   const textLayers = layers.filter((l) => l.type === 'text' && l.content)
-  const otherLayers = layers.filter((l) => l.type !== 'text' || !l.content)
+  const imageLayers = layers.filter((l) => l.type === 'image')
+  const otherLayers = layers.filter((l) => (l.type !== 'text' || !l.content) && l.type !== 'image')
   const hasLowConfidence = layers.some((l) => (l.confidence || 0) < CONFIDENCE_THRESHOLDS.medium)
 
   if (loading) {
@@ -206,6 +207,45 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                   </g>
                 )
               })}
+              {imageLayers.map((layer, i) => {
+                const x = parseFloat(layer.x) || 0
+                const y = parseFloat(layer.y) || 0
+                const w = parseFloat(layer.width) || 60
+                const h = parseFloat(layer.height) || 60
+                const isSelected = selectedLayerId === layer.id
+                return (
+                  <g
+                    key={layer.id || `img-${i}`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
+                  >
+                    <rect
+                      x={x}
+                      y={y}
+                      width={w}
+                      height={h}
+                      fill="#0d6efd"
+                      fillOpacity={isSelected ? 0.35 : 0.12}
+                      stroke={isSelected ? '#0d6efd' : 'rgba(255,255,255,0.6)'}
+                      strokeWidth={isSelected ? 3 : 1.5}
+                      strokeDasharray={isSelected ? 'none' : '6 3'}
+                      rx={3}
+                    />
+                    {isSelected && (
+                      <text
+                        x={x + 4}
+                        y={y + 14}
+                        fill="#0d6efd"
+                        fontSize="11"
+                        fontWeight="600"
+                        fontFamily="sans-serif"
+                      >
+                        {layer.role?.toUpperCase() || 'LOGO'}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
             </svg>
           </div>
         ) : (
@@ -284,6 +324,62 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
               </div>
             )
           })}
+
+          {imageLayers.length > 0 && (
+            <>
+              <div className="px-3 py-2 bg-light border-bottom border-top">
+                <small className="text-muted fw-semibold">Image Elements</small>
+              </div>
+              {imageLayers.map((layer, i) => {
+                const globalIndex = layers.indexOf(layer)
+                const isSelected = selectedLayerId === layer.id
+                return (
+                  <div
+                    key={layer.id || `img-${i}`}
+                    className="d-flex align-items-center gap-3 p-3 border-bottom"
+                    style={{
+                      cursor: 'pointer',
+                      backgroundColor: isSelected ? 'rgba(13, 110, 253, 0.08)' : 'transparent',
+                      borderLeft: isSelected ? '3px solid #0d6efd' : '3px solid transparent',
+                      transition: 'background-color 0.15s, border-color 0.15s',
+                    }}
+                    onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
+                  >
+                    <div
+                      className="rounded-circle flex-shrink-0"
+                      style={{ width: 12, height: 12, backgroundColor: roleColor(layer.role) }}
+                    />
+                    <div className="flex-grow-1">
+                      <div className="d-flex align-items-center gap-2 mb-1">
+                        <span className="small fw-semibold">
+                          <i className="bi bi-image me-1"></i>Image
+                        </span>
+                        {layer.width && layer.height && (
+                          <span className="badge bg-light text-dark border" style={{ fontSize: '0.65rem' }}>
+                            {layer.width}×{layer.height}
+                          </span>
+                        )}
+                      </div>
+                      <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>
+                        {layer.id}
+                        {layer.x && layer.y && ` · (${layer.x}, ${layer.y})`}
+                      </small>
+                    </div>
+                    <select
+                      className="form-select form-select-sm flex-shrink-0"
+                      style={{ width: 130 }}
+                      value={layer.role || 'logo'}
+                      onChange={(e) => { e.stopPropagation(); updateRole(globalIndex, e.target.value) }}
+                    >
+                      {ROLE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              })}
+            </>
+          )}
 
           {otherLayers.length > 0 && (
             <>
