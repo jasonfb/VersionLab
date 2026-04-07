@@ -82,8 +82,8 @@ gem "annotaterb", "~> 4.21", groups: [ :development, :test ]
 
 gem "rubycritic", "~> 5.0", group: :dev
 
-# gem "hot-glue", "~> 0.7.6"
-gem "hot-glue", path: "/Users/jason/Work/Hot_Glue/hot-glue-private"
+gem "hot-glue", "~> 0.7.6.1"
+# gem "hot-glue", path: "/Users/jason/Work/Hot_Glue/hot-glue-private"
 
 
 gem "cssbundling-rails", "~> 1.4"
