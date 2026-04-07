@@ -1,0 +1,24 @@
+<% if @user.errors.none? %>
+  <%= turbo_stream.replace "admin__users-list" + "" do %>
+  <%= render partial: "list", locals: {users: @users,
+  
+} %>
+
+<% end %>
+  <% end %>
+<!-- parental updated -->
+
+<!-- errors -->
+  <%= turbo_stream.replace "admin__user-new" do %>
+  <% if @user.errors.none? %>
+  <%= render partial: "new_button", locals: {
+
+
+} %>
+  <% else %>
+  <%= render partial: "new_form", locals: {user: @user,  } %>
+  <% end %>
+  <% end %>
+  <%= turbo_stream.replace "flash_notices" do %>
+  <%= render partial: "layouts/flash_notices", locals: {resource: @user} %>
+<% end %>

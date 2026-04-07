@@ -1,0 +1,16 @@
+<%= turbo_frame_tag "admin__subscription_tier-new" do %>
+  <h3>
+    New Subscription Tier
+  </h3>
+  <%= form_with model:  subscription_tier,
+         url: admin_subscription_tiers_path, method: :post do  |f| %>
+  <%=  render partial: "admin/subscription_tiers/form", locals: {
+    subscription_tier: subscription_tier,
+    f: f,
+    
+} %>
+
+
+<% end %>
+
+<% end %>

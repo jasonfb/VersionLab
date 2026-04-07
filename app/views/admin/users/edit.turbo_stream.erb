@@ -1,0 +1,3 @@
+<%= turbo_stream.replace "admin__#{dom_id(@user)}" do %>
+  <%= render 'edit', locals: { user: @user } %>
+<% end %>

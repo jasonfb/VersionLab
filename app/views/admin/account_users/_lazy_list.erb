@@ -1,0 +1,7 @@
+<%= tag.turbo_frame id: "admin__account_users-list" + ((('__' + nested_for) if defined?(nested_for)) || ""),
+                    src: admin_account_account_users_path(account) + "?__lazy",
+                    loading: "lazy" do %>
+
+  <div class="text-muted">Loading ...</div>
+
+<% end %>

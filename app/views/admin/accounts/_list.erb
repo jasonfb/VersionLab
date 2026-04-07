@@ -1,0 +1,50 @@
+<%= turbo_frame_tag "admin__accounts-list"   do %>
+
+  <div class="container ">
+    
+      <h4>
+        ACCOUNTS
+      </h4>
+    
+
+    
+    
+      <%= render partial: "admin/accounts/new_button", locals: {
+     } %>
+        <br />
+    
+    
+
+    
+      
+        <div class="row hg-row ">
+          <div class='col-sm-2 hg-heading-row heading--account--name' >Name</div>
+<div class='col-sm-2 hg-heading-row heading--account--is_agency' >Is agency</div>
+<div class='col-sm-2 hg-heading-row heading--account--stripe_customer_id' >Stripe customer</div>
+
+          
+
+          
+
+          <div class=' scaffold-col-heading scaffold-col-heading-buttons col-sm-2' >
+          </div>
+        </div>
+      
+      
+      <% if accounts.empty? %>
+    <div>
+        None
+    </div>
+      <% end %>
+      <% accounts.each do |account| %>
+        <%= render partial: 'admin/accounts/line', locals: {account: account,
+       } %>
+      <% end %>
+      
+    <%== @pagy.series_nav(:bootstrap) if @pagy && @pagy.pages > 1 %>
+  
+
+
+  
+  </div>
+<% end %>

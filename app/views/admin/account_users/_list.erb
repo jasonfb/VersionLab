@@ -1,0 +1,47 @@
+<%= turbo_frame_tag "admin__account_users-list" + ((('__' + nested_for) if defined?(nested_for)) || "")  do %>
+
+  <div class="container ">
+    
+
+    
+    
+      <%= render partial: "admin/account_users/new_button", locals: {
+    account: account } %>
+        <br />
+    
+    
+
+    
+      
+        <div class="row hg-row ">
+          <div class='col-sm-2 hg-heading-row heading--account_user--is_owner' >Is owner</div>
+<div class='col-sm-2 hg-heading-row heading--account_user--user_id' >User</div>
+<div class='col-sm-2 hg-heading-row heading--account_user--is_admin' >Is admin</div>
+<div class='col-sm-2 hg-heading-row heading--account_user--is_billing_admin' >Is billing admin</div>
+
+          
+
+          
+
+          <div class=' scaffold-col-heading scaffold-col-heading-buttons col-sm-2' >
+          </div>
+        </div>
+      
+      
+      <% if account_users.empty? %>
+    <div>
+        None
+    </div>
+      <% end %>
+      <% account_users.each do |account_user| %>
+        <%= render partial: 'admin/account_users/line', locals: {account_user: account_user,
+      nested_for: nested_for, account: account } %>
+      <% end %>
+      
+    <%== @pagy.series_nav(:bootstrap) if @pagy && @pagy.pages > 1 %>
+  
+
+
+  
+  </div>
+<% end %>

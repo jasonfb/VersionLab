@@ -1,0 +1,52 @@
+<%= turbo_frame_tag "admin__subscription_tiers-list"   do %>
+
+  <div class="container ">
+    
+      <h4>
+        SUBSCRIPTION TIERS
+      </h4>
+    
+
+    
+    
+      <%= render partial: "admin/subscription_tiers/new_button", locals: {
+     } %>
+        <br />
+    
+    
+
+    
+      
+        <div class="row hg-row ">
+          <div class='col-sm-2 hg-heading-row heading--subscription_tier--name' >Name</div>
+<div class='col-sm-2 hg-heading-row heading--subscription_tier--slug' >Slug</div>
+<div class='col-sm-2 hg-heading-row heading--subscription_tier--monthly_price_cents' >Monthly price cents</div>
+<div class='col-sm-2 hg-heading-row heading--subscription_tier--annual_price_cents' >Annual price cents</div>
+<div class='col-sm-2 hg-heading-row heading--subscription_tier--position' >Position</div>
+
+          
+
+          
+
+          <div class=' scaffold-col-heading scaffold-col-heading-buttons col-sm-2' >
+          </div>
+        </div>
+      
+      
+      <% if subscription_tiers.empty? %>
+    <div>
+        None
+    </div>
+      <% end %>
+      <% subscription_tiers.each do |subscription_tier| %>
+        <%= render partial: 'admin/subscription_tiers/line', locals: {subscription_tier: subscription_tier,
+       } %>
+      <% end %>
+      
+    <%== @pagy.series_nav(:bootstrap) if @pagy && @pagy.pages > 1 %>
+  
+
+
+  
+  </div>
+<% end %>

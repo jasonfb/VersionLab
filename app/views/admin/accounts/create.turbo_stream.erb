@@ -1,0 +1,24 @@
+<% if @account.errors.none? %>
+  <%= turbo_stream.replace "admin__accounts-list" + "" do %>
+  <%= render partial: "list", locals: {accounts: @accounts,
+  
+} %>
+
+<% end %>
+  <% end %>
+<!-- parental updated -->
+
+<!-- errors -->
+  <%= turbo_stream.replace "admin__account-new" do %>
+  <% if @account.errors.none? %>
+  <%= render partial: "new_button", locals: {
+
+
+} %>
+  <% else %>
+  <%= render partial: "new_form", locals: {account: @account,  } %>
+  <% end %>
+  <% end %>
+  <%= turbo_stream.replace "flash_notices" do %>
+  <%= render partial: "layouts/flash_notices", locals: {resource: @account} %>
+<% end %>

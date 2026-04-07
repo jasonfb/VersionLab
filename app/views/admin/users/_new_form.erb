@@ -1,0 +1,16 @@
+<%= turbo_frame_tag "admin__user-new" do %>
+  <h3>
+    New User
+  </h3>
+  <%= form_with model:  user,
+         url: admin_users_path, method: :post do  |f| %>
+  <%=  render partial: "admin/users/form", locals: {
+    user: user,
+    f: f,
+    
+} %>
+
+
+<% end %>
+
+<% end %>

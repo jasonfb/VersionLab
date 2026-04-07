@@ -1,0 +1,10 @@
+<%= turbo_frame_tag "admin__#{ dom_id(subscription_tier) }" do  %>
+  <div class='row hg-row' data-id='<%= subscription_tier.id %>' data-edit='false'>
+  <%= render partial: 'admin/subscription_tiers/show', locals: {
+    subscription_tier: subscription_tier } %>
+  </div>
+<% end %>
+
+
+
+

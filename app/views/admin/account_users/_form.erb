@@ -1,0 +1,55 @@
+<div class="row">
+  <div class='col-md-2 cell--account_user--is_owner' >  
+    <div class='<%= "alert alert-danger" if account_user.errors.details.keys.include?(:is_owner) %>'  >
+      <span class='form-check '>
+        <%= f.radio_button(:is_owner, '0', checked: account_user.is_owner  ? '' : 'checked', class: 'form-check-input') %>
+        <%= f.label(:is_owner, value: 'No', for: 'account_user_is_owner_0') %>
+       <br /> <%= f.radio_button(:is_owner, '1',  checked: account_user.is_owner  ? 'checked' : '' , class: 'form-check-input') %>
+        <%= f.label(:is_owner, value: 'Yes', for: 'account_user_is_owner_1') %>
+      </span> 
+      
+      <label class='text-muted small form-text form-check-label' for='account_user_is_owner'>Is owner</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--account_user--user_id' >  
+    <div class='<%= "alert alert-danger" if account_user.errors.details.keys.include?(:user) %>'  >
+        <%= f.collection_select(:user_id, User.all, :id, :to_label, { prompt: true, selected: account_user.user_id }, class: 'form-control') %>
+      <br />
+      
+      <label class='text-muted small form-text' for=''>User</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--account_user--is_admin' >  
+    <div class='<%= "alert alert-danger" if account_user.errors.details.keys.include?(:is_admin) %>'  >
+      <span class='form-check '>
+        <%= f.radio_button(:is_admin, '0', checked: account_user.is_admin  ? '' : 'checked', class: 'form-check-input') %>
+        <%= f.label(:is_admin, value: 'No', for: 'account_user_is_admin_0') %>
+       <br /> <%= f.radio_button(:is_admin, '1',  checked: account_user.is_admin  ? 'checked' : '' , class: 'form-check-input') %>
+        <%= f.label(:is_admin, value: 'Yes', for: 'account_user_is_admin_1') %>
+      </span> 
+      
+      <label class='text-muted small form-text form-check-label' for='account_user_is_admin'>Is admin</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--account_user--is_billing_admin' >  
+    <div class='<%= "alert alert-danger" if account_user.errors.details.keys.include?(:is_billing_admin) %>'  >
+      <span class='form-check '>
+        <%= f.radio_button(:is_billing_admin, '0', checked: account_user.is_billing_admin  ? '' : 'checked', class: 'form-check-input') %>
+        <%= f.label(:is_billing_admin, value: 'No', for: 'account_user_is_billing_admin_0') %>
+       <br /> <%= f.radio_button(:is_billing_admin, '1',  checked: account_user.is_billing_admin  ? 'checked' : '' , class: 'form-check-input') %>
+        <%= f.label(:is_billing_admin, value: 'Yes', for: 'account_user_is_billing_admin_1') %>
+      </span> 
+      
+      <label class='text-muted small form-text form-check-label' for='account_user_is_billing_admin'>Is billing admin</label>
+    </div>
+   
+  </div>
+
+  <div class="col-md-2">
+    <%= link_to "Cancel", admin_account_account_users_path(account) + (params[:page] ? "?page=" + params[:page] : ""),  {class: "btn btn-secondary"} %>
+    <%= f.submit "Save", class: "btn btn-primary pull-right" %>
+  </div>
+</div>

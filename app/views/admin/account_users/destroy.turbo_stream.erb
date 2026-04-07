@@ -1,0 +1,14 @@
+<%= turbo_stream.replace "__admin#{dom_id(@account)}" do %>
+    <%= render partial: "admin/accounts/line", locals: {account: @account} %>
+  <% end %>
+
+<%= turbo_stream.update "admin__account_users-list" + "__account-#{@account.id}" do %>
+  <%= render partial: "list", locals: {account_users: @account_users ,
+nested_for: "account-#{@account.id}",
+account: @account
+} %>
+<% end %>
+
+<%= turbo_stream.update "flash_notices" do %>
+<%= render partial: "layouts/flash_notices", locals: {resource: @account_user} %>
+<% end %>

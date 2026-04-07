@@ -1,0 +1,24 @@
+<% if @subscription_tier.errors.none? %>
+  <%= turbo_stream.replace "admin__subscription_tiers-list" + "" do %>
+  <%= render partial: "list", locals: {subscription_tiers: @subscription_tiers,
+  
+} %>
+
+<% end %>
+  <% end %>
+<!-- parental updated -->
+
+<!-- errors -->
+  <%= turbo_stream.replace "admin__subscription_tier-new" do %>
+  <% if @subscription_tier.errors.none? %>
+  <%= render partial: "new_button", locals: {
+
+
+} %>
+  <% else %>
+  <%= render partial: "new_form", locals: {subscription_tier: @subscription_tier,  } %>
+  <% end %>
+  <% end %>
+  <%= turbo_stream.replace "flash_notices" do %>
+  <%= render partial: "layouts/flash_notices", locals: {resource: @subscription_tier} %>
+<% end %>

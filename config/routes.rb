@@ -94,6 +94,12 @@ Rails.application.routes.draw do
 
   namespace :admin do
     resources :ai_keys
+    resources :users
+
+    resources :accounts do
+      resources :account_users
+    end
+    resources :subscription_tiers
   end
 
   # Health check

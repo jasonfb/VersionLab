@@ -1,0 +1,46 @@
+<div class='hg-col col-sm-2 account_user--is_owner'> <% if account_user.is_owner.nil? %>
+        <span class=''>MISSING</span>
+    <% elsif account_user.is_owner %>
+      YES
+    <% else %>
+      NO
+    <% end %>
+</div>
+<div class='hg-col col-sm-2 account_user--user_id'> <%= account_user.user.try(:to_label) || '<span class="content ">MISSING</span>'.html_safe %>
+</div>
+<div class='hg-col col-sm-2 account_user--is_admin'> <% if account_user.is_admin.nil? %>
+        <span class=''>MISSING</span>
+    <% elsif account_user.is_admin %>
+      YES
+    <% else %>
+      NO
+    <% end %>
+</div>
+<div class='hg-col col-sm-2 account_user--is_billing_admin'> <% if account_user.is_billing_admin.nil? %>
+        <span class=''>MISSING</span>
+    <% elsif account_user.is_billing_admin %>
+      YES
+    <% else %>
+      NO
+    <% end %>
+</div>
+
+
+
+
+
+
+
+<div class=" scaffold-line-buttons col-md-2" >
+  
+
+  
+    <%= form_with url: admin_account_account_user_path(account,account_user), html: {data: {'turbo-confirm': "Are you sure you want to delete #{ account_user.to_label }?" }, style: "display: inline-block;"}, method: :delete do |f| %>
+      <%= f.submit "Delete".html_safe,  class: "delete-account_user-button btn btn-primary btn-sm", disabled: (account_user.respond_to?(:delete_able?) && ! account_user.delete_able? ) %>
+    <% end %>
+  
+
+  
+  <%= link_to "Edit ".html_safe, edit_admin_account_account_user_path(account,account_user) + (params[:page] ? "?page=#{params[:page]}" : ""), disable_with: "Loading...", class: "edit-account_user-button btn btn-primary btn-sm" %>
+  
+</div>

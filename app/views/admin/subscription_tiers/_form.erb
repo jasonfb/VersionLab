@@ -1,0 +1,52 @@
+<div class="row">
+  <div class='col-md-2 cell--subscription_tier--name' >  
+    <div class='<%= "alert alert-danger" if subscription_tier.errors.details.keys.include?(:name) %>'  >
+        <%= f.text_field :name, value: subscription_tier.name, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Name</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--subscription_tier--slug' >  
+    <div class='<%= "alert alert-danger" if subscription_tier.errors.details.keys.include?(:slug) %>'  >
+        <%= f.text_field :slug, value: subscription_tier.slug, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Slug</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--subscription_tier--monthly_price_cents' >  
+    <div class='<%= "alert alert-danger" if subscription_tier.errors.details.keys.include?(:monthly_price_cents) %>'  >
+        <%= f.text_field :monthly_price_cents, value: subscription_tier.monthly_price_cents, autocomplete: 'off', size: 4, class: 'form-control', type: 'number' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Monthly price cents</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--subscription_tier--annual_price_cents' >  
+    <div class='<%= "alert alert-danger" if subscription_tier.errors.details.keys.include?(:annual_price_cents) %>'  >
+        <%= f.text_field :annual_price_cents, value: subscription_tier.annual_price_cents, autocomplete: 'off', size: 4, class: 'form-control', type: 'number' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Annual price cents</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--subscription_tier--position' >  
+    <div class='<%= "alert alert-danger" if subscription_tier.errors.details.keys.include?(:position) %>'  >
+        <%= f.text_field :position, value: subscription_tier.position, autocomplete: 'off', size: 4, class: 'form-control', type: 'number' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Position</label>
+    </div>
+   
+  </div>
+
+  <div class="col-md-2">
+    <%= link_to "Cancel", admin_subscription_tiers_path + (params[:page] ? "?page=" + params[:page] : ""),  {class: "btn btn-secondary"} %>
+    <%= f.submit "Save", class: "btn btn-primary pull-right" %>
+  </div>
+</div>

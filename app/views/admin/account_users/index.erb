@@ -1,0 +1,13 @@
+
+
+<div class="container">
+  <div class="row"> <div class="col-md-12">
+  <%= render partial: "admin/nav", locals: {nav: "account_users"} %></div> </div>
+  
+
+  <div class="row"> <div class="col-md-12">
+  <%= render partial: 'admin/account_users/list',
+    locals: {account_users: @account_users  , nested_for: "account-#{@account.id}", account: @account
+  } %>
+  </div> </div>
+</div>

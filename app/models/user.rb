@@ -32,6 +32,12 @@ class User < ApplicationRecord
   has_many :client_users, dependent: :destroy
   has_many :clients, through: :client_users
 
+  def to_label
+    email
+  end
+
+  scope :reverse_sort, -> { order(created_at:  :desc) }
+
   def admin?
     roles.exists?(name: "admin")
   end

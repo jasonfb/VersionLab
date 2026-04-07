@@ -24,6 +24,8 @@ class Account < ApplicationRecord
   has_many :payment_methods, dependent: :destroy
   has_many :payments, dependent: :destroy
 
+  scope :reverse_sort, -> { order(created_at:  :desc) }
+
   def default_client
     clients.find_by(hidden: true)
   end

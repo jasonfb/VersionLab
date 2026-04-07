@@ -1,0 +1,38 @@
+<div class="row">
+  <div class='col-md-2 cell--account--name' >  
+    <div class='<%= "alert alert-danger" if account.errors.details.keys.include?(:name) %>'  >
+        <%= f.text_field :name, value: account.name, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Name</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--account--is_agency' >  
+    <div class='<%= "alert alert-danger" if account.errors.details.keys.include?(:is_agency) %>'  >
+      <span class='form-check '>
+        <%= f.radio_button(:is_agency, '0', checked: account.is_agency  ? '' : 'checked', class: 'form-check-input') %>
+        <%= f.label(:is_agency, value: 'No', for: 'account_is_agency_0') %>
+       <br /> <%= f.radio_button(:is_agency, '1',  checked: account.is_agency  ? 'checked' : '' , class: 'form-check-input') %>
+        <%= f.label(:is_agency, value: 'Yes', for: 'account_is_agency_1') %>
+      </span> 
+      
+      <label class='text-muted small form-text form-check-label' for='account_is_agency'>Is agency</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--account--stripe_customer_id' >  
+    <div class='<%= "alert alert-danger" if account.errors.details.keys.include?(:stripe_customer_id) %>'  >
+        <%= f.text_field :stripe_customer_id, value: account.stripe_customer_id, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Stripe customer</label>
+    </div>
+   
+  </div>
+
+  <div class="col-md-2">
+    <%= link_to "Cancel", admin_accounts_path + (params[:page] ? "?page=" + params[:page] : ""),  {class: "btn btn-secondary"} %>
+    <%= f.submit "Save", class: "btn btn-primary pull-right" %>
+  </div>
+</div>

@@ -1,0 +1,32 @@
+<div class='hg-col col-sm-2 account--name'> <%= account.name %>
+</div>
+<div class='hg-col col-sm-2 account--is_agency'> <% if account.is_agency.nil? %>
+        <span class=''>MISSING</span>
+    <% elsif account.is_agency %>
+      YES
+    <% else %>
+      NO
+    <% end %>
+</div>
+<div class='hg-col col-sm-2 account--stripe_customer_id'> <%= account.stripe_customer_id %>
+</div>
+
+
+
+
+
+
+
+<div class=" scaffold-line-buttons col-md-2" >
+  
+
+  
+    <%= form_with url: admin_account_path(account), html: {data: {'turbo-confirm': "Are you sure you want to delete #{ account.name }?" }, style: "display: inline-block;"}, method: :delete do |f| %>
+      <%= f.submit "Delete".html_safe,  class: "delete-account-button btn btn-primary btn-sm", disabled: (account.respond_to?(:delete_able?) && ! account.delete_able? ) %>
+    <% end %>
+  
+
+  
+  <%= link_to "Edit ".html_safe, edit_admin_account_path(account) + (params[:page] ? "?page=#{params[:page]}" : ""), 'data-turbo' => 'false', disable_with: "Loading...", class: "edit-account-button btn btn-primary btn-sm" %>
+  
+</div>

@@ -1,0 +1,30 @@
+<div class='hg-col col-sm-2 subscription_tier--name'> <%= subscription_tier.name %>
+</div>
+<div class='hg-col col-sm-2 subscription_tier--slug'> <%= subscription_tier.slug %>
+</div>
+<div class='hg-col col-sm-2 subscription_tier--monthly_price_cents'> <%= subscription_tier.monthly_price_cents %>
+</div>
+<div class='hg-col col-sm-2 subscription_tier--annual_price_cents'> <%= subscription_tier.annual_price_cents %>
+</div>
+<div class='hg-col col-sm-2 subscription_tier--position'> <%= subscription_tier.position %>
+</div>
+
+
+
+
+
+
+
+<div class=" scaffold-line-buttons col-md-2" >
+  
+
+  
+    <%= form_with url: admin_subscription_tier_path(subscription_tier), html: {data: {'turbo-confirm': "Are you sure you want to delete #{ subscription_tier.name }?" }, style: "display: inline-block;"}, method: :delete do |f| %>
+      <%= f.submit "Delete".html_safe,  class: "delete-subscription_tier-button btn btn-primary btn-sm", disabled: (subscription_tier.respond_to?(:delete_able?) && ! subscription_tier.delete_able? ) %>
+    <% end %>
+  
+
+  
+  <%= link_to "Edit ".html_safe, edit_admin_subscription_tier_path(subscription_tier) + (params[:page] ? "?page=#{params[:page]}" : ""), disable_with: "Loading...", class: "edit-subscription_tier-button btn btn-primary btn-sm" %>
+  
+</div>

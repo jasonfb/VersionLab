@@ -1,0 +1,49 @@
+<%= turbo_frame_tag "admin__users-list"   do %>
+
+  <div class="container ">
+    
+      <h4>
+        USERS
+      </h4>
+    
+
+    
+    
+      <%= render partial: "admin/users/new_button", locals: {
+     } %>
+        <br />
+    
+    
+
+    
+      
+        <div class="row hg-row ">
+          <div class='col-sm-2 hg-heading-row heading--user--email' >Email</div>
+<div class='col-sm-2 hg-heading-row heading--user--name' >Name</div>
+
+          
+
+          
+
+          <div class=' scaffold-col-heading scaffold-col-heading-buttons col-sm-2' >
+          </div>
+        </div>
+      
+      
+      <% if users.empty? %>
+    <div>
+        None
+    </div>
+      <% end %>
+      <% users.each do |user| %>
+        <%= render partial: 'admin/users/line', locals: {user: user,
+       } %>
+      <% end %>
+      
+    <%== @pagy.series_nav(:bootstrap) if @pagy && @pagy.pages > 1 %>
+  
+
+
+  
+  </div>
+<% end %>

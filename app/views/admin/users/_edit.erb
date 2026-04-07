@@ -1,0 +1,18 @@
+<%= turbo_frame_tag "admin__#{dom_id(user)}" do  %>
+<div class="cell editable" style="position: relative;">
+  <% if user.errors.any? %>
+  <%= render(partial: "admin/errors", locals: {resource: user }) %>
+  <% end %>
+  <h2>Editing <%= user.name %></h2>
+  <%= form_with model: user,
+   url: admin_user_path(user) do |f| %>
+    <%=  render partial: "admin/users/form", locals: {
+      user: user,
+      f: f,
+      
+  } %>
+  
+  <% end %>
+  
+</div>
+<% end %>

@@ -1,0 +1,13 @@
+
+
+<div class="container">
+  <div class="row"> <div class="col-md-12">
+  <%= render partial: "admin/nav", locals: {nav: "subscription_tiers"} %></div> </div>
+  
+
+  <div class="row"> <div class="col-md-12">
+  <%= render partial: 'admin/subscription_tiers/list',
+    locals: {subscription_tiers: @subscription_tiers  
+  } %>
+  </div> </div>
+</div>

@@ -1,0 +1,18 @@
+<%= turbo_frame_tag "admin__#{dom_id(subscription_tier)}" do  %>
+<div class="cell editable" style="position: relative;">
+  <% if subscription_tier.errors.any? %>
+  <%= render(partial: "admin/errors", locals: {resource: subscription_tier }) %>
+  <% end %>
+  <h2>Editing <%= subscription_tier.name %></h2>
+  <%= form_with model: subscription_tier,
+   url: admin_subscription_tier_path(subscription_tier) do |f| %>
+    <%=  render partial: "admin/subscription_tiers/form", locals: {
+      subscription_tier: subscription_tier,
+      f: f,
+      
+  } %>
+  
+  <% end %>
+  
+</div>
+<% end %>

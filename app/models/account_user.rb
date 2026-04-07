@@ -16,6 +16,10 @@ class AccountUser < ApplicationRecord
   belongs_to :account
   belongs_to :user
 
+  def to_label
+    "#{user_id}"
+  end
+
   def role_label
     return "Owner" if is_owner?
     return "Admin" if is_admin?

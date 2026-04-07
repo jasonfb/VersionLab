@@ -1,0 +1,11 @@
+
+
+<%= turbo_stream.update "admin__accounts-list" + "" do %>
+  <%= render partial: "list", locals: {accounts: @accounts ,
+
+} %>
+<% end %>
+
+<%= turbo_stream.update "flash_notices" do %>
+<%= render partial: "layouts/flash_notices", locals: {resource: @account} %>
+<% end %>

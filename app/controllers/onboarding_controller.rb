@@ -15,12 +15,23 @@ class OnboardingController < ApplicationController
   end
 
   def signup
-    @email = params[:email].to_s.strip
+    @email = params[:email].to_s.strip.downcase
+
+    if User.exists?(email: @email)
+      redirect_to onboarding_path, alert: "#{@email} is already registered. Please ask your organization's admin to add you, or log in."
+      return
+    end
+
     @user = User.new(email: @email)
   end
 
   def create
     @email = onboarding_params[:email].to_s.strip.downcase
+
+    if User.exists?(email: @email)
+      redirect_to onboarding_path, alert: "#{@email} is already registered. Please ask your organization's admin to add you, or log in."
+      return
+    end
 
     ActiveRecord::Base.transaction do
       @user = User.new(

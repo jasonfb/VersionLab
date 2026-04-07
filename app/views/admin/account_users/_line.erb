@@ -1,0 +1,12 @@
+<%= turbo_frame_tag "admin__#{ dom_id(account_user) }" do  %>
+  <div class='row hg-row' data-id='<%= account_user.id %>' data-edit='false'>
+  <%= render partial: 'admin/account_users/show', locals: {
+    account_user: account_user,
+    account: account,
+    nested_for: "account-#{account.id}" } %>
+  </div>
+<% end %>
+
+
+
+

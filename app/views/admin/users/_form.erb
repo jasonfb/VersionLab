@@ -1,0 +1,25 @@
+<div class="row">
+  <div class='col-md-2 cell--user--email' >  
+    <div class='<%= "alert alert-danger" if user.errors.details.keys.include?(:email) %>'  >
+        <%= f.text_field :email, value: user.email, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Email</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--user--name' >  
+    <div class='<%= "alert alert-danger" if user.errors.details.keys.include?(:name) %>'  >
+        <%= f.text_field :name, value: user.name, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Name</label>
+    </div>
+   
+  </div>
+
+  <div class="col-md-2">
+    <%= link_to "Cancel", admin_users_path + (params[:page] ? "?page=" + params[:page] : ""),  {class: "btn btn-secondary"} %>
+    <%= f.submit "Save", class: "btn btn-primary pull-right" %>
+  </div>
+</div>

@@ -37,6 +37,10 @@ describe 'Account signup', type: :feature do
   end
 
   describe 'completing signup' do
+    before do
+      create(:subscription_tier, name: 'Free Trial', slug: 'free_trial', monthly_price_cents: 0, annual_price_cents: 0)
+    end
+
     it 'creates a new account where I am the owner' do
       visit '/start'
       fill_in 'email', with: 'newuser@example.com'
@@ -46,6 +50,8 @@ describe 'Account signup', type: :feature do
       fill_in 'Password', with: 'securepassword'
       fill_in 'Password confirmation', with: 'securepassword'
       click_button 'Create Account'
+
+      expect(page).to have_current_path(%r{\A/app}, wait: 5)
 
       user = User.find_by(email: 'newuser@example.com')
       expect(user).to be_present
@@ -68,6 +74,8 @@ describe 'Account signup', type: :feature do
       fill_in 'Password confirmation', with: 'securepassword'
       click_button 'Create Account'
 
+      expect(page).to have_current_path(%r{\A/app}, wait: 5)
+
       account = User.find_by(email: 'another@example.com').accounts.first
       expect(account.clients.count).to eq(1)
       expect(account.clients.first).to be_hidden
@@ -84,7 +92,7 @@ describe 'Account signup', type: :feature do
       fill_in 'Password confirmation', with: 'securepassword'
       click_button 'Create Account'
 
-      expect(page).to have_current_path('/app')
+      expect(page).to have_current_path(%r{\A/app}, wait: 5)
     end
   end
 end
