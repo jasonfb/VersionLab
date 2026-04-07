@@ -14,10 +14,49 @@ export default function AdResizePicker({
 }) {
   const [expandedPlatform, setExpandedPlatform] = useState(null)
 
+  // selectedPlatforms is { [platformName]: sizeName[] }
+  // e.g. { "Facebook (Meta)": ["Feed Image", "Story"], "Google Display": ["Leaderboard"] }
+
+  const allSizeNames = (platformName) => (PLATFORMS[platformName] || []).map((s) => s.name)
+
+  const selectedSizes = (platformName) => selectedPlatforms[platformName] || []
+
+  const isFullySelected = (platformName) => {
+    const sel = selectedSizes(platformName)
+    const all = allSizeNames(platformName)
+    return all.length > 0 && sel.length === all.length
+  }
+
+  const isPartiallySelected = (platformName) => {
+    const sel = selectedSizes(platformName)
+    return sel.length > 0 && sel.length < allSizeNames(platformName).length
+  }
+
   const togglePlatform = (name) => {
-    const next = selectedPlatforms.includes(name)
-      ? selectedPlatforms.filter((p) => p !== name)
-      : [...selectedPlatforms, name]
+    const next = { ...selectedPlatforms }
+    if (isFullySelected(name) || isPartiallySelected(name)) {
+      // Turn off entirely
+      delete next[name]
+    } else {
+      // Turn on all sizes
+      next[name] = allSizeNames(name)
+    }
+    onPlatformsChange(next)
+  }
+
+  const toggleSize = (platformName, sizeName) => {
+    const current = selectedSizes(platformName)
+    const next = { ...selectedPlatforms }
+    if (current.includes(sizeName)) {
+      const remaining = current.filter((s) => s !== sizeName)
+      if (remaining.length === 0) {
+        delete next[platformName]
+      } else {
+        next[platformName] = remaining
+      }
+    } else {
+      next[platformName] = [...current, sizeName]
+    }
     onPlatformsChange(next)
   }
 
@@ -37,7 +76,9 @@ export default function AdResizePicker({
           {PLATFORM_NAMES.map((name) => {
             const sizes = PLATFORMS[name]
             const isExpanded = expandedPlatform === name
-            const isSelected = selectedPlatforms.includes(name)
+            const full = isFullySelected(name)
+            const partial = isPartiallySelected(name)
+            const hasSel = full || partial
 
             return (
               <div key={name} className="mb-2">
@@ -47,7 +88,8 @@ export default function AdResizePicker({
                       className="form-check-input"
                       type="checkbox"
                       id={`plat-${name}`}
-                      checked={isSelected}
+                      checked={hasSel}
+                      ref={(el) => { if (el) el.indeterminate = partial }}
                       onChange={() => togglePlatform(name)}
                     />
                     <label className="form-check-label fw-medium" htmlFor={`plat-${name}`}>
@@ -64,12 +106,27 @@ export default function AdResizePicker({
                 </div>
                 {isExpanded && (
                   <div className="ms-4 mt-1">
-                    {sizes.map((s) => (
-                      <div key={`${name}-${s.name}`} className="d-flex justify-content-between">
-                        <small className="text-muted">{s.name}</small>
-                        <small className="text-muted">{s.width}x{s.height}</small>
-                      </div>
-                    ))}
+                    {sizes.map((s) => {
+                      const sizeSelected = selectedSizes(name).includes(s.name)
+                      const sizeId = `size-${name}-${s.name}`
+                      return (
+                        <div key={sizeId} className="d-flex align-items-center justify-content-between">
+                          <div className="form-check mb-0">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id={sizeId}
+                              checked={sizeSelected}
+                              onChange={() => toggleSize(name, s.name)}
+                            />
+                            <label className="form-check-label" htmlFor={sizeId}>
+                              <small className="text-muted">{s.name}</small>
+                            </label>
+                          </div>
+                          <small className="text-muted">{s.width}x{s.height}</small>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -77,11 +134,11 @@ export default function AdResizePicker({
           })}
         </div>
 
-        {selectedPlatforms.length > 0 && (
+        {Object.keys(selectedPlatforms).length > 0 && (
           <div className="mb-3">
             <small className="text-muted">
               {deduped.length} unique size{deduped.length !== 1 ? 's' : ''} will be generated
-              {deduped.length < selectedPlatforms.reduce((n, p) => n + (PLATFORMS[p]?.length || 0), 0) && (
+              {deduped.length < Object.entries(selectedPlatforms).reduce((n, [, sizes]) => n + sizes.length, 0) && (
                 <span> (duplicates merged)</span>
               )}
             </small>
@@ -92,7 +149,7 @@ export default function AdResizePicker({
           <button
             className="btn btn-danger btn-sm"
             onClick={onGenerateResizes}
-            disabled={resizing || selectedPlatforms.length === 0}
+            disabled={resizing || Object.keys(selectedPlatforms).length === 0}
           >
             {resizing ? (
               <><span className="spinner-border spinner-border-sm me-1" />Generating Resizes…</>

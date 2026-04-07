@@ -39,11 +39,27 @@ module AdPlatformSizes
     ]
   }.freeze
 
+  # selected_platforms can be:
+  #   - Hash/object: { "Platform Name" => ["Size1", "Size2"] } for specific sizes
+  #     (nil value means all sizes for that platform)
+  #   - Array: ["Platform Name", ...] for all sizes (legacy)
   def self.deduplicated_sizes(selected_platforms)
     by_dims = {}
 
-    selected_platforms.each do |platform_name|
-      sizes = PLATFORMS[platform_name] || []
+    entries = if selected_platforms.is_a?(Hash)
+      selected_platforms
+    else
+      Array(selected_platforms).index_with { |_| nil }
+    end
+
+    entries.each do |platform_name, size_names|
+      all_sizes = PLATFORMS[platform_name] || []
+      sizes = if size_names.present?
+        all_sizes.select { |s| size_names.include?(s[:name]) }
+      else
+        all_sizes
+      end
+
       sizes.each do |size|
         key = "#{size[:width]}x#{size[:height]}"
         by_dims[key] ||= { width: size[:width], height: size[:height], labels: [] }

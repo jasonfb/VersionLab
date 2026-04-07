@@ -16,6 +16,9 @@ module AdLayout
           height: height,
           viewBox: "0 0 #{width} #{height}"
         ) do
+          # Embed web fonts used by text layers
+          render_font_imports(xml, layout_result.layers)
+
           # Background
           render_background(xml, width, height)
 
@@ -34,6 +37,26 @@ module AdLayout
     end
 
     private
+
+    # Extract unique Google-importable font families from layers and embed @import rules
+    def render_font_imports(xml, layers)
+      families = layers
+        .select { |l| l["type"] == "text" && l["font_family"].present? }
+        .map { |l| l["font_family"].split(",").first.strip.gsub(/['"]/, "") }
+        .uniq
+        .reject { |f| f.match?(/\b(sans-serif|serif|monospace|cursive|fantasy)\b/i) }
+
+      return if families.empty?
+
+      imports = families.map { |f|
+        encoded = f.gsub(" ", "+")
+        "@import url('https://fonts.googleapis.com/css2?family=#{encoded}:wght@100;200;300;400;500;600;700;800;900&display=swap');"
+      }.join("\n")
+
+      xml.style(type: "text/css") do
+        xml.text(imports)
+      end
+    end
 
     def render_background(xml, width, height)
       bg_color = @ad.background_color.presence || "#000000"
@@ -70,12 +93,15 @@ module AdLayout
       line_height = font_size * 1.3
       start_y = y + font_size
 
+      font_weight = layer["font_weight"].presence || "normal"
+
       xml.text_(
         x: text_x.round,
         y: start_y.round,
         fill: fill,
         "font-size": font_size.round(1),
         "font-family": font_family,
+        "font-weight": font_weight,
         "text-anchor": text_anchor
       ) do
         lines.each_with_index do |line, i|

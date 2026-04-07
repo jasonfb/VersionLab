@@ -33,6 +33,15 @@ class AdParseService
       { layers: [], warnings: [ { type: "unsupported_format", message: "Only SVG and PDF files are supported." } ], width: nil, height: nil, aspect_ratio: nil }
     end
 
+    # Warn if no logo/image element was detected
+    has_logo = result[:layers].any? { |l| l[:type] == "image" }
+    unless has_logo
+      result[:warnings] << {
+        type: "no_logo_detected",
+        message: "No separate logo element was detected. If your logo is part of the background image, it will be replaced when the background is swapped. You can upload a logo separately in the ad editor."
+      }
+    end
+
     @ad.update!(
       parsed_layers: result[:layers],
       file_warnings: result[:warnings],
@@ -95,10 +104,12 @@ class AdParseService
       layer_id = node["id"].presence || node["inkscape:label"].presence || "layer_#{index}"
       font_size = node["font-size"] || node.css_style("font-size")
       font_family = node["font-family"] || node.css_style("font-family")
+      font_weight = node["font-weight"] || node.css_style("font-weight")
+      fill = node["fill"] || node.css_style("fill")
       x = node["x"]
       y = node["y"]
 
-      layers << {
+      layer = {
         id: layer_id,
         type: "text",
         content: content,
@@ -107,6 +118,9 @@ class AdParseService
         x: x,
         y: y
       }
+      layer[:font_weight] = font_weight if font_weight.present?
+      layer[:fill] = fill if fill.present?
+      layers << layer
       index += 1
     end
 
@@ -261,7 +275,16 @@ class AdParseService
       bbox = bounding_rect_from_clip(clip_el)
       next unless bbox
 
-      layers << {
+      # Capture the source image href from the inner <use> element (if any)
+      use_el = outer_g.at_css("use")
+      source_href = nil
+      if use_el
+        ref_id = (use_el["href"] || use_el["xlink:href"]).to_s.sub("#", "")
+        source_el = doc.at_css("##{ref_id}") if ref_id.present?
+        source_href = (source_el["href"] || source_el["xlink:href"]) if source_el&.name == "image"
+      end
+
+      layer = {
         id: "region_#{i}",
         type: "text",
         content: "",
@@ -270,19 +293,23 @@ class AdParseService
         width: bbox[:w].to_s,
         height: bbox[:h].to_s
       }
+      layer[:href] = source_href if source_href
+      layers << layer
     end
 
     remove_nested_regions(layers)
   end
 
-  # Remove regions fully contained within another region to avoid
-  # overlapping text in rendered output.
+  # Remove regions that are near-duplicates of another region (>70% area overlap)
+  # to avoid overlapping text in rendered output. Small regions that happen to fall
+  # within a larger region's bounding box are preserved (e.g. a logo inside a CTA area).
   def remove_nested_regions(layers)
     layers.reject { |inner|
       ix = inner[:x].to_f
       iy = inner[:y].to_f
       iw = inner[:width].to_f
       ih = inner[:height].to_f
+      inner_area = iw * ih
 
       layers.any? { |outer|
         next false if outer.equal?(inner)
@@ -290,10 +317,14 @@ class AdParseService
         oy = outer[:y].to_f
         ow = outer[:width].to_f
         oh = outer[:height].to_f
+        outer_area = ow * oh
 
-        ox <= ix && oy <= iy &&
+        next false unless ox <= ix && oy <= iy &&
           (ox + ow) >= (ix + iw) &&
           (oy + oh) >= (iy + ih)
+
+        # Only remove if the inner region covers most of the outer region (near-duplicate)
+        outer_area > 0 && inner_area / outer_area > 0.7
       }
     }.each_with_index.map { |layer, i|
       layer[:id] = "region_#{i}"
@@ -314,6 +345,8 @@ class AdParseService
     end
     return if runs.empty?
 
+    claimed_runs = Set.new
+
     layers.each do |layer|
       rx = layer[:x].to_f
       ry = layer[:y].to_f
@@ -328,12 +361,16 @@ class AdParseService
       # since clip-path bounding boxes may not perfectly match text extents)
       pad = 15
       matched = runs.select { |r|
-        r.origin.x >= (rx - pad) &&
+        !claimed_runs.include?(r.object_id) &&
+          r.origin.x >= (rx - pad) &&
           r.origin.x <= (rx + rw + pad) &&
           r.origin.y >= (pdf_y_bottom - pad) &&
           r.origin.y <= (pdf_y_top + pad)
       }
       next if matched.empty?
+
+      # Claim these runs so they aren't reused by another region
+      matched.each { |r| claimed_runs.add(r.object_id) }
 
       # Group into lines by y-proximity (within half a font size)
       lines = group_runs_into_lines(matched)
@@ -354,6 +391,37 @@ class AdParseService
       if text.strip == text.strip.upcase && text.strip.length > 3
         layer[:is_bold] = true
       end
+    end
+
+    # Regions with no text content that are contained within a text region are sub-layers
+    # (e.g. a CTA button's inner rendering layer) — remove them.
+    # Standalone empty regions outside of any text region are kept as image elements.
+    layers.reject! do |layer|
+      next false if layer[:content].present?
+
+      ix = layer[:x].to_f
+      iy = layer[:y].to_f
+      iw = layer[:width].to_f
+      ih = layer[:height].to_f
+
+      layers.any? do |other|
+        next false if other.equal?(layer)
+        next false if other[:content].blank?
+        ox = other[:x].to_f
+        oy = other[:y].to_f
+        ow = other[:width].to_f
+        oh = other[:height].to_f
+        ox <= ix && oy <= iy && (ox + ow) >= (ix + iw) && (oy + oh) >= (iy + ih)
+      end
+    end
+
+    # Re-index region IDs after removal
+    layers.each_with_index { |layer, i| layer[:id] = "region_#{i}" }
+
+    # Remaining regions with no text content are standalone image elements (logos, icons)
+    layers.each do |layer|
+      next unless layer[:content].blank?
+      layer[:type] = "image"
     end
 
     # Try to assign font families from embedded AdFont records

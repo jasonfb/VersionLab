@@ -32,6 +32,15 @@ This document defines the requirements for uploading ad creatives to Version Lab
 - Keep background image or background color on its own layer
 - Avoid merging all elements into a single group
 
+### Logo Requirements
+
+- Logos **must be a separate element** in the file — do not flatten or merge the logo into the background image
+- In SVG files, the logo should be an `<image>` element (e.g. an embedded PNG)
+- In PDF files, the logo should be a separate placed image, not part of the background raster
+- If the logo is baked into the background image, it **will be lost** when the background is swapped during versioning
+- Transparent PNG is the recommended format for logos embedded in ad creatives
+- If your file does not contain a detectable logo, you can upload one separately in the ad editor
+
 ---
 
 ## Background Image Requirements

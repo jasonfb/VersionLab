@@ -1,6 +1,6 @@
 class Api::AdsController < Api::BaseController
   before_action :set_client
-  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version, :classifications, :confirm_classifications ]
+  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version, :classifications, :confirm_classifications, :upload_logo, :remove_logo ]
 
   def index
     ads = @client.ads.includes(:audiences, :campaign, :ai_service, :ai_model)
@@ -108,14 +108,23 @@ class Api::AdsController < Api::BaseController
     end
 
     platforms = params[:platforms]
-    unless platforms.is_a?(Array) && platforms.any?
+    unless platforms.present?
       return render json: { error: "At least one platform must be selected" }, status: :unprocessable_entity
+    end
+
+    # Accept either { "Platform Name": ["Size1", "Size2"] } or ["Platform Name", ...]
+    platform_selections = if platforms.is_a?(ActionController::Parameters) || platforms.is_a?(Hash)
+      platforms.to_unsafe_h
+    elsif platforms.is_a?(Array)
+      platforms.index_with { |_| nil } # nil means all sizes
+    else
+      return render json: { error: "Invalid platforms format" }, status: :unprocessable_entity
     end
 
     # Clear any existing versions if going back from Step 2
     @ad.ad_versions.destroy_all if @ad.ad_versions.any?
 
-    resizes = AdResizeService.new(@ad, platforms: platforms).call
+    resizes = AdResizeService.new(@ad, platforms: platform_selections).call
     @ad.update!(state: :resizing)
 
     render json: {
@@ -218,6 +227,53 @@ class Api::AdsController < Api::BaseController
     redirect_to Rails.application.routes.url_helpers.rails_blob_url(
       version.rendered_image, only_path: true, disposition: "attachment"
     ), allow_other_host: true
+  end
+
+  # POST /api/clients/:client_id/ads/:id/upload_logo
+  def upload_logo
+    unless params[:logo].present?
+      return render json: { error: "Logo file is required" }, status: :unprocessable_entity
+    end
+
+    content_type = params[:logo].content_type
+    unless content_type&.include?("png")
+      return render json: { error: "Logo must be a PNG file (transparent PNG recommended)" }, status: :unprocessable_entity
+    end
+
+    @ad.logo_file.attach(params[:logo])
+
+    # Create a synthetic logo layer in parsed_layers
+    logo_layer = {
+      "id" => "uploaded_logo",
+      "type" => "image",
+      "href" => @ad.logo_url,
+      "x" => (@ad.width ? (@ad.width * 0.05).round : 50).to_s,
+      "y" => (@ad.height ? (@ad.height * 0.85).round : 850).to_s,
+      "width" => (@ad.width ? (@ad.width * 0.25).round : 250).to_s,
+      "height" => (@ad.height ? (@ad.height * 0.10).round : 100).to_s
+    }
+
+    layers = (@ad.parsed_layers || []).reject { |l| l["id"] == "uploaded_logo" }
+    layers << logo_layer
+    @ad.update!(parsed_layers: layers)
+
+    # Update classified_layers too
+    classified = (@ad.classified_layers || []).reject { |l| l["id"] == "uploaded_logo" }
+    classified << logo_layer.merge("role" => "logo", "confidence" => 1.0)
+    @ad.update!(classified_layers: classified)
+
+    render json: ad_json(@ad)
+  end
+
+  # DELETE /api/clients/:client_id/ads/:id/remove_logo
+  def remove_logo
+    @ad.logo_file.purge if @ad.logo_file.attached?
+
+    layers = (@ad.parsed_layers || []).reject { |l| l["id"] == "uploaded_logo" }
+    classified = (@ad.classified_layers || []).reject { |l| l["id"] == "uploaded_logo" }
+    @ad.update!(parsed_layers: layers, classified_layers: classified)
+
+    render json: ad_json(@ad)
   end
 
   private
@@ -368,6 +424,8 @@ class Api::AdsController < Api::BaseController
       audience_names: ad.audiences.map(&:name),
       layer_overrides: ad.layer_overrides,
       svg_url: ad.svg_url,
+      logo_url: ad.logo_url,
+      has_logo: ad.logo_file.attached?,
       file_url: ad.file_url,
       file_content_type: ad.file_content_type,
       has_resizes: ad.ad_resizes.any?,

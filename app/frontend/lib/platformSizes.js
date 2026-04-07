@@ -40,12 +40,14 @@ export const PLATFORMS = {
 
 export const PLATFORM_NAMES = Object.keys(PLATFORMS)
 
+// selectedPlatforms is { [platformName]: sizeName[] }
 export function deduplicatedSizes(selectedPlatforms) {
   const byDims = {}
 
-  selectedPlatforms.forEach((platform) => {
-    const sizes = PLATFORMS[platform] || []
-    sizes.forEach((size) => {
+  Object.entries(selectedPlatforms).forEach(([platform, sizeNames]) => {
+    const allSizes = PLATFORMS[platform] || []
+    const filtered = allSizes.filter((s) => sizeNames.includes(s.name))
+    filtered.forEach((size) => {
       const key = `${size.width}x${size.height}`
       if (!byDims[key]) {
         byDims[key] = { width: size.width, height: size.height, labels: [] }

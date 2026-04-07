@@ -52,7 +52,7 @@ export default function AdEdit() {
     setStepRaw(n)
     setSearchParams({ step: STEP_NAMES[n] || 'classify' }, { replace: true })
   }
-  const [selectedPlatforms, setSelectedPlatforms] = useState([])
+  const [selectedPlatforms, setSelectedPlatforms] = useState({})
   const [resizes, setResizes] = useState([])
   const [resizing, setResizing] = useState(false)
   const [editingResize, setEditingResize] = useState(null)

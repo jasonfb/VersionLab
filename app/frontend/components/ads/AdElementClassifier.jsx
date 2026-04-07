@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { apiFetch } from '~/lib/api'
+import { apiFetch, apiUpload } from '~/lib/api'
 
 const ROLE_OPTIONS = [
   { value: 'headline', label: 'Headline', color: '#dc3545' },
@@ -30,7 +30,10 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
   const [selectedLayerId, setSelectedLayerId] = useState(null)
   const [svgMarkup, setSvgMarkup] = useState(null)
   const [viewMode, setViewMode] = useState('fit') // 'fit' or 'natural'
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoUrl, setLogoUrl] = useState(ad?.logo_url || null)
   const svgContainerRef = useRef(null)
+  const logoInputRef = useRef(null)
 
   useEffect(() => {
     if (!ad?.id) return
@@ -97,9 +100,46 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
     }
   }
 
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.includes('png')) {
+      alert('Please upload a PNG file (transparent PNG recommended)')
+      return
+    }
+
+    setUploadingLogo(true)
+    try {
+      const formData = new FormData()
+      formData.append('logo', file)
+      const data = await apiUpload(`/api/clients/${clientId}/ads/${ad.id}/upload_logo`, formData)
+      setLayers(data.classified_layers || [])
+      setLogoUrl(data.logo_url || null)
+    } catch (err) {
+      alert(err.message || 'Failed to upload logo')
+    } finally {
+      setUploadingLogo(false)
+      if (logoInputRef.current) logoInputRef.current.value = ''
+    }
+  }
+
+  const handleRemoveLogo = async () => {
+    try {
+      const data = await apiFetch(`/api/clients/${clientId}/ads/${ad.id}/remove_logo`, {
+        method: 'DELETE',
+      })
+      setLayers(data.classified_layers || [])
+      setLogoUrl(null)
+    } catch (err) {
+      alert(err.message || 'Failed to remove logo')
+    }
+  }
+
   const textLayers = layers.filter((l) => l.type === 'text' && l.content)
   const imageLayers = layers.filter((l) => l.type === 'image')
   const otherLayers = layers.filter((l) => (l.type !== 'text' || !l.content) && l.type !== 'image')
+  const hasLogo = layers.some((l) => l.role === 'logo' || l.type === 'image')
   const hasLowConfidence = layers.some((l) => (l.confidence || 0) < CONFIDENCE_THRESHOLDS.medium)
 
   if (loading) {
@@ -170,10 +210,15 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
             >
               {textLayers.map((layer, i) => {
                 const x = parseFloat(layer.x) || 0
-                const y = parseFloat(layer.y) || 0
-                const w = parseFloat(layer.width) || (ad.width * 0.4)
-                const h = parseFloat(layer.height) || (parseFloat(layer.font_size) || 20) * 1.5
+                const fontSize = parseFloat(layer.font_size) || 20
+                // For native SVG text, y is the baseline — offset up by font size for the rect top
+                const hasExplicitHeight = !!layer.height
+                const h = hasExplicitHeight ? parseFloat(layer.height) : fontSize * 1.4
+                const y = hasExplicitHeight ? parseFloat(layer.y) || 0 : (parseFloat(layer.y) || 0) - fontSize
+                // Estimate width from content length and font size if not explicit
+                const w = parseFloat(layer.width) || Math.max(fontSize * 0.6 * (layer.content?.length || 5), 30)
                 const isSelected = selectedLayerId === layer.id
+                const pad = 3
                 return (
                   <g
                     key={layer.id || i}
@@ -181,29 +226,16 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                     onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
                   >
                     <rect
-                      x={x}
-                      y={y}
-                      width={w}
-                      height={h}
-                      fill="#00b4d8"
-                      fillOpacity={isSelected ? 0.35 : 0.12}
-                      stroke={isSelected ? '#00b4d8' : 'rgba(255,255,255,0.6)'}
-                      strokeWidth={isSelected ? 3 : 1.5}
-                      strokeDasharray={isSelected ? 'none' : '6 3'}
-                      rx={3}
+                      x={x - pad}
+                      y={y - pad}
+                      width={w + pad * 2}
+                      height={h + pad * 2}
+                      fill="transparent"
+                      stroke={isSelected ? '#00b4d8' : 'rgba(255,255,255,0.5)'}
+                      strokeWidth={isSelected ? 2 : 1}
+                      strokeDasharray={isSelected ? 'none' : '4 2'}
+                      rx={2}
                     />
-                    {isSelected && (
-                      <text
-                        x={x + 4}
-                        y={y + 14}
-                        fill="#00b4d8"
-                        fontSize="11"
-                        fontWeight="600"
-                        fontFamily="sans-serif"
-                      >
-                        {layer.role?.toUpperCase()}
-                      </text>
-                    )}
                   </g>
                 )
               })}
@@ -213,36 +245,36 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                 const w = parseFloat(layer.width) || 60
                 const h = parseFloat(layer.height) || 60
                 const isSelected = selectedLayerId === layer.id
+                const isUploaded = layer.id === 'uploaded_logo'
+                const pad = 3
                 return (
                   <g
                     key={layer.id || `img-${i}`}
                     style={{ cursor: 'pointer' }}
                     onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
                   >
-                    <rect
-                      x={x}
-                      y={y}
-                      width={w}
-                      height={h}
-                      fill="#0d6efd"
-                      fillOpacity={isSelected ? 0.35 : 0.12}
-                      stroke={isSelected ? '#0d6efd' : 'rgba(255,255,255,0.6)'}
-                      strokeWidth={isSelected ? 3 : 1.5}
-                      strokeDasharray={isSelected ? 'none' : '6 3'}
-                      rx={3}
-                    />
-                    {isSelected && (
-                      <text
-                        x={x + 4}
-                        y={y + 14}
-                        fill="#0d6efd"
-                        fontSize="11"
-                        fontWeight="600"
-                        fontFamily="sans-serif"
-                      >
-                        {layer.role?.toUpperCase() || 'LOGO'}
-                      </text>
+                    {isUploaded && logoUrl && (
+                      <image
+                        href={logoUrl}
+                        x={x}
+                        y={y}
+                        width={w}
+                        height={h}
+                        preserveAspectRatio="xMidYMid meet"
+                        style={{ pointerEvents: 'none' }}
+                      />
                     )}
+                    <rect
+                      x={x - pad}
+                      y={y - pad}
+                      width={w + pad * 2}
+                      height={h + pad * 2}
+                      fill="transparent"
+                      stroke={isSelected ? '#0d6efd' : 'rgba(255,255,255,0.5)'}
+                      strokeWidth={isSelected ? 2 : 1}
+                      strokeDasharray={isSelected ? 'none' : '4 2'}
+                      rx={2}
+                    />
                   </g>
                 )
               })}
@@ -411,6 +443,61 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                 )
               })}
             </>
+          )}
+        </div>
+
+        {/* Logo upload */}
+        <div className="mt-3">
+          {!hasLogo ? (
+            <div className="border rounded p-3 text-center" style={{ borderStyle: 'dashed !important', background: '#f8f9fa' }}>
+              <i className="bi bi-image fs-4 d-block mb-2 text-muted"></i>
+              <p className="small text-muted mb-2">
+                No logo detected in this file. If your logo is part of the background, it will be replaced when the background is swapped.
+              </p>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png"
+                className="d-none"
+                onChange={handleLogoUpload}
+              />
+              <button
+                className="btn btn-outline-primary btn-sm"
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploadingLogo}
+              >
+                {uploadingLogo ? (
+                  <><span className="spinner-border spinner-border-sm me-1" />Uploading…</>
+                ) : (
+                  <><i className="bi bi-upload me-1"></i>Upload Logo (PNG)</>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="d-flex align-items-center gap-2">
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png"
+                className="d-none"
+                onChange={handleLogoUpload}
+              />
+              <button
+                className="btn btn-outline-secondary btn-sm"
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploadingLogo}
+              >
+                <i className="bi bi-arrow-repeat me-1"></i>Replace Logo
+              </button>
+              {layers.some((l) => l.id === 'uploaded_logo') && (
+                <button
+                  className="btn btn-outline-danger btn-sm"
+                  onClick={handleRemoveLogo}
+                >
+                  <i className="bi bi-trash me-1"></i>Remove
+                </button>
+              )}
+            </div>
           )}
         </div>
 

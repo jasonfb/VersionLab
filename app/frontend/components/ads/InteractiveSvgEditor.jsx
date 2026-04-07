@@ -318,6 +318,22 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
             const el = svg.getElementById(id)
             if (el && (x || y)) el.setAttribute('transform', `translate(${x}, ${y})`)
           })
+
+          // Inject uploaded logo as an <image> element if not already in the SVG
+          const uploadedLogo = layers?.find((l) => l.id === 'uploaded_logo' && l.type === 'image')
+          if (uploadedLogo && !svg.getElementById('uploaded_logo')) {
+            const imgEl = document.createElementNS('http://www.w3.org/2000/svg', 'image')
+            imgEl.setAttribute('id', 'uploaded_logo')
+            imgEl.setAttribute('href', uploadedLogo.href)
+            imgEl.setAttribute('x', uploadedLogo.x || '50')
+            imgEl.setAttribute('y', uploadedLogo.y || '850')
+            imgEl.setAttribute('width', uploadedLogo.width || '250')
+            imgEl.setAttribute('height', uploadedLogo.height || '100')
+            imgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet')
+            const offset = layerOffsets.current['uploaded_logo']
+            if (offset) imgEl.setAttribute('transform', `translate(${offset.x}, ${offset.y})`)
+            svg.appendChild(imgEl)
+          }
         }
         buildInteractiveLayer()
       })

@@ -59,6 +59,8 @@ Rails.application.routes.draw do
           get  :download_version
           get  :classifications
           post :confirm_classifications
+          post :upload_logo
+          delete :remove_logo
         end
         resources :ad_resizes, only: [ :update ], controller: "ad_resizes"
       end

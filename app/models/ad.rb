@@ -52,6 +52,7 @@ class Ad < ApplicationRecord
 
   has_one_attached :file
   has_one_attached :converted_svg
+  has_one_attached :logo_file
   has_many :ad_audiences, dependent: :destroy
   has_many :audiences, through: :ad_audiences
   has_many :ad_versions, dependent: :destroy
@@ -79,5 +80,10 @@ class Ad < ApplicationRecord
     blob = converted_svg.attached? ? converted_svg : (file.attached? && file_content_type&.include?("svg") ? file : nil)
     return nil unless blob&.attached?
     Rails.application.routes.url_helpers.rails_blob_url(blob, only_path: true)
+  end
+
+  def logo_url
+    return nil unless logo_file.attached?
+    Rails.application.routes.url_helpers.rails_blob_url(logo_file, only_path: true)
   end
 end
