@@ -1,7 +1,102 @@
-<section style="background:#f5f6f8;min-height:80vh;display:flex;align-items:center;justify-content:center;">
-  <div class="text-center" style="max-width:520px;padding:3rem 1.5rem;">
-    <h1 style="font-size:2.8rem;font-weight:900;color:#1a1a1a;letter-spacing:-0.02em;margin-bottom:1rem;">Pricing</h1>
-    <p style="font-size:1.1rem;color:#6b7280;line-height:1.7;margin-bottom:2rem;">Pricing details coming soon. <%= link_to "Contact us", "/contact", style: "color:#CD0000;font-weight:600;" %> to discuss your needs.</p>
-    <%= link_to "Back to Home", root_path, class: "btn btn-danger fw-semibold px-4", style: "border-radius:10px;" %>
+<section class="pricing-page mkt-section" data-billing="monthly">
+  <div class="container">
+    <div class="pricing-header">
+      <div class="section-eyebrow">Pricing</div>
+      <h1 class="section-title">Simple, transparent pricing</h1>
+      <p style="font-size:1.15rem;color:#6b7280;line-height:1.7;">
+        Pick the plan that fits your team. Every plan includes a monthly token allotment for AI-powered versioning, with affordable overages if you need more.
+      </p>
+    </div>
+
+    <% if @subscription_tiers.any? %>
+      <%
+        # Compute average savings % across tiers (annual vs 12 × monthly)
+        savings_pcts = @subscription_tiers.map do |t|
+          full = t.monthly_price_cents * 12
+          full.positive? ? ((full - t.annual_price_cents).to_f / full * 100).round : 0
+        end
+        avg_savings = savings_pcts.any? ? (savings_pcts.sum / savings_pcts.size) : 0
+      %>
+
+      <div class="text-center">
+        <div class="pricing-toggle" role="tablist">
+          <button type="button" class="is-active" data-billing-target="monthly">Monthly</button>
+          <button type="button" data-billing-target="annual">
+            Annual
+            <% if avg_savings.positive? %><span class="save-badge">Save <%= avg_savings %>%</span><% end %>
+          </button>
+        </div>
+      </div>
+
+      <div class="row justify-content-center g-4">
+        <% @subscription_tiers.each do |tier| %>
+          <%
+            full_year       = tier.monthly_price_cents * 12
+            annual_savings  = full_year.positive? ? ((full_year - tier.annual_price_cents).to_f / full_year * 100).round : 0
+            annual_monthly  = tier.annual_price_cents / 12.0 / 100.0
+          %>
+          <div class="col-md-6 col-lg-5">
+            <div class="pricing-card">
+              <h2><%= tier.name %></h2>
+
+              <div class="price-block">
+                <span class="price-monthly">
+                  <span class="price-current"><%= number_to_currency(tier.monthly_price, precision: tier.monthly_price_cents % 100 == 0 ? 0 : 2) %></span>
+                  <span class="price-period">/ month</span>
+                </span>
+
+                <span class="price-annual">
+                  <span class="price-current"><%= number_to_currency(annual_monthly, precision: annual_monthly == annual_monthly.to_i ? 0 : 2) %></span>
+                  <span class="price-period">/ month</span>
+                  <% if annual_savings.positive? %>
+                    <span class="price-savings">Save <%= annual_savings %>%</span>
+                  <% end %>
+                  <span class="price-strike">
+                    <%= number_to_currency(tier.monthly_price, precision: tier.monthly_price_cents % 100 == 0 ? 0 : 2) %> / month
+                  </span>
+                </span>
+              </div>
+
+              <div class="price-billing-note">
+                <span class="price-monthly">Billed monthly. Switch to annual to save.</span>
+                <span class="price-annual">
+                  Billed annually at <strong><%= number_to_currency(tier.annual_price, precision: tier.annual_price_cents % 100 == 0 ? 0 : 2) %></strong>
+                </span>
+              </div>
+
+              <ul class="features">
+                <li><strong><%= number_with_delimiter(tier.monthly_token_allotment) %></strong> AI tokens included each month</li>
+                <li>Overage: <strong><%= number_to_currency(tier.overage_cents_per_1000_tokens / 100.0, precision: 2) %></strong> per 1,000 tokens</li>
+              </ul>
+
+              <div class="cta-wrap">
+                <%= link_to "Get started", onboarding_path, class: "btn btn-danger fw-semibold w-100", style: "border-radius:10px;padding:0.85rem;" %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-center" style="color:#6b7280;">Pricing details coming soon. <%= link_to "Contact us", "/contact", style: "color:#CD0000;font-weight:600;" %> to discuss your needs.</p>
+    <% end %>
+
+    <div class="text-center" style="margin-top:3rem;">
+      <p style="color:#6b7280;">Questions? <%= link_to "Contact us", "/contact", style: "color:#CD0000;font-weight:600;" %>.</p>
+    </div>
   </div>
 </section>
+
+<script>
+  (function () {
+    var page = document.querySelector('.pricing-page');
+    if (!page) return;
+    var buttons = page.querySelectorAll('[data-billing-target]');
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var target = btn.getAttribute('data-billing-target');
+        page.setAttribute('data-billing', target);
+        buttons.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+      });
+    });
+  })();
+</script>

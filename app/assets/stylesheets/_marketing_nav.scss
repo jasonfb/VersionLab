@@ -1,0 +1,27 @@
+.nav-marketing {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.85rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  .brand-text {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: #1a1a1a;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .nav-lnk {
+    color: #555;
+    font-weight: 500;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover { color: #1a1a1a; }
+    &.is-active { color: #CD0000; }
+  }
+}

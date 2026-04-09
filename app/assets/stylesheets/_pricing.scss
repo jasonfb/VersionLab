@@ -1,0 +1,139 @@
+.pricing-page {
+  background: #f5f6f8;
+
+  .pricing-header {
+    max-width: 720px;
+    margin: 0 auto 2.5rem;
+    text-align: center;
+  }
+
+  .pricing-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 0.3rem;
+    margin-bottom: 3rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+
+    button {
+      border: none;
+      background: transparent;
+      color: #6b7280;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.55rem 1.4rem;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &.is-active {
+        background: #1a1a1a;
+        color: #fff;
+      }
+    }
+
+    .save-badge {
+      display: inline-block;
+      background: #fee2e2;
+      color: #CD0000;
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+    }
+  }
+
+  .pricing-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    height: 100%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    border: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+
+    h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #1a1a1a;
+      margin-bottom: 0.5rem;
+    }
+
+    .price-block {
+      margin: 1.25rem 0 1.5rem;
+      min-height: 5.5rem;
+    }
+
+    .price-current {
+      font-size: 3rem;
+      font-weight: 900;
+      color: #1a1a1a;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .price-period {
+      color: #6b7280;
+      font-weight: 600;
+      margin-left: 0.25rem;
+    }
+
+    .price-strike {
+      display: block;
+      margin-top: 0.5rem;
+      color: #9ca3af;
+      font-size: 1.05rem;
+      text-decoration: line-through;
+    }
+
+    .price-savings {
+      display: inline-block;
+      margin-top: 0.5rem;
+      background: #fee2e2;
+      color: #CD0000;
+      font-size: 0.78rem;
+      font-weight: 800;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      margin-left: 0.5rem;
+    }
+
+    .price-billing-note {
+      color: #6b7280;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+
+      strong { color: #1a1a1a; }
+    }
+
+    .features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 2rem;
+      color: #374151;
+      line-height: 1.9;
+    }
+
+    .cta-wrap {
+      margin-top: auto;
+    }
+  }
+
+  // Toggle visibility states
+  &[data-billing="monthly"] {
+    .price-monthly { display: inline; }
+    .price-annual  { display: none; }
+    .show-when-annual { display: none; }
+  }
+  &[data-billing="annual"] {
+    .price-monthly { display: none; }
+    .price-annual  { display: inline; }
+    .show-when-annual { display: inline-block; }
+  }
+}

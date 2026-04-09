@@ -116,32 +116,6 @@
     display: block;
   }
 
-  /* ── Nav ── */
-  .nav-marketing {
-    background: #fff;
-    border-bottom: 1px solid #e5e7eb;
-    padding: 0.85rem 0;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .nav-marketing .brand-text {
-    font-size: 1.1rem;
-    font-weight: 900;
-    color: #1a1a1a;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .nav-marketing .nav-lnk {
-    color: #555;
-    font-weight: 500;
-    font-size: 0.95rem;
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-  .nav-marketing .nav-lnk:hover { color: #1a1a1a; }
-  .nav-marketing .nav-lnk.is-active { color: #CD0000; }
-
   /* ── Hero ── */
   .hero-section {
     background: #f5f6f8;
@@ -322,30 +296,6 @@
     .step-num { font-size: 3.5rem; }
   }
 </style>
-
-<!-- ══════════════════════════════════════
-     NAV
-══════════════════════════════════════ -->
-<nav class="nav-marketing">
-  <div class="container d-flex align-items-center justify-content-between">
-    <a href="/" class="text-decoration-none d-flex align-items-center gap-2">
-      <%= image_tag "version-lab-icon.png", height: 30, alt: "Version Lab" %>
-      <span class="brand-text">Version Lab</span>
-    </a>
-    <div class="d-flex align-items-center gap-4">
-      <a href="/" class="nav-lnk is-active">Home</a>
-      <a href="/pricing" class="nav-lnk">Pricing</a>
-      <a href="/contact" class="nav-lnk">Contact</a>
-      <% if user_signed_in? %>
-        <%= link_to "Go to App", "/app", class: "nav-lnk" %>
-        <%= link_to "Logout", destroy_user_session_path, data: { turbo_method: :delete }, class: "btn btn-sm btn-outline-secondary ms-2" %>
-      <% else %>
-        <%= link_to "Login", new_user_session_path, class: "nav-lnk" %>
-        <%= link_to "Start a Free Trial", onboarding_path, class: "btn btn-danger fw-semibold px-4 ms-2" %>
-      <% end %>
-    </div>
-  </div>
-</nav>
 
 <!-- ══════════════════════════════════════
      SECTION 1 — HERO
