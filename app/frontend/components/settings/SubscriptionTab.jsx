@@ -115,6 +115,72 @@ export default function SubscriptionTab() {
         </div>
       </div>
 
+      {/* VersionLab Tokens */}
+      {sub?.tokens && (
+        <div className="card mb-4">
+          <div className="card-header fw-semibold d-flex justify-content-between align-items-center">
+            <span>
+              <i className="bi bi-lightning-charge-fill me-1 text-warning"></i>
+              VersionLab Tokens
+            </span>
+            <span className="text-muted small fw-normal">
+              Cycle: {formatDate(sub.tokens.cycle_start)} – {formatDate(sub.tokens.cycle_end)}
+            </span>
+          </div>
+          <div className="card-body">
+            <div className="d-flex justify-content-between mb-1">
+              <span className="small text-muted">Used this cycle</span>
+              <span className="small fw-semibold">
+                {sub.tokens.used_this_cycle.toLocaleString()} / {sub.tokens.monthly_allotment.toLocaleString()}
+              </span>
+            </div>
+            <div className="progress mb-3" style={{ height: 8 }}>
+              <div
+                className={`progress-bar ${sub.tokens.overage_tokens > 0 ? 'bg-danger' : 'bg-success'}`}
+                role="progressbar"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (sub.tokens.used_this_cycle / Math.max(1, sub.tokens.monthly_allotment)) * 100
+                  )}%`,
+                }}
+              />
+            </div>
+            <div className="row text-center small">
+              <div className="col">
+                <div className="text-muted">Allotment</div>
+                <div className="fw-semibold">{sub.tokens.monthly_allotment.toLocaleString()}</div>
+              </div>
+              <div className="col">
+                <div className="text-muted">Remaining</div>
+                <div className="fw-semibold">{sub.tokens.remaining.toLocaleString()}</div>
+              </div>
+              <div className="col">
+                <div className="text-muted">Overage</div>
+                <div className={`fw-semibold ${sub.tokens.overage_tokens > 0 ? 'text-danger' : ''}`}>
+                  {sub.tokens.overage_tokens.toLocaleString()}
+                </div>
+              </div>
+              <div className="col">
+                <div className="text-muted">Overage charge</div>
+                <div className={`fw-semibold ${sub.tokens.overage_cents > 0 ? 'text-danger' : ''}`}>
+                  ${(sub.tokens.overage_cents / 100).toFixed(2)}
+                </div>
+              </div>
+            </div>
+            <div className="alert alert-info small mt-3 mb-0">
+              <i className="bi bi-info-circle me-1"></i>
+              <strong>Remember:</strong> You get {sub.tokens.monthly_allotment.toLocaleString()} VersionLab tokens
+              per month included. VersionLab tokens do not map 1:1 to the AI tokens you see from
+              the AI providers. More expensive models use tokens faster. After{' '}
+              {sub.tokens.monthly_allotment.toLocaleString()} tokens, you will pay an overage fee of $
+              {(sub.tokens.overage_rate_per_1000_cents / 100 / 1000).toFixed(3)} per token, billed
+              at the end of your billing cycle.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Next Payment */}
       {sub && !sub.is_free_trial && !sub.trial_expired && (
         <div className="card mb-4">
@@ -122,8 +188,15 @@ export default function SubscriptionTab() {
           <div className="card-body">
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <div className="fw-semibold">${(sub.price_cents / 100).toFixed(2)}</div>
-                <div className="text-muted small">Due {formatDate(sub.paid_through_date)}</div>
+                <div className="fw-semibold">
+                  ${((sub.price_cents + (sub.tokens?.overage_cents || 0)) / 100).toFixed(2)}
+                </div>
+                <div className="text-muted small">
+                  Due {formatDate(sub.paid_through_date)}
+                  {sub.tokens?.overage_cents > 0 && (
+                    <> &middot; includes ${(sub.tokens.overage_cents / 100).toFixed(2)} token overage</>
+                  )}
+                </div>
               </div>
               {paymentMethods.length > 0 && (
                 <div className="text-muted small">

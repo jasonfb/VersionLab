@@ -8,6 +8,7 @@ export default function AdResizePicker({
   resizes,
   onGenerateResizes,
   onEditResize,
+  onRebuildResize,
   onContinue,
   onSkip,
   resizing,
@@ -233,6 +234,20 @@ export default function AdResizePicker({
                       <small className="text-primary d-block mt-1">
                         <i className="bi bi-pencil me-1"></i>Click to adjust
                       </small>
+                    )}
+                    {onRebuildResize && resize.state !== 'pending' && (
+                      <button
+                        type="button"
+                        className="btn btn-link btn-sm p-0 mt-1 text-muted"
+                        style={{ fontSize: '0.7rem' }}
+                        title="Destroy and rebuild this size from current classifications"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onRebuildResize(resize)
+                        }}
+                      >
+                        <i className="bi bi-arrow-clockwise me-1"></i>Rebuild
+                      </button>
                     )}
                   </div>
                 </div>

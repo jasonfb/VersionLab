@@ -1,3 +1,5 @@
+require "set"
+
 module AdLayout
   class LayoutEngine
     Result = Data.define(:layers, :bucket, :target_width, :target_height)
@@ -22,9 +24,35 @@ module AdLayout
 
       positioned = []
 
-      @ad.classified_layers.each do |layer|
+      # Collapse continuation chains so multi-fragment sentences are positioned
+      # as a single text block per chain head.
+      classified = AdContinuation.collapse(@ad.classified_layers)
+
+      # Wordmark groups: lay out as a single unit (like an image) so members
+      # keep their relative spacing. Process before per-layer iteration and
+      # skip the members in the main loop.
+      wordmark_template = template[:wordmark]
+      wordmark_member_ids = Set.new
+      if placed_roles.include?("wordmark") && wordmark_template && !wordmark_template[:drop]
+        wordmark_groups = classified
+          .select { |l| l["role"] == "wordmark" && l["wordmark_group_id"].present? }
+          .group_by { |l| l["wordmark_group_id"] }
+
+        wordmark_groups.each do |_group_id, members|
+          anchor_px = LayoutTemplate.anchor_to_pixels(
+            wordmark_template[:anchor], target_width, target_height
+          )
+          positioned_members = position_wordmark_group(members, anchor_px)
+          positioned.concat(positioned_members)
+          members.each { |m| wordmark_member_ids << m["id"] }
+        end
+      end
+
+      classified.each do |layer|
+        next if wordmark_member_ids.include?(layer["id"])
         role = layer["role"]
         next unless role
+        next if role == "wordmark" # ungrouped wordmarks fall through silently
         next unless placed_roles.include?(role)
 
         role_template = template[role.to_sym]
@@ -49,6 +77,70 @@ module AdLayout
     end
 
     private
+
+    # Position a wordmark group as a single unit. Members may have different
+    # font sizes/families — we treat the group's combined bounding box like
+    # an image: scale it to fit the wordmark anchor preserving aspect ratio,
+    # then place each member at its scaled relative position with a scaled
+    # font size. No text wrapping; wordmarks are short by design.
+    def position_wordmark_group(members, anchor_px)
+      return [] if members.empty?
+
+      # Per-member original bbox (estimated from font_size + content length)
+      bboxes = members.map do |layer|
+        font_size = layer["font_size"].to_f
+        font_size = 12.0 if font_size <= 0
+        content = layer["content"].to_s
+        # Approximate width using the same heuristic used elsewhere in this file
+        est_width = layer["width"].to_f
+        est_width = font_size * content.length * 0.55 if est_width <= 0
+        est_height = layer["height"].to_f
+        est_height = font_size * 1.3 if est_height <= 0
+        {
+          layer: layer,
+          font_size: font_size,
+          x: layer["x"].to_f,
+          y: layer["y"].to_f,
+          w: est_width,
+          h: est_height
+        }
+      end
+
+      group_min_x = bboxes.map { |b| b[:x] }.min
+      group_min_y = bboxes.map { |b| b[:y] }.min
+      group_max_x = bboxes.map { |b| b[:x] + b[:w] }.max
+      group_max_y = bboxes.map { |b| b[:y] + b[:h] }.max
+      group_w = group_max_x - group_min_x
+      group_h = group_max_y - group_min_y
+      return [] if group_w <= 0 || group_h <= 0
+
+      scale = [anchor_px[:w] / group_w, anchor_px[:h] / group_h].min
+      # Center the scaled group within the anchor region
+      scaled_w = group_w * scale
+      scaled_h = group_h * scale
+      offset_x = anchor_px[:x] + (anchor_px[:w] - scaled_w) / 2.0
+      offset_y = anchor_px[:y] + (anchor_px[:h] - scaled_h) / 2.0
+
+      bboxes.map do |b|
+        result = b[:layer].dup
+        new_x = offset_x + (b[:x] - group_min_x) * scale
+        new_y = offset_y + (b[:y] - group_min_y) * scale
+        new_font = (b[:font_size] * scale).round(1)
+        new_font = [new_font, 6.0].max # don't scale below readability floor
+
+        result["x"] = new_x.round.to_s
+        result["y"] = new_y.round.to_s
+        result["width"] = (b[:w] * scale).round.to_s
+        result["height"] = (b[:h] * scale).round.to_s
+        result["font_size"] = new_font.to_s
+        result["align"] = "left"
+        result["wrapped_lines"] = [b[:layer]["content"]]
+        # Strip any inherited cta_background since wordmarks aren't buttons
+        result.delete("cta_background_color")
+        result.delete("cta_background_rx_ratio")
+        result
+      end
+    end
 
     def position_layer(layer, role_template, anchor_px, base_scale, font_lookup)
       result = layer.dup

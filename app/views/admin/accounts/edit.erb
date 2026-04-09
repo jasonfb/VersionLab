@@ -12,6 +12,20 @@
 
 <%= render partial: "edit", locals: {account: @account}  %>
 
+<% if (sub = @account.active_subscription) %>
+  <div class="card mt-3">
+    <div class="card-header fw-semibold">VersionLab Tokens</div>
+    <div class="card-body">
+      <div class="small">
+        Tier default: <strong><%= sub.subscription_tier.monthly_token_allotment %></strong> tokens/cycle<br>
+        Override: <strong><%= sub.monthly_token_allotment_override || "—" %></strong><br>
+        Effective: <strong><%= sub.effective_monthly_token_allotment %></strong>
+      </div>
+      <%= link_to "Edit token override", edit_admin_subscription_path(sub), class: "btn btn-sm btn-primary mt-2" %>
+    </div>
+  </div>
+<% end %>
+
     </div>
   </div>
 </div>

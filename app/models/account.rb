@@ -23,6 +23,7 @@ class Account < ApplicationRecord
   has_many :subscriptions, dependent: :destroy
   has_many :payment_methods, dependent: :destroy
   has_many :payments, dependent: :destroy
+  has_many :invoices, dependent: :destroy
 
   scope :reverse_sort, -> { order(created_at:  :desc) }
 

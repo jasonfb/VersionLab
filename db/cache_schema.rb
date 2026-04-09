@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_02_125113) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_08_113439) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -33,6 +33,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_125113) do
   create_enum "element_role", ["headline", "subhead", "body", "cta", "logo", "background", "decoration"]
   create_enum "email_state", ["setup", "pending", "merged", "regenerating"]
   create_enum "email_version_state", ["generating", "active", "rejected"]
+  create_enum "invoice_line_item_kind", ["subscription", "overage", "credit", "adjustment"]
+  create_enum "invoice_status", ["draft", "open", "paid", "void", "uncollectible"]
   create_enum "payment_status", ["succeeded", "failed", "pending", "refunded"]
   create_enum "subscription_billing_interval", ["monthly", "annual"]
   create_enum "template_import_state", ["pending", "processing", "completed", "failed"]
@@ -470,6 +472,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_125113) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "invoice_line_items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "amount_cents", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.string "description", null: false
+    t.uuid "invoice_id", null: false
+    t.enum "kind", null: false, enum_type: "invoice_line_item_kind"
+    t.integer "quantity", default: 1, null: false
+    t.integer "unit_amount_cents", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["invoice_id"], name: "index_invoice_line_items_on_invoice_id"
+  end
+
+  create_table "invoices", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "account_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "email_sent_at"
+    t.string "invoice_number", null: false
+    t.datetime "issued_at"
+    t.datetime "paid_at"
+    t.date "period_end"
+    t.date "period_start"
+    t.enum "status", default: "draft", null: false, enum_type: "invoice_status"
+    t.uuid "subscription_id"
+    t.integer "subtotal_cents", default: 0, null: false
+    t.integer "total_cents", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_invoices_on_account_id"
+    t.index ["invoice_number"], name: "index_invoices_on_invoice_number", unique: true
+    t.index ["subscription_id"], name: "index_invoices_on_subscription_id"
+  end
+
   create_table "organization_types", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -498,12 +531,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_125113) do
     t.string "currency", default: "usd", null: false
     t.string "description"
     t.text "failure_reason"
+    t.uuid "invoice_id"
     t.uuid "payment_method_id"
     t.enum "status", null: false, enum_type: "payment_status"
     t.string "stripe_payment_intent_id"
     t.uuid "subscription_id"
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_payments_on_account_id"
+    t.index ["invoice_id"], name: "index_payments_on_invoice_id"
     t.index ["stripe_payment_intent_id"], name: "index_payments_on_stripe_payment_intent_id", unique: true
     t.index ["subscription_id"], name: "index_payments_on_subscription_id"
   end
@@ -668,7 +703,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_125113) do
     t.integer "annual_price_cents", null: false
     t.datetime "created_at", null: false
     t.integer "monthly_price_cents", null: false
+    t.integer "monthly_token_allotment", default: 1000, null: false
     t.string "name", null: false
+    t.integer "overage_cents_per_1000_tokens", default: 500, null: false
     t.integer "position", default: 0, null: false
     t.string "slug", null: false
     t.datetime "updated_at", null: false
@@ -681,10 +718,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_125113) do
     t.date "canceled_date"
     t.datetime "created_at", null: false
     t.integer "credit_applied_cents"
+    t.datetime "final_billed_at"
+    t.integer "monthly_token_allotment_override"
     t.date "paid_through_date", null: false
     t.integer "prorated_refund_cents"
     t.date "start_date", null: false
     t.uuid "subscription_tier_id", null: false
+    t.date "token_cycle_started_on", null: false
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_subscriptions_on_account_id"
     t.index ["subscription_tier_id"], name: "index_subscriptions_on_subscription_tier_id"
@@ -771,6 +811,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_125113) do
   add_foreign_key "email_documents", "emails"
   add_foreign_key "emails", "campaigns"
   add_foreign_key "emails", "clients"
+  add_foreign_key "invoice_line_items", "invoices"
+  add_foreign_key "invoices", "accounts"
+  add_foreign_key "invoices", "subscriptions"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

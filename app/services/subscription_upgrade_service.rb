@@ -65,6 +65,7 @@ class SubscriptionUpgradeService
       subscription_tier: new_tier,
       billing_interval: interval,
       start_date: Date.current,
+      token_cycle_started_on: Date.current,
       paid_through_date: calculate_paid_through_date(interval),
       credit_applied_cents: credit_cents.positive? ? credit_cents : nil
     )

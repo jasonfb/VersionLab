@@ -53,6 +53,7 @@ class OnboardingController < ApplicationController
         subscription_tier: free_trial_tier,
         billing_interval: "monthly",
         start_date: Date.current,
+        token_cycle_started_on: Date.current,
         paid_through_date: Date.current + 7.days
       )
     end

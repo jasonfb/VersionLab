@@ -35,6 +35,18 @@
     </div>
    
   </div>
+  <div class='col-md-2 cell--subscription_tier--monthly_token_allotment' >
+    <div class='<%= "alert alert-danger" if subscription_tier.errors.details.keys.include?(:monthly_token_allotment) %>'  >
+        <%= f.text_field :monthly_token_allotment, value: subscription_tier.monthly_token_allotment, autocomplete: 'off', size: 6, class: 'form-control', type: 'number' %>
+      <label class='text-muted small form-text' for=''>Monthly VL token allotment</label>
+    </div>
+  </div>
+  <div class='col-md-2 cell--subscription_tier--overage_cents_per_1000_tokens' >
+    <div class='<%= "alert alert-danger" if subscription_tier.errors.details.keys.include?(:overage_cents_per_1000_tokens) %>'  >
+        <%= f.text_field :overage_cents_per_1000_tokens, value: subscription_tier.overage_cents_per_1000_tokens, autocomplete: 'off', size: 6, class: 'form-control', type: 'number' %>
+      <label class='text-muted small form-text' for=''>Overage cents per 1000 tokens</label>
+    </div>
+  </div>
   <div class='col-md-2 cell--subscription_tier--position' >  
     <div class='<%= "alert alert-danger" if subscription_tier.errors.details.keys.include?(:position) %>'  >
         <%= f.text_field :position, value: subscription_tier.position, autocomplete: 'off', size: 4, class: 'form-control', type: 'number' %>

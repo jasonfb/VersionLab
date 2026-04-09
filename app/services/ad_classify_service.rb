@@ -12,9 +12,15 @@ class AdClassifyService
     return [] if layers.blank?
 
     text_layers = layers.select { |l| l["type"] == "text" && l["content"].present? }
-    non_text_layers = layers.select { |l| l["type"] != "text" || l["content"].blank? }
+    shape_layers = layers.select { |l| l["type"] == "shape" }
+    non_text_layers = layers.select { |l| l["type"] != "text" && l["type"] != "shape" || (l["type"] == "text" && l["content"].blank?) }
 
-    classified = classify_text_layers(text_layers) + classify_non_text_layers(non_text_layers)
+    classified_text = classify_text_layers(text_layers)
+    attach_cta_backgrounds(classified_text, shape_layers)
+    detect_wordmarks!(classified_text)
+
+    classified = classified_text + classify_non_text_layers(non_text_layers)
+    link_continuations!(classified)
 
     @ad.update!(classified_layers: classified)
     classified
@@ -80,6 +86,163 @@ class AdClassifyService
     end
 
     classified
+  end
+
+  # Detect multi-line text fragments that should be treated as one logical
+  # element for AI re-flow. Adjacent text layers are linked into a chain when
+  # they share font styling, are vertically stacked at the same x, and the
+  # previous fragment doesn't end in a sentence terminator. Mutates `layers`
+  # in place by setting `continuation_of` on chain children.
+  CONTINUATION_TERMINATORS = /[.!?:]["'\)\]]?\s*$/
+  CONTINUATION_ROLES = %w[body subhead].freeze
+
+  def link_continuations!(layers)
+    text_layers = layers.select { |l| l["type"] == "text" && l["content"].to_s.strip.present? }
+    return if text_layers.size < 2
+
+    # Process in document order (as parsed)
+    text_layers.each_cons(2) do |prev, curr|
+      next unless continuation?(prev, curr)
+      curr["continuation_of"] = prev["id"]
+      # Inherit role from the chain head so the UI/render treats them as one
+      curr["role"] = prev["role"] if prev["role"]
+    end
+  end
+
+  def continuation?(prev, curr)
+    return false unless CONTINUATION_ROLES.include?(prev["role"]) && CONTINUATION_ROLES.include?(curr["role"])
+
+    prev_text = prev["content"].to_s.strip
+    return false if prev_text.match?(CONTINUATION_TERMINATORS)
+
+    # Same font styling
+    prev_size = prev["font_size"].to_f
+    curr_size = curr["font_size"].to_f
+    return false unless prev_size > 0 && curr_size > 0
+    return false if (prev_size - curr_size).abs > 0.5
+    return false if prev["font_family"].to_s != curr["font_family"].to_s
+    return false if prev["fill"].to_s != curr["fill"].to_s
+
+    # Roughly aligned horizontally (within 5% of canvas width, or 20px if no canvas)
+    canvas_w = @ad.width.to_f
+    x_tolerance = canvas_w > 0 ? canvas_w * 0.05 : 20.0
+    return false if (prev["x"].to_f - curr["x"].to_f).abs > x_tolerance
+
+    # Vertically stacked: curr starts within ~1.8x font size below prev's baseline
+    vertical_gap = curr["y"].to_f - prev["y"].to_f
+    return false unless vertical_gap > 0
+    return false if vertical_gap > prev_size * 2.5
+
+    true
+  end
+
+  # For each layer classified as a CTA, find the smallest shape whose
+  # bounding box contains the CTA's anchor point. If found, capture the
+  # shape's fill and corner radius (as a ratio of its height) so the
+  # SvgComposer can render a proportional button background in resizes.
+  def attach_cta_backgrounds(classified_text, shape_layers)
+    return if shape_layers.empty?
+
+    classified_text.each do |layer|
+      next unless layer["role"] == "cta"
+      cx = layer["x"].to_f
+      cy = layer["y"].to_f
+
+      candidates = shape_layers.select do |s|
+        sx = s["x"].to_f
+        sy = s["y"].to_f
+        sw = s["width"].to_f
+        sh = s["height"].to_f
+        cx >= sx && cx <= sx + sw && cy >= sy - sh && cy <= sy + sh
+      end
+      next if candidates.empty?
+
+      best = candidates.min_by { |s| s["width"].to_f * s["height"].to_f }
+      h = best["height"].to_f
+      w = best["width"].to_f
+      rx = best["rx"].to_f
+      # If the original shape is a rect with no rx, treat as square corners (0).
+      # Path-based shapes get a default 15% rounding since we can't read corners.
+      rx_ratio = if best["shape"] == "path"
+        0.5
+      else
+        h > 0 ? (rx / h) : 0.0
+      end
+
+      layer["cta_background_color"] = best["fill"]
+      layer["cta_background_rx_ratio"] = rx_ratio
+      # Capture original shape aspect for centering hints (optional, unused for now)
+      layer["cta_background_aspect"] = (h > 0 && w > 0) ? (w / h) : nil
+    end
+  end
+
+  # Heuristic wordmark detection. A wordmark is a text element (or small
+  # group of stacked elements with possibly different fonts/sizes) that lives
+  # like a brand mark in the upper portion of the ad. Detection is purely
+  # spatial — we do NOT require members to share font family or size.
+  #
+  # Pre-selects wordmarks during classification; user can confirm/override
+  # in the classify UI. Members of a group share `wordmark_group_id` (the
+  # head member's id).
+  def detect_wordmarks!(classified)
+    return unless @ad.width.present? && @ad.height.present?
+
+    # Candidates: short text in the top 30% of the canvas, not already
+    # locked into a high-confidence role like CTA or background.
+    top_band_y = @ad.height * 0.30
+    candidates = classified.select do |l|
+      next false unless l["type"] == "text" && l["content"].present?
+      next false if %w[cta background].include?(l["role"])
+      next false if l["y"].to_f > top_band_y
+      word_count = l["content"].to_s.split(/\s+/).size
+      word_count <= 3
+    end
+    return if candidates.empty?
+
+    # Cluster by spatial proximity. Two candidates join the same cluster if
+    # they're within ~2x the larger font size vertically and overlap or are
+    # close horizontally (within 1x font size).
+    sorted = candidates.sort_by { |l| [l["y"].to_f, l["x"].to_f] }
+    clusters = []
+    sorted.each do |layer|
+      placed = false
+      clusters.each do |cluster|
+        if cluster.any? { |c| wordmark_adjacent?(c, layer) }
+          cluster << layer
+          placed = true
+          break
+        end
+      end
+      clusters << [layer] unless placed
+    end
+
+    # Only mark as wordmark if the cluster has 2+ members (the joining is
+    # the whole point of the feature). Single-element top-corner brand text
+    # stays as headline/subhead unless the user reclassifies manually.
+    clusters.each do |cluster|
+      next if cluster.size < 2
+      head_id = cluster.first["id"]
+      cluster.each do |member|
+        member["role"] = "wordmark"
+        member["confidence"] = 0.75
+        member["wordmark_group_id"] = head_id
+      end
+    end
+  end
+
+  def wordmark_adjacent?(a, b)
+    ax = a["x"].to_f
+    ay = a["y"].to_f
+    bx = b["x"].to_f
+    by = b["y"].to_f
+    a_size = [a["font_size"].to_f, 8.0].max
+    b_size = [b["font_size"].to_f, 8.0].max
+    max_size = [a_size, b_size].max
+
+    vertical_gap = (ay - by).abs
+    horizontal_gap = (ax - bx).abs
+
+    vertical_gap <= max_size * 2.5 && horizontal_gap <= max_size * 4.0
   end
 
   def classify_non_text_layers(layers)

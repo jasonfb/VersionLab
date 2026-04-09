@@ -115,13 +115,13 @@ class Admin::SubscriptionTiersController < Admin::BaseController
 
 
   def subscription_tier_params
-    fields = :name, :slug, :monthly_price_cents, :annual_price_cents, :position
+    fields = :name, :slug, :monthly_price_cents, :annual_price_cents, :monthly_token_allotment, :overage_cents_per_1000_tokens, :position
     params.require(:subscription_tier).permit(fields)
   end
 
   
   def update_subscription_tier_params
-    fields = :name, :slug, :monthly_price_cents, :annual_price_cents, :position
+    fields = :name, :slug, :monthly_price_cents, :annual_price_cents, :monthly_token_allotment, :overage_cents_per_1000_tokens, :position
     
     params.require(:subscription_tier).permit(fields)
   end

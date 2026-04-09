@@ -55,18 +55,48 @@ class StripeCheckoutService
         subscription_tier: tier,
         billing_interval: billing_interval,
         start_date: Date.current,
+        token_cycle_started_on: Date.current,
         paid_through_date: calculate_paid_through(billing_interval),
         credit_applied_cents: credit.positive? ? credit : nil
       )
 
-      @account.payments.create!(
+      invoice = @account.invoices.create!(
         subscription: subscription,
+        status: "draft",
+        period_start: Date.current,
+        period_end: subscription.paid_through_date
+      )
+      invoice.add_line_item!(
+        kind: :subscription,
+        description: "#{tier.name} — #{billing_interval} subscription",
+        quantity: 1,
+        unit_amount_cents: intent.amount,
+        amount_cents: intent.amount
+      )
+      if credit.positive?
+        invoice.add_line_item!(
+          kind: :credit,
+          description: "Prorated credit applied",
+          quantity: 1,
+          unit_amount_cents: -credit,
+          amount_cents: -credit
+        )
+      end
+      invoice.finalize!
+
+      payment = @account.payments.create!(
+        subscription: subscription,
+        invoice: invoice,
         payment_method: pm,
         stripe_payment_intent_id: payment_intent_id,
         amount_cents: intent.amount,
         status: "succeeded",
-        description: "#{tier.name} #{billing_interval} subscription"
+        description: invoice.invoice_number
       )
+      invoice.mark_paid!(payment: payment)
+
+      InvoiceMailer.issued(invoice).deliver_later
+      invoice.update!(email_sent_at: Time.current)
 
       subscription
     end

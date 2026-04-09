@@ -11,6 +11,15 @@ class Api::AdResizesController < Api::BaseController
     render json: resize_json(@resize)
   end
 
+  # Destroy & rebuild a single resize so it picks up the latest layer
+  # classifications without regenerating every other size.
+  def rebuild
+    new_resize = AdResizeService.rebuild(@resize)
+    render json: resize_json(new_resize)
+  rescue AdResizeService::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   private
 
   def set_client

@@ -48,8 +48,12 @@ class AdRenderService
     # Identify and remove the clip-path groups that contain outlined text
     remove_text_region_groups(doc, root, parsed)
 
+    # Collapse continuation chains so multi-line sentences render as one
+    # flowing block at the union bounding box
+    collapsed = AdContinuation.collapse(parsed)
+
     # Add new text elements for generated content
-    parsed.select { |l| l["type"] == "text" }.each do |layer|
+    collapsed.select { |l| l["type"] == "text" }.each do |layer|
       layer_id = layer["id"]
       content = generated[layer_id]
       next unless content.present?
@@ -152,6 +156,7 @@ class AdRenderService
 
     parsed = effective_parsed_layers
     overrides = effective_layer_overrides
+    parsed = AdContinuation.collapse(parsed)
 
     parsed.select { |l| l["type"] == "text" }.map { |layer|
       layer_id = layer["id"]

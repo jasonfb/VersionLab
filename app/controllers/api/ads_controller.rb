@@ -1,6 +1,6 @@
 class Api::AdsController < Api::BaseController
   before_action :set_client
-  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version, :classifications, :confirm_classifications, :upload_logo, :remove_logo ]
+  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version, :classifications, :confirm_classifications, :ai_classify, :upload_logo, :remove_logo ]
 
   def index
     ads = @client.ads.includes(:audiences, :campaign, :ai_service, :ai_model)
@@ -77,6 +77,17 @@ class Api::AdsController < Api::BaseController
       classified_layers: @ad.classified_layers,
       classifications_confirmed: @ad.classifications_confirmed
     }
+  end
+
+  # POST /api/clients/:client_id/ads/:id/ai_classify
+  def ai_classify
+    AdAiClassifyService.new(@ad).call
+    render json: {
+      classified_layers: @ad.classified_layers,
+      classifications_confirmed: @ad.classifications_confirmed
+    }
+  rescue AdAiClassifyService::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   # POST /api/clients/:client_id/ads/:id/confirm_classifications

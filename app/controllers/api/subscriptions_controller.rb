@@ -45,6 +45,11 @@ class Api::SubscriptionsController < Api::BaseController
   def subscription_json(subscription)
     return nil unless subscription
 
+    allotment = subscription.effective_monthly_token_allotment
+    used = subscription.current_cycle_vl_tokens_used
+    overage_tokens = subscription.current_cycle_overage_tokens
+    overage_cents = subscription.current_cycle_overage_cents
+
     {
       id: subscription.id,
       tier_slug: subscription.subscription_tier.slug,
@@ -56,7 +61,17 @@ class Api::SubscriptionsController < Api::BaseController
       trial_expired: @current_account.trial_expired?,
       is_overdue: subscription.overdue?,
       credit_applied_cents: subscription.credit_applied_cents,
-      price_cents: subscription.current_period_price_cents
+      price_cents: subscription.current_period_price_cents,
+      tokens: {
+        monthly_allotment: allotment,
+        used_this_cycle: used,
+        remaining: [allotment - used, 0].max,
+        overage_tokens: overage_tokens,
+        overage_cents: overage_cents,
+        overage_rate_per_1000_cents: subscription.overage_cents_per_1000_tokens,
+        cycle_start: subscription.current_token_cycle_start,
+        cycle_end: subscription.current_token_cycle_end
+      }
     }
   end
 
@@ -65,7 +80,9 @@ class Api::SubscriptionsController < Api::BaseController
       slug: tier.slug,
       name: tier.name,
       monthly_price_cents: tier.monthly_price_cents,
-      annual_price_cents: tier.annual_price_cents
+      annual_price_cents: tier.annual_price_cents,
+      monthly_token_allotment: tier.monthly_token_allotment,
+      overage_cents_per_1000_tokens: tier.overage_cents_per_1000_tokens
     }
   end
 end

@@ -48,12 +48,16 @@ class AdMergeService
       overrides = @ad.layer_overrides || {}
     end
 
-    layers.select { |l| l["type"] == "text" }.map { |l|
+    enriched = layers.select { |l| l["type"] == "text" }.map { |l|
       layer = l.dup
       ov = overrides[l["id"]] || {}
       layer["content"] = ov["content"].presence || l["content"].presence || ""
       layer
     }
+
+    # Collapse continuation chains so the AI sees one logical layer per
+    # multi-line sentence and can reflow naturally within the combined bbox.
+    AdContinuation.collapse(enriched).select { |l| l["type"] == "text" }
   end
 
   def build_messages(text_layers, audience, rejection_comment, campaign: nil)
@@ -165,24 +169,31 @@ class AdMergeService
                   .first
 
     source_layers = @ad_resize ? (@ad_resize.resized_layers || []) : (@ad.parsed_layers || [])
-    layer_ids = source_layers.map { |l| l["id"] }.to_set
+    # Collapse so we can resolve head ids and recover member_ids per chain
+    collapsed_source = AdContinuation.collapse(source_layers)
+    layer_ids = collapsed_source.map { |l| l["id"] }.to_set
+    member_ids_by_head = collapsed_source.each_with_object({}) { |l, h|
+      h[l["id"]] = l["member_ids"] if l["member_ids"]
+    }
+
+    build_generated = ->(data) {
+      data.each_with_object([]) do |(layer_id, new_text), arr|
+        next unless layer_ids.include?(layer_id)
+        head = collapsed_source.find { |l| l["id"] == layer_id }
+        entry = { "id" => layer_id, "content" => new_text, "original_content" => head&.dig("content") }
+        entry["member_ids"] = member_ids_by_head[layer_id] if member_ids_by_head[layer_id]
+        arr << entry
+      end
+    }
 
     if version
       AdVersion.transaction do
-        generated = layers_data.each_with_object([]) do |(layer_id, new_text), arr|
-          next unless layer_ids.include?(layer_id)
-          original = source_layers.find { |l| l["id"] == layer_id }
-          arr << { "id" => layer_id, "content" => new_text, "original_content" => original&.dig("content") }
-        end
+        generated = build_generated.call(layers_data)
         version.update!(generated_layers: generated, state: :active)
       end
     else
       AdVersion.transaction do
-        generated = layers_data.each_with_object([]) do |(layer_id, new_text), arr|
-          next unless layer_ids.include?(layer_id)
-          original = source_layers.find { |l| l["id"] == layer_id }
-          arr << { "id" => layer_id, "content" => new_text, "original_content" => original&.dig("content") }
-        end
+        generated = build_generated.call(layers_data)
         @ad.ad_versions.create!(
           audience: audience,
           ad_resize: @ad_resize,

@@ -19,29 +19,47 @@ class AdResizeService
     engine = AdLayout::LayoutEngine.new(@ad)
 
     deduped.map do |size_info|
-      layout_result = engine.compute_layout(size_info[:width], size_info[:height])
-
-      resize = @ad.ad_resizes.create!(
-        platform_labels: size_info[:labels],
-        width: size_info[:width],
-        height: size_info[:height],
-        aspect_ratio: compute_aspect_ratio(size_info[:width], size_info[:height]),
-        state: :pending,
-        resized_layers: layout_result.layers
-      )
-
-      generate_resized_svg(resize, layout_result)
-      generate_preview(resize)
-      resize.update!(state: :resized)
-      resize
-    rescue => e
-      Rails.logger.error("AdResizeService failed for #{size_info[:width]}x#{size_info[:height]}: #{e.message}")
-      resize&.update!(state: :failed) if resize&.persisted?
-      resize
+      build_resize(engine, size_info[:width], size_info[:height], size_info[:labels])
     end
   end
 
+  # Destroy and rebuild a single existing resize, preserving its dimensions
+  # and platform_labels. Used when the user changes layer classifications and
+  # wants the layout re-flowed without regenerating every size.
+  def self.rebuild(resize)
+    ad = resize.ad
+    width = resize.width
+    height = resize.height
+    labels = resize.platform_labels
+    resize.destroy!
+
+    engine = AdLayout::LayoutEngine.new(ad)
+    new(ad, platforms: {}).send(:build_resize, engine, width, height, labels)
+  end
+
   private
+
+  def build_resize(engine, width, height, labels)
+    layout_result = engine.compute_layout(width, height)
+
+    resize = @ad.ad_resizes.create!(
+      platform_labels: labels,
+      width: width,
+      height: height,
+      aspect_ratio: compute_aspect_ratio(width, height),
+      state: :pending,
+      resized_layers: layout_result.layers
+    )
+
+    generate_resized_svg(resize, layout_result)
+    generate_preview(resize)
+    resize.update!(state: :resized)
+    resize
+  rescue => e
+    Rails.logger.error("AdResizeService failed for #{width}x#{height}: #{e.message}")
+    resize&.update!(state: :failed) if resize&.persisted?
+    resize
+  end
 
   def generate_resized_svg(resize, layout_result)
     svg_string = build_resized_svg(resize, layout_result)

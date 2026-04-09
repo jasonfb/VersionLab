@@ -100,7 +100,22 @@ export default function AdEdit() {
 
       // Load resizes if they exist
       const resizePromise = (a.has_resizes || a.state === 'resizing')
-        ? apiFetch(`/api/clients/${clientId}/ads/${adId}/resizes`).then((r) => { setResizes(r); return r })
+        ? apiFetch(`/api/clients/${clientId}/ads/${adId}/resizes`).then((r) => {
+            setResizes(r)
+            // Reconstruct selectedPlatforms from existing resizes so checkboxes
+            // reflect prior selections when the user returns to this screen.
+            const reconstructed = {}
+            r.forEach((resize) => {
+              ;(resize.platform_labels || []).forEach(({ platform, size_name }) => {
+                if (!reconstructed[platform]) reconstructed[platform] = []
+                if (!reconstructed[platform].includes(size_name)) {
+                  reconstructed[platform].push(size_name)
+                }
+              })
+            })
+            setSelectedPlatforms(reconstructed)
+            return r
+          })
         : Promise.resolve([])
 
       resizePromise.then((loadedResizes) => {
@@ -221,6 +236,23 @@ export default function AdEdit() {
 
   const handleEditResize = (resize) => {
     setEditingResize(resize)
+  }
+
+  const handleRebuildResize = async (resize) => {
+    // Mark as pending in the UI immediately for feedback
+    setResizes((prev) => prev.map((r) => r.id === resize.id ? { ...r, state: 'pending' } : r))
+    try {
+      const rebuilt = await apiFetch(
+        `/api/clients/${clientId}/ads/${adId}/ad_resizes/${resize.id}/rebuild`,
+        { method: 'POST' }
+      )
+      // Replace the old resize (by old id) with the new one
+      setResizes((prev) => prev.map((r) => r.id === resize.id ? rebuilt : r))
+    } catch (e) {
+      alert(e.message || 'Failed to rebuild resize')
+      // Restore prior state on failure
+      setResizes((prev) => prev.map((r) => r.id === resize.id ? resize : r))
+    }
   }
 
   const handleResizeOverridesChange = async (layerId, overrides, resizeId) => {
@@ -399,6 +431,7 @@ export default function AdEdit() {
             resizes={resizes}
             onGenerateResizes={generateResizes}
             onEditResize={handleEditResize}
+            onRebuildResize={handleRebuildResize}
             onContinue={handleContinueToStyling}
             onSkip={handleSkipResizing}
             resizing={resizing}

@@ -1,0 +1,43 @@
+<h2>Invoice <%= @invoice.invoice_number %></h2>
+
+<p>
+  Hi <%= @account.name %>,<br>
+  Thanks for using VersionLab. Below is the breakdown of your latest charge.
+</p>
+
+<table style="width:100%; border-collapse:collapse; margin: 16px 0;">
+  <thead>
+    <tr>
+      <th align="left" style="border-bottom:1px solid #ccc; padding:6px;">Description</th>
+      <th align="right" style="border-bottom:1px solid #ccc; padding:6px;">Qty</th>
+      <th align="right" style="border-bottom:1px solid #ccc; padding:6px;">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @line_items.each do |li| %>
+      <tr>
+        <td style="padding:6px;"><%= li.description %></td>
+        <td align="right" style="padding:6px;"><%= li.quantity %></td>
+        <td align="right" style="padding:6px;">$<%= format('%.2f', li.amount_cents / 100.0) %></td>
+      </tr>
+    <% end %>
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="2" align="right" style="border-top:1px solid #ccc; padding:6px; font-weight:bold;">Total</td>
+      <td align="right" style="border-top:1px solid #ccc; padding:6px; font-weight:bold;">
+        $<%= format('%.2f', @invoice.total_cents / 100.0) %>
+      </td>
+    </tr>
+  </tfoot>
+</table>
+
+<% if @invoice.period_start && @invoice.period_end %>
+  <p style="color:#666; font-size:12px;">
+    Billing period: <%= @invoice.period_start.strftime('%b %-d, %Y') %> – <%= @invoice.period_end.strftime('%b %-d, %Y') %>
+  </p>
+<% end %>
+
+<p style="color:#666; font-size:12px;">
+  This invoice was charged to your card on file.
+</p>

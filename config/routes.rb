@@ -59,10 +59,15 @@ Rails.application.routes.draw do
           get  :download_version
           get  :classifications
           post :confirm_classifications
+          post :ai_classify
           post :upload_logo
           delete :remove_logo
         end
-        resources :ad_resizes, only: [ :update ], controller: "ad_resizes"
+        resources :ad_resizes, only: [ :update ], controller: "ad_resizes" do
+          member do
+            post :rebuild
+          end
+        end
       end
       resources :emails, only: [ :index, :show, :create, :update, :destroy ] do
         member do
@@ -102,6 +107,7 @@ Rails.application.routes.draw do
       resources :account_users
     end
     resources :subscription_tiers
+    resources :subscriptions, only: [ :edit, :update ]
   end
 
   # Health check

@@ -64,6 +64,7 @@ class AdParseService
     width, height = extract_svg_dimensions(root)
     layers = extract_svg_text_layers(doc)
     layers += extract_svg_image_layers(doc, width, height)
+    layers += extract_svg_shape_layers(doc, width, height)
     warnings = check_svg_warnings(layers, doc)
     aspect_ratio = compute_aspect_ratio(width, height)
 
@@ -160,6 +161,90 @@ class AdParseService
     layers
   end
 
+  # Extract filled shape elements (rects + paths) so the classifier can later
+  # detect button backgrounds behind CTAs. Shapes are stored as a separate
+  # layer type and excluded from classified output unless attached to a CTA.
+  def extract_svg_shape_layers(doc, canvas_width, canvas_height)
+    layers = []
+    return layers unless canvas_width && canvas_height && canvas_width > 0 && canvas_height > 0
+    canvas_area = canvas_width.to_f * canvas_height.to_f
+    index = 0
+
+    doc.css("rect").each do |node|
+      fill = read_fill(node)
+      next if fill.blank?
+      x = node["x"].to_f
+      y = node["y"].to_f
+      w = node["width"].to_f
+      h = node["height"].to_f
+      next unless w > 0 && h > 0
+      next if w * h >= canvas_area * 0.5  # too large to be a button
+      next if w * h < 50  # too tiny to matter
+
+      layers << {
+        id: "shape_#{index}",
+        type: "shape",
+        shape: "rect",
+        fill: fill,
+        rx: (node["rx"] || node["ry"]).to_f,
+        x: x.round.to_s,
+        y: y.round.to_s,
+        width: w.round.to_s,
+        height: h.round.to_s
+      }
+      index += 1
+    end
+
+    doc.css("path").each do |node|
+      fill = read_fill(node)
+      next if fill.blank? || fill.casecmp("none").zero?
+      bbox = path_bounding_box(node["d"].to_s)
+      next unless bbox
+      area = bbox[:w] * bbox[:h]
+      next if area >= canvas_area * 0.5
+      next if area < 50
+
+      layers << {
+        id: "shape_#{index}",
+        type: "shape",
+        shape: "path",
+        fill: fill,
+        rx: 0.0, # path-based corners; we'll round visually using min(w,h)*0.15
+        x: bbox[:x].round.to_s,
+        y: bbox[:y].round.to_s,
+        width: bbox[:w].round.to_s,
+        height: bbox[:h].round.to_s
+      }
+      index += 1
+    end
+
+    layers
+  end
+
+  def read_fill(node)
+    fill = node["fill"]
+    if fill.blank? && node["style"].present?
+      m = node["style"].match(/(?:^|;)\s*fill\s*:\s*([^;]+)/i)
+      fill = m[1].strip if m
+    end
+    fill
+  end
+
+  def path_bounding_box(d)
+    return nil if d.blank?
+    coords = d.scan(/-?\d+(?:\.\d+)?/).map(&:to_f)
+    return nil if coords.length < 4
+    xs = coords.each_slice(2).map(&:first)
+    ys = coords.each_slice(2).map(&:last).compact
+    return nil if xs.empty? || ys.empty?
+    x1, x2 = xs.min, xs.max
+    y1, y2 = ys.min, ys.max
+    w = x2 - x1
+    h = y2 - y1
+    return nil if w <= 0 || h <= 0
+    { x: x1, y: y1, w: w, h: h }
+  end
+
   def check_svg_warnings(layers, doc)
     warnings = []
 
@@ -244,6 +329,7 @@ class AdParseService
       fill_clipped_layer_text(layers, reader.pages.first, height) if layers.any?
     end
     layers += extract_svg_image_layers(doc, width, height)
+    layers += extract_svg_shape_layers(doc, width, height)
     warnings += check_svg_warnings(layers, doc) if layers.any? { |l| l[:type] == "text" && l[:content].present? }
 
     if layers.empty?

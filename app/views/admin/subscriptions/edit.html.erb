@@ -1,0 +1,21 @@
+<div class="container">
+  <h4>Edit Subscription Token Override</h4>
+  <p class="text-muted small">
+    Account: <strong><%= @subscription.account.name %></strong><br>
+    Tier: <strong><%= @subscription.subscription_tier.name %></strong>
+    (default monthly allotment: <%= @subscription.subscription_tier.monthly_token_allotment %> VL tokens)
+  </p>
+
+  <%= form_with model: @subscription, url: admin_subscription_path(@subscription), method: :patch, local: true do |f| %>
+    <div class="mb-3">
+      <%= f.label :monthly_token_allotment_override, "Monthly VL token allotment (override)", class: "form-label" %>
+      <%= f.number_field :monthly_token_allotment_override, class: "form-control", min: 0 %>
+      <div class="form-text">
+        Leave blank to use the tier default. Set to grant this customer extra tokens each cycle.
+      </div>
+    </div>
+
+    <%= f.submit "Save", class: "btn btn-primary" %>
+    <%= link_to "Cancel", edit_admin_account_path(@subscription.account), class: "btn btn-secondary" %>
+  <% end %>
+</div>

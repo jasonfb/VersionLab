@@ -1,0 +1,14 @@
+Invoice <%= @invoice.invoice_number %>
+
+Hi <%= @account.name %>,
+Thanks for using VersionLab. Here is the breakdown of your latest charge.
+
+<% @line_items.each do |li| -%>
+  <%= li.description %> (qty <%= li.quantity %>) — $<%= format('%.2f', li.amount_cents / 100.0) %>
+<% end -%>
+
+Total: $<%= format('%.2f', @invoice.total_cents / 100.0) %>
+
+<% if @invoice.period_start && @invoice.period_end -%>
+Billing period: <%= @invoice.period_start.strftime('%b %-d, %Y') %> – <%= @invoice.period_end.strftime('%b %-d, %Y') %>
+<% end -%>

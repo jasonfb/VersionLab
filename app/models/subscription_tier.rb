@@ -23,6 +23,8 @@ class SubscriptionTier < ApplicationRecord
   validates :slug, presence: true, uniqueness: true
   validates :monthly_price_cents, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :annual_price_cents, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :monthly_token_allotment, presence: true, numericality: { greater_than_or_equal_to: 0, only_integer: true }
+  validates :overage_cents_per_1000_tokens, presence: true, numericality: { greater_than_or_equal_to: 0, only_integer: true }
 
   def monthly_price
     monthly_price_cents / 100.0
