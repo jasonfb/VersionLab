@@ -11,6 +11,7 @@ export default function AudiencesIndex() {
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState(null) // null = hidden, string = shown
   const [saving, setSaving] = useState(false)
+  const [seeding, setSeeding] = useState(false)
 
   useEffect(() => {
     if (!clientId) return
@@ -37,6 +38,18 @@ export default function AudiencesIndex() {
     }
   }
 
+  const seedAudiences = async () => {
+    setSeeding(true)
+    try {
+      const created = await apiFetch(`/api/clients/${clientId}/audiences/seed`, {
+        method: 'POST',
+      })
+      setAudiences((prev) => [...created, ...prev])
+    } finally {
+      setSeeding(false)
+    }
+  }
+
   const deleteAudience = async (id) => {
     if (!confirm('Delete this audience?')) return
     await apiFetch(`/api/clients/${clientId}/audiences/${id}`, { method: 'DELETE' })
@@ -58,9 +71,14 @@ export default function AudiencesIndex() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4 className="mb-0">Audiences</h4>
         {clientId && (
-          <button className="btn btn-danger" onClick={() => setNewName('')} disabled={newName !== null}>
-            <i className="bi bi-plus-lg me-1"></i> New Audience
-          </button>
+          <div className="d-flex gap-2">
+            <button className="btn btn-outline-secondary" onClick={seedAudiences} disabled={seeding}>
+              <i className="bi bi-cloud-download me-1"></i> {seeding ? 'Seeding…' : 'Seed'}
+            </button>
+            <button className="btn btn-danger" onClick={() => setNewName('')} disabled={newName !== null}>
+              <i className="bi bi-plus-lg me-1"></i> New Audience
+            </button>
+          </div>
         )}
       </div>
 

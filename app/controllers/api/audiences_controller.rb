@@ -1,6 +1,6 @@
 class Api::AudiencesController < Api::BaseController
   before_action :set_client
-  before_action :set_audience, only: [:show, :update, :destroy]
+  before_action :set_audience, only: [ :show, :update, :destroy ]
 
   def index
     audiences = @client.audiences.order(updated_at: :desc)
@@ -26,6 +26,13 @@ class Api::AudiencesController < Api::BaseController
     else
       render json: { errors: @audience.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  def seed
+    created = AudienceSamples::SAMPLES.map do |sample|
+      @client.audiences.create!(sample)
+    end
+    render json: created.map { |a| audience_json(a) }, status: :created
   end
 
   def destroy

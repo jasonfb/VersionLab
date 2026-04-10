@@ -48,7 +48,9 @@ Rails.application.routes.draw do
           resources :variables, controller: "template_variables", only: [ :index, :create, :update, :destroy ]
         end
       end
-      resources :audiences, only: [ :index, :show, :create, :update, :destroy ]
+      resources :audiences, only: [ :index, :show, :create, :update, :destroy ] do
+        post :seed, on: :collection
+      end
       resources :ads, only: [ :index, :show, :create, :update, :destroy ] do
         member do
           post :run
