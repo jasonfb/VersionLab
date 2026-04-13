@@ -104,3 +104,5 @@ gem "rubyzip", "~> 2.4"
 gem "pdf-reader", "~> 2.0"
 
 gem "stripe", "~> 14.0"
+
+gem "mailgun-ruby", "~> 1.3"
