@@ -1,6 +1,4 @@
 class ApplicationController < ActionController::Base
-  http_basic_authenticate_with name: "username", password: "manyversions", if: -> { Rails.env.production? }
-
   include Pundit::Authorization
 
   include Pagy::Method
