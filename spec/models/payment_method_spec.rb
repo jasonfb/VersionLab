@@ -52,4 +52,25 @@ RSpec.describe PaymentMethod do
       expect(payment_method.display_name).to eq("Card ending in 1234")
     end
   end
+
+  describe "associations" do
+    it "belongs to account" do
+      assoc = described_class.reflect_on_association(:account)
+      expect(assoc.macro).to eq(:belongs_to)
+    end
+
+    it "has many payments with dependent nullify" do
+      assoc = described_class.reflect_on_association(:payments)
+      expect(assoc.macro).to eq(:has_many)
+      expect(assoc.options[:dependent]).to eq(:nullify)
+    end
+  end
+
+  describe "scopes" do
+    it ".default_method returns only default payment methods" do
+      default_pm = create(:payment_method, is_default: true)
+      create(:payment_method, is_default: false)
+      expect(described_class.default_method).to contain_exactly(default_pm)
+    end
+  end
 end

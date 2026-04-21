@@ -71,4 +71,11 @@ RSpec.describe AccountUser, type: :model do
       end
     end
   end
+
+  describe "#to_label" do
+    it "returns the user_id as a string" do
+      account_user = build(:account_user)
+      expect(account_user.to_label).to eq(account_user.user_id.to_s)
+    end
+  end
 end

@@ -27,5 +27,6 @@ FactoryBot.define do
     billing_interval { "monthly" }
     start_date { Date.current }
     paid_through_date { Date.current + 30.days }
+    token_cycle_started_on { Date.current }
   end
 end

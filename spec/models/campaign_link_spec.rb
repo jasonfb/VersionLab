@@ -38,4 +38,21 @@ RSpec.describe CampaignLink, type: :model do
       expect(link.errors[:url]).to include("can't be blank")
     end
   end
+
+  describe "after_commit callbacks" do
+    it "enqueues FetchLinkPreviewJob on create" do
+      allow(FetchLinkPreviewJob).to receive(:perform_later)
+      link = create(:campaign_link)
+      expect(FetchLinkPreviewJob).to have_received(:perform_later).with(link.id)
+    end
+
+    it "enqueues CampaignSummaryJob on destroy" do
+      allow(FetchLinkPreviewJob).to receive(:perform_later)
+      allow(CampaignSummaryJob).to receive(:perform_later)
+      link = create(:campaign_link)
+      allow(CampaignSummaryJob).to receive(:perform_later)
+      link.destroy!
+      expect(CampaignSummaryJob).to have_received(:perform_later).with(link.campaign_id)
+    end
+  end
 end

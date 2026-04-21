@@ -39,4 +39,21 @@ RSpec.describe EmailDocument, type: :model do
       expect(doc.errors[:display_name]).to include("can't be blank")
     end
   end
+
+  describe "after_commit :trigger_summary" do
+    it "enqueues EmailSummaryJob on create" do
+      doc = create(:email_document)
+      expect(EmailSummaryJob).to have_received(:perform_later).with(doc.email_id)
+    end
+
+    it "enqueues EmailSummaryJob on destroy" do
+      doc = create(:email_document)
+      email_id = doc.email_id
+      # Reset expectations after create so we only track destroy
+      RSpec::Mocks.space.proxy_for(EmailSummaryJob).reset
+      allow(EmailSummaryJob).to receive(:perform_later)
+      doc.destroy!
+      expect(EmailSummaryJob).to have_received(:perform_later).with(email_id)
+    end
+  end
 end

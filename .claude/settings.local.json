@@ -16,7 +16,11 @@
       "Bash(bin/rspec spec/models/ad_spec.rb spec/models/ad_audience_spec.rb spec/models/ad_version_spec.rb spec/models/ai_service_spec.rb spec/models/ai_model_spec.rb spec/models/ai_key_spec.rb spec/models/ai_log_spec.rb spec/models/asset_spec.rb spec/models/audience_spec.rb spec/models/brand_profile_spec.rb spec/models/brand_profile_geography_spec.rb spec/models/brand_profile_primary_audience_spec.rb spec/models/brand_profile_tone_rule_spec.rb spec/models/campaign_spec.rb spec/models/campaign_document_spec.rb spec/models/campaign_link_spec.rb spec/models/geography_spec.rb spec/models/industry_spec.rb spec/models/organization_type_spec.rb spec/models/primary_audience_spec.rb spec/models/tone_rule_spec.rb spec/models/project_spec.rb 2>&1)",
       "Bash(grep:*)",
       "Bash(bin/rspec spec/models/email_template_spec.rb spec/models/email_template_section_spec.rb spec/models/template_variable_spec.rb spec/models/template_import_spec.rb spec/models/email_spec.rb spec/models/email_audience_spec.rb spec/models/email_version_spec.rb spec/models/email_version_variable_spec.rb spec/models/email_document_spec.rb spec/models/email_section_autolink_setting_spec.rb 2>&1)",
-      "Bash(md5 -q spec/models/client_spec.rb)"
+      "Bash(md5 -q spec/models/client_spec.rb)",
+      "Bash(cat)",
+      "Bash(chmod +x /tmp/compare_models.sh)",
+      "Bash(/tmp/compare_models.sh)",
+      "Bash(bin/rspec:*)"
     ]
   }
 }

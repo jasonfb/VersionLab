@@ -137,4 +137,53 @@ RSpec.describe AdResizeService do
       expect(platforms).to include("Facebook (Meta)", "Instagram", "LinkedIn")
     end
   end
+
+  describe ".rebuild" do
+    it "destroys and recreates a resize" do
+      service = described_class.new(ad, platforms: ["Threads"])
+      resizes = service.call
+      original = resizes.first
+      original_id = original.id
+
+      new_resize = described_class.rebuild(original)
+      expect(new_resize).to be_persisted
+      expect(new_resize.id).not_to eq(original_id)
+      expect(new_resize.width).to eq(original.width)
+      expect(new_resize.height).to eq(original.height)
+    end
+  end
+
+  describe "private methods" do
+    let(:service) { described_class.new(ad, platforms: []) }
+
+    describe "#fallback_svg" do
+      it "generates a placeholder SVG" do
+        svg = service.send(:fallback_svg, 728, 90)
+        expect(svg).to include("<svg")
+        expect(svg).to include("728x90")
+      end
+    end
+
+    describe "#rescale_svg" do
+      it "updates width, height, and viewBox" do
+        source = '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080"><text>Hi</text></svg>'
+        result = service.send(:rescale_svg, source, 300, 250)
+        doc = Nokogiri::XML(result)
+        root = doc.at_css("svg")
+        expect(root["width"]).to eq("300")
+        expect(root["height"]).to eq("250")
+        expect(root["viewBox"]).to include("1080")
+      end
+    end
+
+    describe "#compute_aspect_ratio" do
+      it "simplifies ratios" do
+        expect(service.send(:compute_aspect_ratio, 1920, 1080)).to eq("16:9")
+      end
+
+      it "returns nil for zero" do
+        expect(service.send(:compute_aspect_ratio, 0, 100)).to be_nil
+      end
+    end
+  end
 end

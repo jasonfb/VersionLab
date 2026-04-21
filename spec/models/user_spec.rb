@@ -88,4 +88,19 @@ RSpec.describe User, type: :model do
       end
     end
   end
+
+  describe "#to_label" do
+    it "returns the user email" do
+      user = build(:user, email: "test@example.com")
+      expect(user.to_label).to eq("test@example.com")
+    end
+  end
+
+  describe "scopes" do
+    it ".reverse_sort orders by created_at desc" do
+      old_user = create(:user, created_at: 2.days.ago)
+      new_user = create(:user, created_at: 1.hour.ago)
+      expect(described_class.reverse_sort.to_a).to eq([new_user, old_user])
+    end
+  end
 end

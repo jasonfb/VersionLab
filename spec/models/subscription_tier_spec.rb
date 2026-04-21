@@ -21,6 +21,14 @@ require "rails_helper"
 RSpec.describe SubscriptionTier do
   subject(:tier) { build(:subscription_tier) }
 
+  describe "associations" do
+    it "has many subscriptions with dependent restrict_with_error" do
+      assoc = described_class.reflect_on_association(:subscriptions)
+      expect(assoc.macro).to eq(:has_many)
+      expect(assoc.options[:dependent]).to eq(:restrict_with_error)
+    end
+  end
+
   describe "validations" do
     it { is_expected.to be_valid }
 
@@ -42,6 +50,16 @@ RSpec.describe SubscriptionTier do
 
     it "requires annual_price_cents >= 0" do
       tier.annual_price_cents = -1
+      expect(tier).not_to be_valid
+    end
+
+    it "requires monthly_token_allotment >= 0" do
+      tier.monthly_token_allotment = -1
+      expect(tier).not_to be_valid
+    end
+
+    it "requires overage_cents_per_1000_tokens >= 0" do
+      tier.overage_cents_per_1000_tokens = -1
       expect(tier).not_to be_valid
     end
   end

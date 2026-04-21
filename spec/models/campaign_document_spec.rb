@@ -35,4 +35,23 @@ RSpec.describe CampaignDocument, type: :model do
       expect(doc.errors[:display_name]).to include("can't be blank")
     end
   end
+
+  describe "after_commit :trigger_summary" do
+    it "enqueues CampaignSummaryJob on create" do
+      allow(CampaignSummaryJob).to receive(:perform_later)
+      doc = create(:campaign_document)
+      expect(CampaignSummaryJob).to have_received(:perform_later).with(doc.campaign_id)
+    end
+
+    it "enqueues CampaignSummaryJob on destroy" do
+      allow(CampaignSummaryJob).to receive(:perform_later)
+      doc = create(:campaign_document)
+      campaign_id = doc.campaign_id
+      # Reset expectations after create so we only track destroy
+      RSpec::Mocks.space.proxy_for(CampaignSummaryJob).reset
+      allow(CampaignSummaryJob).to receive(:perform_later)
+      doc.destroy!
+      expect(CampaignSummaryJob).to have_received(:perform_later).with(campaign_id)
+    end
+  end
 end

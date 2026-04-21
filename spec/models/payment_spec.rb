@@ -50,7 +50,39 @@ RSpec.describe Payment do
     end
   end
 
-  describe "enum" do
+  describe "associations" do
+    it "belongs to account" do
+      assoc = described_class.reflect_on_association(:account)
+      expect(assoc.macro).to eq(:belongs_to)
+    end
+
+    it "belongs to subscription (optional)" do
+      assoc = described_class.reflect_on_association(:subscription)
+      expect(assoc.macro).to eq(:belongs_to)
+      expect(assoc.options[:optional]).to eq(true)
+    end
+
+    it "belongs to payment_method (optional)" do
+      assoc = described_class.reflect_on_association(:payment_method)
+      expect(assoc.macro).to eq(:belongs_to)
+      expect(assoc.options[:optional]).to eq(true)
+    end
+
+    it "belongs to invoice (optional)" do
+      assoc = described_class.reflect_on_association(:invoice)
+      expect(assoc.macro).to eq(:belongs_to)
+      expect(assoc.options[:optional]).to eq(true)
+    end
+  end
+
+  describe "enums" do
+    it "defines all status values" do
+      expect(described_class.statuses).to eq(
+        "succeeded" => "succeeded", "failed" => "failed",
+        "pending" => "pending", "refunded" => "refunded"
+      )
+    end
+
     it "supports succeeded status" do
       payment.status = "succeeded"
       expect(payment).to be_succeeded
@@ -59,6 +91,16 @@ RSpec.describe Payment do
     it "supports failed status" do
       payment.status = "failed"
       expect(payment).to be_failed
+    end
+
+    it "supports pending status" do
+      payment.status = "pending"
+      expect(payment).to be_pending
+    end
+
+    it "supports refunded status" do
+      payment.status = "refunded"
+      expect(payment).to be_refunded
     end
   end
 end

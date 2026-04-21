@@ -22,6 +22,8 @@ FactoryBot.define do
     sequence(:slug) { |n| "standard-#{n}" }
     monthly_price_cents { 4900 }
     annual_price_cents { 49900 }
+    monthly_token_allotment { 1000 }
+    overage_cents_per_1000_tokens { 500 }
     position { 0 }
 
     trait :agency do

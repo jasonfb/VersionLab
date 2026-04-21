@@ -66,4 +66,122 @@ RSpec.describe AiLog, type: :model do
       )
     end
   end
+
+  describe "before_create :compute_cost" do
+    let(:ai_model) do
+      create(:ai_model,
+        input_cost_per_mtok_cents: 300,
+        output_cost_per_mtok_cents: 1500)
+    end
+
+    it "computes cost from token counts and model pricing" do
+      log = create(:ai_log,
+        ai_model: ai_model,
+        ai_service: ai_model.ai_service,
+        prompt_tokens: 1_000_000,
+        completion_tokens: 500_000,
+        total_tokens: 1_500_000,
+        call_type: "email")
+      # input: (1_000_000 * 300) / 1_000_000 = 300 cents
+      # output: (500_000 * 1500) / 1_000_000 = 750 cents
+      # total: ceil(1050) = 1050 cents
+      expect(log._cost_to_us_cents).to eq(1050)
+    end
+
+    it "rounds cost up to nearest cent" do
+      log = create(:ai_log,
+        ai_model: ai_model,
+        ai_service: ai_model.ai_service,
+        prompt_tokens: 1,
+        completion_tokens: 1,
+        total_tokens: 2,
+        call_type: "email")
+      # input: (1 * 300) / 1_000_000 = 0.0003
+      # output: (1 * 1500) / 1_000_000 = 0.0015
+      # total: ceil(0.0018) = 1
+      expect(log._cost_to_us_cents).to eq(1)
+    end
+
+    it "skips cost computation when ai_model is nil" do
+      log = create(:ai_log, ai_model: nil, prompt_tokens: 1000, completion_tokens: 500)
+      expect(log._cost_to_us_cents).to be_nil
+    end
+
+    it "skips cost computation when model has no pricing" do
+      model_no_pricing = create(:ai_model, input_cost_per_mtok_cents: nil, output_cost_per_mtok_cents: nil)
+      log = create(:ai_log,
+        ai_model: model_no_pricing,
+        ai_service: model_no_pricing.ai_service,
+        prompt_tokens: 1000,
+        completion_tokens: 500,
+        call_type: "email")
+      expect(log._cost_to_us_cents).to be_nil
+    end
+
+    it "handles nil token counts gracefully" do
+      log = create(:ai_log,
+        ai_model: ai_model,
+        ai_service: ai_model.ai_service,
+        prompt_tokens: nil,
+        completion_tokens: nil,
+        total_tokens: nil,
+        call_type: "email")
+      expect(log._cost_to_us_cents).to eq(0)
+    end
+  end
+
+  describe "after_create :update_usage_summary" do
+    let(:ai_model) do
+      create(:ai_model,
+        input_cost_per_mtok_cents: 300,
+        output_cost_per_mtok_cents: 1500)
+    end
+    let(:account) { create(:account) }
+
+    it "creates an AiUsageSummary record on first log" do
+      expect {
+        create(:ai_log,
+          account: account,
+          ai_model: ai_model,
+          ai_service: ai_model.ai_service,
+          prompt_tokens: 1000,
+          completion_tokens: 500,
+          total_tokens: 1500,
+          call_type: "email")
+      }.to change(AiUsageSummary, :count).by(1)
+    end
+
+    it "accumulates tokens into existing summary for same account/model/month" do
+      create(:ai_log,
+        account: account,
+        ai_model: ai_model,
+        ai_service: ai_model.ai_service,
+        prompt_tokens: 1000,
+        completion_tokens: 500,
+        total_tokens: 1500,
+        call_type: "email")
+
+      expect {
+        create(:ai_log,
+          account: account,
+          ai_model: ai_model,
+          ai_service: ai_model.ai_service,
+          prompt_tokens: 2000,
+          completion_tokens: 1000,
+          total_tokens: 3000,
+          call_type: "ad")
+      }.not_to change(AiUsageSummary, :count)
+
+      summary = AiUsageSummary.find_by(account: account, ai_model: ai_model)
+      expect(summary._input_tokens).to eq(3000)
+      expect(summary._output_tokens).to eq(1500)
+      expect(summary._total_tokens).to eq(4500)
+    end
+
+    it "skips summary update when ai_model_id is nil" do
+      expect {
+        create(:ai_log, account: account, ai_model: nil, call_type: "email")
+      }.not_to change(AiUsageSummary, :count)
+    end
+  end
 end

@@ -60,7 +60,7 @@ RSpec.describe AdLayout::LayoutTemplate do
 
     it "returns subhead, body, decoration for leaderboard" do
       dropped = described_class.dropped_roles(:leaderboard)
-      expect(dropped).to contain_exactly("subhead", "body", "decoration")
+      expect(dropped).to contain_exactly("subhead", "body", "decoration", "wordmark")
     end
   end
 
