@@ -32,7 +32,7 @@ RSpec.describe "Api::AdResizes", type: :request do
       allow(AdResizeService).to receive(:rebuild).and_raise(AdResizeService::Error, "Cannot rebuild")
 
       post "/api/clients/#{client.id}/ads/#{ad.id}/ad_resizes/#{resize.id}/rebuild"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 end

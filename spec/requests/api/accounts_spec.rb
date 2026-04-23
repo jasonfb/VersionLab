@@ -63,7 +63,7 @@ RSpec.describe "Api::Accounts", type: :request do
     it "returns error if already an agency" do
       account.update!(is_agency: true)
       post "/api/upgrade_to_agency"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "forbids non-owners" do

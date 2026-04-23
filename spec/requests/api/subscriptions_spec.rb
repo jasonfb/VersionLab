@@ -38,7 +38,7 @@ RSpec.describe "Api::Subscriptions", type: :request do
       tier = create(:subscription_tier, slug: "pro")
       post "/api/subscription/create_payment_intent",
            params: { tier_slug: "pro", billing_interval: "biweekly" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 end

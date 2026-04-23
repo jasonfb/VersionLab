@@ -43,8 +43,9 @@ describe 'Audience management', type: :feature, js: true do
       find('button[title="Edit"]').click
       expect(page).to have_content('Back to Audiences', wait: 10)
 
-      # Edit basic fields — use JS to properly set React-controlled inputs
+      # Edit basic fields — clear first, then set via native setter + React events
       name_input = find('input.form-control[type="text"]')
+      name_input.native.clear
       react_fill_in(name_input, with: 'Cold Lapsed Updated')
 
       textareas = all('textarea.form-control')
@@ -54,6 +55,9 @@ describe 'Audience management', type: :feature, js: true do
       react_fill_in_textarea(textareas[2], with: 'Age 45-65, income $75k+, suburban households.')
 
       click_button 'Save'
+
+      # Wait for the async save to complete
+      expect(page).not_to have_button('Saving…', wait: 5)
 
       # Verify the data was persisted
       audience.reload

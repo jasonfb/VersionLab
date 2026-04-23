@@ -28,7 +28,7 @@ RSpec.describe "Api::CampaignDocuments", type: :request do
 
     it "rejects missing file" do
       post "/api/clients/#{api_client.id}/campaigns/#{campaign.id}/campaign_documents"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 

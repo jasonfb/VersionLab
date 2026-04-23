@@ -35,7 +35,7 @@ RSpec.describe "Api::Audiences", type: :request do
     it "rejects blank name" do
       post "/api/clients/#{api_client.id}/audiences",
            params: { audience: { name: "" } }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 

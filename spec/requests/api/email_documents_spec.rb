@@ -35,7 +35,7 @@ RSpec.describe "Api::EmailDocuments", type: :request do
 
     it "returns 422 without file" do
       post "/api/clients/#{client.id}/emails/#{email.id}/email_documents"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 

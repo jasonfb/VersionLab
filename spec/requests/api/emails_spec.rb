@@ -79,14 +79,14 @@ RSpec.describe "Api::Emails", type: :request do
       email = create(:email, client: api_client, email_template: template)
       email.audiences << audience
       post "/api/clients/#{api_client.id}/emails/#{email.id}/run"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects run without audiences" do
       email = create(:email, client: api_client, email_template: template,
                      ai_service: ai_service, ai_model: ai_model)
       post "/api/clients/#{api_client.id}/emails/#{email.id}/run"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects run when not in setup state" do
@@ -95,7 +95,7 @@ RSpec.describe "Api::Emails", type: :request do
                      ai_service: ai_service, ai_model: ai_model, state: "pending")
       email.audiences << audience
       post "/api/clients/#{api_client.id}/emails/#{email.id}/run"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -146,20 +146,20 @@ RSpec.describe "Api::Emails", type: :request do
              ai_service: ai_service, ai_model: ai_model, state: "active")
       post "/api/clients/#{api_client.id}/emails/#{email.id}/reject",
            params: { audience_id: audience.id }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects when not in merged state" do
       email.update!(state: "setup")
       post "/api/clients/#{api_client.id}/emails/#{email.id}/reject",
            params: { audience_id: audience.id, rejection_comment: "Bad" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects when no active version exists" do
       post "/api/clients/#{api_client.id}/emails/#{email.id}/reject",
            params: { audience_id: audience.id, rejection_comment: "Bad" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -214,7 +214,7 @@ RSpec.describe "Api::Emails", type: :request do
                      ai_service: ai_service, ai_model: ai_model)
       email.audiences << audience
       post "/api/clients/#{api_client.id}/emails/#{email.id}/run"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body["error"]).to include("No API key")
     end
   end

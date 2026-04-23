@@ -31,7 +31,7 @@ RSpec.describe "Api::CampaignLinks", type: :request do
     it "rejects blank url" do
       post "/api/clients/#{api_client.id}/campaigns/#{campaign.id}/campaign_links",
            params: { url: "" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 

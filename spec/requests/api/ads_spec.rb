@@ -85,14 +85,14 @@ RSpec.describe "Api::Ads", type: :request do
       ad = create(:ad, client: api_client, ai_service: ai_service, ai_model: ai_model,
                   parsed_layers: [{ "type" => "text" }])
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/run"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects run without AI service" do
       ad = create(:ad, client: api_client, parsed_layers: [{ "type" => "text" }])
       ad.audiences << audience
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/run"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects run without text layers" do
@@ -100,7 +100,7 @@ RSpec.describe "Api::Ads", type: :request do
                   parsed_layers: [{ "type" => "image" }])
       ad.audiences << audience
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/run"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -127,7 +127,7 @@ RSpec.describe "Api::Ads", type: :request do
     it "rejects missing layers" do
       ad = create(:ad, client: api_client)
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/confirm_classifications"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -154,7 +154,7 @@ RSpec.describe "Api::Ads", type: :request do
       ad = create(:ad, client: api_client)
       allow_any_instance_of(AdAiClassifyService).to receive(:call).and_raise(AdAiClassifyService::Error, "No layers")
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/ai_classify"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -180,12 +180,12 @@ RSpec.describe "Api::Ads", type: :request do
       ad.update!(classifications_confirmed: false)
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/resize",
            params: { platforms: ["Facebook"] }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects when no platforms provided" do
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/resize"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -233,14 +233,14 @@ RSpec.describe "Api::Ads", type: :request do
     it "rejects without rejection comment" do
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/reject",
            params: { version_id: "fake-id" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects when ad not in merged state" do
       ad.update!(state: "setup")
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/reject",
            params: { version_id: "fake", rejection_comment: "Bad" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -264,7 +264,7 @@ RSpec.describe "Api::Ads", type: :request do
         StringIO.new("fake"), "image/jpeg", true, original_filename: "logo.jpg"
       )
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/upload_logo", params: { logo: jpg }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -298,7 +298,7 @@ RSpec.describe "Api::Ads", type: :request do
                   parsed_layers: [{ "type" => "text", "content" => "Hello" }])
       ad.audiences << audience
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/run"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body["error"]).to include("No API key")
     end
   end

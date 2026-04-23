@@ -45,7 +45,7 @@ RSpec.describe "Admin::Users", type: :request do
     it "renders error on invalid user (admin can only set email/name)" do
       post admin_users_path, as: :turbo_stream,
            params: { user: { email: "", name: "" } }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 

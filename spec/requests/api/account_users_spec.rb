@@ -37,12 +37,12 @@ RSpec.describe "Api::AccountUsers", type: :request do
     it "rejects duplicate user" do
       allow(UserMailer).to receive_message_chain(:account_invitation, :deliver_later)
       post "/api/account_users", params: { email: user.email }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "requires email" do
       post "/api/account_users", params: { email: "" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -77,7 +77,7 @@ RSpec.describe "Api::AccountUsers", type: :request do
 
     it "prevents removing the last owner" do
       delete "/api/account_users/#{account_user.id}"
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 end

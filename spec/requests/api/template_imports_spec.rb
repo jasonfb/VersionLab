@@ -16,21 +16,21 @@ RSpec.describe "Api::TemplateImports", type: :request do
     it "returns 422 when name is blank" do
       post "/api/clients/#{client.id}/template_imports",
            params: { name: "", import_type: "bundled", file: zip_file }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body["errors"]).to include("Name is required")
     end
 
     it "returns 422 for invalid import_type" do
       post "/api/clients/#{client.id}/template_imports",
            params: { name: "Test", import_type: "invalid", file: zip_file }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body["errors"]).to include("Import type must be bundled or external")
     end
 
     it "returns 422 when file is missing" do
       post "/api/clients/#{client.id}/template_imports",
            params: { name: "Test", import_type: "bundled" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "returns 422 for non-ZIP bundled import" do
@@ -42,7 +42,7 @@ RSpec.describe "Api::TemplateImports", type: :request do
       )
       post "/api/clients/#{client.id}/template_imports",
            params: { name: "Test", import_type: "bundled", file: html_file }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body["errors"]).to include(/ZIP/)
     end
 
