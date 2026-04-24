@@ -5,6 +5,8 @@ export default function AdResizePicker({
   ad,
   selectedPlatforms,
   onPlatformsChange,
+  customSizes,
+  onCustomSizesChange,
   resizes,
   onGenerateResizes,
   onEditResize,
@@ -61,7 +63,24 @@ export default function AdResizePicker({
     onPlatformsChange(next)
   }
 
-  const deduped = deduplicatedSizes(selectedPlatforms)
+  const addCustomSize = () => {
+    onCustomSizesChange([...customSizes, { label: '', width: '', height: '' }])
+  }
+
+  const updateCustomSize = (index, field, value) => {
+    const updated = customSizes.map((cs, i) =>
+      i === index ? { ...cs, [field]: field === 'label' ? value : (parseInt(value, 10) || '') } : cs
+    )
+    onCustomSizesChange(updated)
+  }
+
+  const removeCustomSize = (index) => {
+    onCustomSizesChange(customSizes.filter((_, i) => i !== index))
+  }
+
+  const validCustomSizes = customSizes.filter((cs) => cs.width > 0 && cs.height > 0)
+
+  const deduped = deduplicatedSizes(selectedPlatforms, validCustomSizes)
   const resizedCount = resizes.filter((r) => r.state === 'resized').length
   const allResized = resizes.length > 0 && resizedCount === resizes.length
 
@@ -135,11 +154,58 @@ export default function AdResizePicker({
           })}
         </div>
 
-        {Object.keys(selectedPlatforms).length > 0 && (
+        <div className="mb-3">
+          <label className="form-label fw-semibold small text-uppercase text-muted">
+            Custom Sizes
+          </label>
+          {customSizes.map((cs, i) => (
+            <div key={i} className="d-flex align-items-center gap-2 mb-2">
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Label (optional)"
+                value={cs.label}
+                onChange={(e) => updateCustomSize(i, 'label', e.target.value)}
+                style={{ flex: 2 }}
+              />
+              <input
+                type="number"
+                className="form-control form-control-sm"
+                placeholder="Width"
+                value={cs.width}
+                onChange={(e) => updateCustomSize(i, 'width', e.target.value)}
+                min="1"
+                style={{ flex: 1 }}
+              />
+              <span className="text-muted small">x</span>
+              <input
+                type="number"
+                className="form-control form-control-sm"
+                placeholder="Height"
+                value={cs.height}
+                onChange={(e) => updateCustomSize(i, 'height', e.target.value)}
+                min="1"
+                style={{ flex: 1 }}
+              />
+              <button
+                className="btn btn-sm btn-outline-secondary p-1"
+                onClick={() => removeCustomSize(i)}
+                title="Remove"
+              >
+                <i className="bi bi-x"></i>
+              </button>
+            </div>
+          ))}
+          <button className="btn btn-sm btn-outline-secondary" onClick={addCustomSize}>
+            <i className="bi bi-plus me-1"></i>Add Custom Size
+          </button>
+        </div>
+
+        {(Object.keys(selectedPlatforms).length > 0 || validCustomSizes.length > 0) && (
           <div className="mb-3">
             <small className="text-muted">
               {deduped.length} unique size{deduped.length !== 1 ? 's' : ''} will be generated
-              {deduped.length < Object.entries(selectedPlatforms).reduce((n, [, sizes]) => n + sizes.length, 0) && (
+              {deduped.length < Object.entries(selectedPlatforms).reduce((n, [, sizes]) => n + sizes.length, 0) + validCustomSizes.length && (
                 <span> (duplicates merged)</span>
               )}
             </small>
@@ -150,7 +216,7 @@ export default function AdResizePicker({
           <button
             className="btn btn-danger btn-sm"
             onClick={onGenerateResizes}
-            disabled={resizing || Object.keys(selectedPlatforms).length === 0}
+            disabled={resizing || (Object.keys(selectedPlatforms).length === 0 && validCustomSizes.length === 0)}
           >
             {resizing ? (
               <><span className="spinner-border spinner-border-sm me-1" />Generating Resizes…</>

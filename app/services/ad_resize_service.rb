@@ -1,16 +1,17 @@
 class AdResizeService
   class Error < StandardError; end
 
-  def initialize(ad, platforms:)
+  def initialize(ad, platforms:, custom_sizes: [])
     @ad = ad
     @platforms = platforms
+    @custom_sizes = custom_sizes
   end
 
   def call
     raise Error, "Ad has no dimensions" unless @ad.width.present? && @ad.height.present?
     raise Error, "Ad has no parsed layers" unless @ad.parsed_layers.present? && @ad.parsed_layers.any?
 
-    deduped = AdPlatformSizes.deduplicated_sizes(@platforms)
+    deduped = AdPlatformSizes.deduplicated_sizes(@platforms, custom_sizes: @custom_sizes)
     raise Error, "No valid sizes found for selected platforms" if deduped.empty?
 
     # Clear existing resizes (user went back to Step 1)

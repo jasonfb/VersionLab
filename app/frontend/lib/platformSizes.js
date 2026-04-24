@@ -41,7 +41,8 @@ export const PLATFORMS = {
 export const PLATFORM_NAMES = Object.keys(PLATFORMS)
 
 // selectedPlatforms is { [platformName]: sizeName[] }
-export function deduplicatedSizes(selectedPlatforms) {
+// customSizes is [{ label, width, height }, ...]
+export function deduplicatedSizes(selectedPlatforms, customSizes = []) {
   const byDims = {}
 
   Object.entries(selectedPlatforms).forEach(([platform, sizeNames]) => {
@@ -54,6 +55,15 @@ export function deduplicatedSizes(selectedPlatforms) {
       }
       byDims[key].labels.push({ platform, sizeName: size.name })
     })
+  })
+
+  customSizes.forEach((cs) => {
+    if (!cs.width || !cs.height) return
+    const key = `${cs.width}x${cs.height}`
+    if (!byDims[key]) {
+      byDims[key] = { width: cs.width, height: cs.height, labels: [] }
+    }
+    byDims[key].labels.push({ platform: 'Custom', sizeName: cs.label || `${cs.width}x${cs.height}` })
   })
 
   return Object.values(byDims)

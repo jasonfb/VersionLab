@@ -53,6 +53,7 @@ export default function AdEdit() {
     setSearchParams({ step: STEP_NAMES[n] || 'classify' }, { replace: true })
   }
   const [selectedPlatforms, setSelectedPlatforms] = useState({})
+  const [customSizes, setCustomSizes] = useState([])
   const [resizes, setResizes] = useState([])
   const [resizing, setResizing] = useState(false)
   const [editingResize, setEditingResize] = useState(null)
@@ -104,18 +105,33 @@ export default function AdEdit() {
       const resizePromise = (a.has_resizes || a.state === 'resizing')
         ? apiFetch(`/api/clients/${clientId}/ads/${adId}/resizes`).then((r) => {
             setResizes(r)
-            // Reconstruct selectedPlatforms from existing resizes so checkboxes
-            // reflect prior selections when the user returns to this screen.
+            // Reconstruct selectedPlatforms and customSizes from existing resizes
+            // so checkboxes reflect prior selections when the user returns.
             const reconstructed = {}
+            const reconstructedCustom = []
             r.forEach((resize) => {
               ;(resize.platform_labels || []).forEach(({ platform, size_name }) => {
-                if (!reconstructed[platform]) reconstructed[platform] = []
-                if (!reconstructed[platform].includes(size_name)) {
-                  reconstructed[platform].push(size_name)
+                if (platform === 'Custom') {
+                  const alreadyAdded = reconstructedCustom.some(
+                    (cs) => cs.width === resize.width && cs.height === resize.height
+                  )
+                  if (!alreadyAdded) {
+                    reconstructedCustom.push({
+                      label: size_name !== `${resize.width}x${resize.height}` ? size_name : '',
+                      width: resize.width,
+                      height: resize.height,
+                    })
+                  }
+                } else {
+                  if (!reconstructed[platform]) reconstructed[platform] = []
+                  if (!reconstructed[platform].includes(size_name)) {
+                    reconstructed[platform].push(size_name)
+                  }
                 }
               })
             })
             setSelectedPlatforms(reconstructed)
+            setCustomSizes(reconstructedCustom)
             return r
           })
         : Promise.resolve([])
@@ -193,7 +209,14 @@ export default function AdEdit() {
     try {
       const result = await apiFetch(`/api/clients/${clientId}/ads/${adId}/resize`, {
         method: 'POST',
-        body: JSON.stringify({ platforms: selectedPlatforms }),
+        body: JSON.stringify({
+          platforms: selectedPlatforms,
+          custom_sizes: customSizes.filter((cs) => cs.width > 0 && cs.height > 0).map((cs) => ({
+            label: cs.label || `${cs.width}x${cs.height}`,
+            width: cs.width,
+            height: cs.height,
+          })),
+        }),
       })
       setAd((prev) => ({ ...prev, state: result.state, has_resizes: true }))
       setResizes(result.resizes || [])
@@ -449,6 +472,8 @@ export default function AdEdit() {
             ad={ad}
             selectedPlatforms={selectedPlatforms}
             onPlatformsChange={setSelectedPlatforms}
+            customSizes={customSizes}
+            onCustomSizesChange={setCustomSizes}
             resizes={resizes}
             onGenerateResizes={generateResizes}
             onEditResize={handleEditResize}

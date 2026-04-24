@@ -119,12 +119,16 @@ class Api::AdsController < Api::BaseController
     end
 
     platforms = params[:platforms]
-    unless platforms.present?
-      return render json: { error: "At least one platform must be selected" }, status: :unprocessable_entity
+    custom_sizes = params[:custom_sizes]
+
+    unless platforms.present? || custom_sizes.present?
+      return render json: { error: "At least one platform or custom size must be selected" }, status: :unprocessable_entity
     end
 
     # Accept either { "Platform Name": ["Size1", "Size2"] } or ["Platform Name", ...]
-    platform_selections = if platforms.is_a?(ActionController::Parameters) || platforms.is_a?(Hash)
+    platform_selections = if platforms.blank?
+      {}
+    elsif platforms.is_a?(ActionController::Parameters) || platforms.is_a?(Hash)
       platforms.to_unsafe_h
     elsif platforms.is_a?(Array)
       platforms.index_with { |_| nil } # nil means all sizes
@@ -132,10 +136,20 @@ class Api::AdsController < Api::BaseController
       return render json: { error: "Invalid platforms format" }, status: :unprocessable_entity
     end
 
+    # Parse custom sizes: [{ label:, width:, height: }, ...]
+    parsed_custom_sizes = if custom_sizes.present?
+      Array(custom_sizes).map do |cs|
+        cs = cs.to_unsafe_h if cs.respond_to?(:to_unsafe_h)
+        { label: cs["label"].presence || "#{cs['width']}x#{cs['height']}", width: cs["width"].to_i, height: cs["height"].to_i }
+      end.select { |cs| cs[:width] > 0 && cs[:height] > 0 }
+    else
+      []
+    end
+
     # Clear any existing versions if going back from Step 2
     @ad.ad_versions.destroy_all if @ad.ad_versions.any?
 
-    resizes = AdResizeService.new(@ad, platforms: platform_selections).call
+    resizes = AdResizeService.new(@ad, platforms: platform_selections, custom_sizes: parsed_custom_sizes).call
     @ad.update!(state: :resizing)
 
     render json: {

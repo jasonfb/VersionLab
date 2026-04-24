@@ -43,7 +43,8 @@ module AdPlatformSizes
   #   - Hash/object: { "Platform Name" => ["Size1", "Size2"] } for specific sizes
   #     (nil value means all sizes for that platform)
   #   - Array: ["Platform Name", ...] for all sizes (legacy)
-  def self.deduplicated_sizes(selected_platforms)
+  # custom_sizes is an optional array of { label:, width:, height: } hashes
+  def self.deduplicated_sizes(selected_platforms, custom_sizes: [])
     by_dims = {}
 
     entries = if selected_platforms.is_a?(Hash)
@@ -65,6 +66,16 @@ module AdPlatformSizes
         by_dims[key] ||= { width: size[:width], height: size[:height], labels: [] }
         by_dims[key][:labels] << { "platform" => platform_name, "size_name" => size[:name] }
       end
+    end
+
+    Array(custom_sizes).each do |cs|
+      w = cs[:width].to_i
+      h = cs[:height].to_i
+      next if w <= 0 || h <= 0
+
+      key = "#{w}x#{h}"
+      by_dims[key] ||= { width: w, height: h, labels: [] }
+      by_dims[key][:labels] << { "platform" => "Custom", "size_name" => cs[:label].presence || key }
     end
 
     by_dims.values
