@@ -88,7 +88,7 @@ RSpec.describe AiLog, type: :model do
       expect(log._cost_to_us_cents).to eq(1050)
     end
 
-    it "rounds cost up to nearest cent" do
+    it "stores fractional cent cost" do
       log = create(:ai_log,
         ai_model: ai_model,
         ai_service: ai_model.ai_service,
@@ -98,8 +98,8 @@ RSpec.describe AiLog, type: :model do
         call_type: "email")
       # input: (1 * 300) / 1_000_000 = 0.0003
       # output: (1 * 1500) / 1_000_000 = 0.0015
-      # total: ceil(0.0018) = 1
-      expect(log._cost_to_us_cents).to eq(1)
+      # total: 0.0018 cents
+      expect(log._cost_to_us_cents).to eq(BigDecimal("0.0018"))
     end
 
     it "skips cost computation when ai_model is nil" do

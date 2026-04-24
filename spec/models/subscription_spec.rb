@@ -224,9 +224,9 @@ RSpec.describe Subscription do
     it "#current_cycle_vl_tokens_used sums AI log costs as VL tokens" do
       create(:ai_log, account: account, ai_model: ai_model, call_type: "email",
         prompt_tokens: 1000, completion_tokens: 500, total_tokens: 1500)
-      # cost = ceil((1000*300)/1M + (500*1500)/1M) = ceil(0.3 + 0.75) = ceil(1.05) = 2 cents
-      # VL tokens = 2 * 10 = 20
-      expect(sub.current_cycle_vl_tokens_used).to eq(20)
+      # cost = (1000*300)/1M + (500*1500)/1M = 0.3 + 0.75 = 1.05 cents
+      # VL tokens = 1.05.to_i * 10 = 10
+      expect(sub.current_cycle_vl_tokens_used).to eq(10)
     end
 
     it "#current_cycle_overage_tokens returns 0 when within allotment" do
