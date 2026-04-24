@@ -148,43 +148,39 @@ function AccountTab() {
 
 // ─── AI Usage Tab ────────────────────────────────────────────────────────────
 
+const CALL_TYPE_LABELS = { email: 'Email', ad: 'Ad', campaign_summary: 'Campaign', email_summary: 'Email summary' }
+
 function UsageTab() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
-  const [expandedMonth, setExpandedMonth] = useState(null)
 
-  const fetchUsage = (p) => {
+  const fetchLogs = (p) => {
     setLoading(true)
-    apiFetch(`/api/ai_usage_summaries?page=${p}`)
-      .then((res) => {
-        setData(res)
-        if (p === 1 && res.usage.length > 0) {
-          setExpandedMonth(res.usage[0].month)
-        }
-      })
+    apiFetch(`/api/ai_logs?page=${p}&per_page=50`)
+      .then((res) => setData(res))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchUsage(page) }, [page])
+  useEffect(() => { fetchLogs(page) }, [page])
 
-  const formatTokens = (n) => {
+  const fmt = (n) => {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
     if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
     return n.toLocaleString()
   }
 
-  const formatMonth = (m) => {
-    const [year, month] = m.split('-')
-    const date = new Date(year, month - 1)
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const fmtDate = (iso) => {
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+      ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
   }
 
   if (loading && !data) return <Spinner />
 
-  if (!data || data.usage.length === 0) {
+  if (!data || data.logs.length === 0) {
     return (
-      <div style={{ maxWidth: 700 }}>
+      <div style={{ maxWidth: 900 }}>
         <div className="text-center text-muted py-5">
           <i className="bi bi-bar-chart fs-1 d-block mb-3"></i>
           <p>No AI usage recorded yet. Usage will appear here once AI features are used.</p>
@@ -193,91 +189,60 @@ function UsageTab() {
     )
   }
 
-  // Group models by service within each month
-  const groupByService = (models) => {
-    const grouped = {}
-    models.forEach((m) => {
-      if (!grouped[m.ai_service_name]) grouped[m.ai_service_name] = []
-      grouped[m.ai_service_name].push(m)
-    })
-    return grouped
-  }
-
   return (
-    <div style={{ maxWidth: 700 }}>
-      {data.usage.map((monthData, idx) => {
-        const isExpanded = expandedMonth === monthData.month
-        const isCurrentMonth = idx === 0 && page === 1
-        const serviceGroups = groupByService(monthData.models)
-        const monthTotal = monthData.models.reduce((sum, m) => sum + m.total_tokens, 0)
+    <div style={{ maxWidth: 900 }}>
+      <div className="mb-2">
+        <small className="text-muted">{data.total_count} calls total</small>
+      </div>
 
-        return (
-          <div key={monthData.month} className="card mb-3">
-            <div
-              className="card-header d-flex justify-content-between align-items-center"
-              style={{ cursor: 'pointer' }}
-              onClick={() => setExpandedMonth(isExpanded ? null : monthData.month)}
-            >
-              <div className="d-flex align-items-center gap-2">
-                <i className={`bi bi-chevron-${isExpanded ? 'down' : 'right'}`}></i>
-                <span className="fw-semibold">{formatMonth(monthData.month)}</span>
-                {isCurrentMonth && <span className="badge bg-danger">Current</span>}
-              </div>
-              <span className="text-muted small">{formatTokens(monthTotal)} tokens</span>
-            </div>
-
-            {isExpanded && (
-              <div className="card-body p-0">
-                {Object.entries(serviceGroups).map(([serviceName, models]) => (
-                  <div key={serviceName}>
-                    <div className="px-3 py-2 bg-light border-bottom">
-                      <small className="fw-semibold text-muted text-uppercase" style={{ letterSpacing: '0.05em', fontSize: '0.75rem' }}>
-                        {serviceName}
-                      </small>
-                    </div>
-                    <table className="table table-sm mb-0">
-                      <thead>
-                        <tr>
-                          <th className="ps-3">Model</th>
-                          <th className="text-end">Input</th>
-                          <th className="text-end">Output</th>
-                          <th className="text-end pe-3">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {models.map((m) => (
-                          <tr key={m.id}>
-                            <td className="ps-3">{m.ai_model_name}</td>
-                            <td className="text-end text-muted">{formatTokens(m.input_tokens)}</td>
-                            <td className="text-end text-muted">{formatTokens(m.output_tokens)}</td>
-                            <td className="text-end pe-3 fw-semibold">{formatTokens(m.total_tokens)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
+      <table className="table table-sm table-hover">
+        <thead className="table-light">
+          <tr>
+            <th>Date / Time</th>
+            <th>Service · Model</th>
+            <th>Type</th>
+            <th className="text-end">AI tokens in</th>
+            <th className="text-end">AI tokens out</th>
+            <th className="text-end">AI tokens total</th>
+            <th className="text-end">VL tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.logs.map((l) => (
+            <tr key={l.id}>
+              <td className="text-muted" style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>{fmtDate(l.created_at)}</td>
+              <td style={{ fontSize: '0.85rem' }}>
+                <span className="text-muted">{l.ai_service_name}</span>
+                {' · '}
+                <span>{l.ai_model_name}</span>
+              </td>
+              <td>
+                <span className="badge bg-secondary" style={{ fontWeight: 400, fontSize: '0.7rem' }}>
+                  {CALL_TYPE_LABELS[l.call_type] || l.call_type}
+                </span>
+              </td>
+              <td className="text-end text-muted">{fmt(l.input_tokens)}</td>
+              <td className="text-end text-muted">{fmt(l.output_tokens)}</td>
+              <td className="text-end text-muted">{fmt(l.total_tokens)}</td>
+              <td className="text-end fw-semibold">
+                {l.vl_tokens > 0
+                  ? l.vl_tokens.toFixed(2)
+                  : <span className="text-muted">—</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {data.total_pages > 1 && (
-        <div className="d-flex justify-content-between align-items-center mt-3">
-          <button
-            className="btn btn-outline-secondary btn-sm"
-            disabled={page <= 1 || loading}
-            onClick={() => setPage(page - 1)}
-          >
+        <div className="d-flex justify-content-between align-items-center mt-2">
+          <button className="btn btn-outline-secondary btn-sm" disabled={page <= 1 || loading}
+            onClick={() => setPage(page - 1)}>
             <i className="bi bi-chevron-left me-1"></i> Newer
           </button>
           <small className="text-muted">Page {page} of {data.total_pages}</small>
-          <button
-            className="btn btn-outline-secondary btn-sm"
-            disabled={page >= data.total_pages || loading}
-            onClick={() => setPage(page + 1)}
-          >
+          <button className="btn btn-outline-secondary btn-sm" disabled={page >= data.total_pages || loading}
+            onClick={() => setPage(page + 1)}>
             Older <i className="bi bi-chevron-right ms-1"></i>
           </button>
         </div>

@@ -26,6 +26,7 @@ Rails.application.routes.draw do
     post "upgrade_to_agency", to: "accounts#upgrade_to_agency"
     resources :ai_services, only: [ :index ]
     resources :ai_usage_summaries, only: [ :index ]
+    resources :ai_logs, only: [ :index ]
     get "lookups", to: "lookups#index"
     resources :clients, only: [ :index, :create, :update ] do
       resources :campaigns, only: [ :index, :show, :create, :update, :destroy ] do

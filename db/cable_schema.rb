@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_08_113439) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_24_151750) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -181,7 +181,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_08_113439) do
   end
 
   create_table "ai_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.integer "_cost_to_us_cents"
+    t.decimal "_cost_to_us_cents", precision: 12, scale: 6
     t.uuid "account_id", null: false
     t.uuid "ai_model_id"
     t.uuid "ai_service_id"
@@ -222,7 +222,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_08_113439) do
   end
 
   create_table "ai_usage_summaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.integer "_cost_to_us_cents", default: 0, null: false
+    t.decimal "_cost_to_us_cents", precision: 12, scale: 6, default: "0.0", null: false
     t.bigint "_input_tokens", default: 0, null: false
     t.bigint "_output_tokens", default: 0, null: false
     t.bigint "_total_tokens", default: 0, null: false

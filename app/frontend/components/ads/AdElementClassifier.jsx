@@ -6,7 +6,6 @@ const ROLE_OPTIONS = [
   { value: 'subhead', label: 'Subhead', color: '#fd7e14' },
   { value: 'body', label: 'Body', color: '#6c757d' },
   { value: 'cta', label: 'CTA', color: '#198754' },
-  { value: 'wordmark', label: 'Wordmark', color: '#20c997' },
   { value: 'logo', label: 'Logo', color: '#0d6efd' },
   { value: 'background', label: 'Background', color: '#6f42c1' },
   { value: 'decoration', label: 'Decoration', color: '#adb5bd' },
@@ -32,6 +31,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
   const [svgMarkup, setSvgMarkup] = useState(null)
   const [bboxByLayerId, setBboxByLayerId] = useState({})
   const [viewMode, setViewMode] = useState('fit') // 'fit' or 'natural'
+  const [outlineColor, setOutlineColor] = useState('red') // 'red' | 'white'
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoUrl, setLogoUrl] = useState(ad?.logo_url || null)
   const [askingAi, setAskingAi] = useState(false)
@@ -136,22 +136,31 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
   const updateRole = (index, newRole) => {
     setLayers((prev) => prev.map((l, i) => {
       if (i !== index) return l
-      const next = { ...l, role: newRole, confidence: 1.0 }
-      // Joining the wordmark family: default to a solo group (self-id) so
-      // the layer is laid out as a wordmark even before being grouped.
-      if (newRole === 'wordmark' && !next.wordmark_group_id) {
-        next.wordmark_group_id = next.id
-      }
-      // Leaving the wordmark family: drop the group membership so we don't
-      // ship stale group_ids on non-wordmark roles.
-      if (newRole !== 'wordmark' && next.wordmark_group_id) {
-        delete next.wordmark_group_id
-      }
-      return next
+      return { ...l, role: newRole, confidence: 1.0 }
     }))
   }
 
-  const setWordmarkGroup = (index, groupId) => {
+  const toggleJoins = (index) => {
+    setLayers((prev) => {
+      const target = prev[index]
+      const isJoined = !!target.wordmark_group_id
+      if (isJoined) {
+        return prev.map((l, i) => {
+          if (i !== index) return l
+          const { wordmark_group_id, ...rest } = l
+          return rest
+        })
+      }
+      // Default to the first other text layer
+      const otherTextLayer = prev.find((l, i) => i !== index && l.type === 'text' && l.content)
+      if (!otherTextLayer) return prev
+      return prev.map((l, i) =>
+        i === index ? { ...l, wordmark_group_id: otherTextLayer.id } : l
+      )
+    })
+  }
+
+  const setJoinGroup = (index, groupId) => {
     setLayers((prev) => prev.map((l, i) =>
       i === index ? { ...l, wordmark_group_id: groupId } : l
     ))
@@ -298,18 +307,27 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
           <label className="form-label fw-semibold small text-uppercase text-muted mb-0">
             Element Preview
           </label>
-          <div className="btn-group btn-group-sm">
+          <div className="d-flex align-items-center gap-2">
+            <div className="btn-group btn-group-sm">
+              <button
+                className={`btn ${viewMode === 'fit' ? 'btn-dark' : 'btn-outline-secondary'}`}
+                onClick={() => setViewMode('fit')}
+              >
+                Fit
+              </button>
+              <button
+                className={`btn ${viewMode === 'natural' ? 'btn-dark' : 'btn-outline-secondary'}`}
+                onClick={() => setViewMode('natural')}
+              >
+                100%
+              </button>
+            </div>
             <button
-              className={`btn ${viewMode === 'fit' ? 'btn-dark' : 'btn-outline-secondary'}`}
-              onClick={() => setViewMode('fit')}
+              className={`btn btn-sm ${outlineColor === 'white' ? 'btn-light' : 'btn-outline-danger'}`}
+              onClick={() => setOutlineColor((c) => (c === 'red' ? 'white' : 'red'))}
+              title="Toggle outline color (red / white)"
             >
-              Fit
-            </button>
-            <button
-              className={`btn ${viewMode === 'natural' ? 'btn-dark' : 'btn-outline-secondary'}`}
-              onClick={() => setViewMode('natural')}
-            >
-              100%
+              <i className="bi bi-border-outer" />
             </button>
           </div>
         </div>
@@ -335,80 +353,91 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                   : { width: ad.width || 100, height: ad.height || 100 }),
               }}
             >
-              {textLayers.map((layer, i) => {
-                // Prefer the actual rendered bbox (handles text-anchor, fonts, transforms).
-                const bbox = bboxByLayerId[layer.id]
-                let x, y, w, h
-                if (bbox) {
-                  x = bbox.x; y = bbox.y; w = bbox.width; h = bbox.height
-                } else {
-                  x = parseFloat(layer.x) || 0
-                  const fontSize = parseFloat(layer.font_size) || 20
-                  const hasExplicitHeight = !!layer.height
-                  h = hasExplicitHeight ? parseFloat(layer.height) : fontSize * 1.4
-                  y = hasExplicitHeight ? parseFloat(layer.y) || 0 : (parseFloat(layer.y) || 0) - fontSize
-                  w = parseFloat(layer.width) || Math.max(fontSize * 0.6 * (layer.content?.length || 5), 30)
-                }
-                const isSelected = selectedLayerId === layer.id
-                const pad = 3
+              {(() => {
+                const baseStroke = outlineColor === 'white' ? '#ffffff' : '#dd0000'
                 return (
-                  <g
-                    key={layer.id || i}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
-                  >
-                    <rect
-                      x={x - pad}
-                      y={y - pad}
-                      width={w + pad * 2}
-                      height={h + pad * 2}
-                      fill="transparent"
-                      stroke={isSelected ? '#00b4d8' : 'none'}
-                      strokeWidth={isSelected ? 2 : 0}
-                      rx={2}
-                    />
-                  </g>
+                  <>
+                    {textLayers.map((layer, i) => {
+                      // Prefer the actual rendered bbox (handles text-anchor, fonts, transforms).
+                      const bbox = bboxByLayerId[layer.id]
+                      let x, y, w, h
+                      if (bbox) {
+                        x = bbox.x; y = bbox.y; w = bbox.width; h = bbox.height
+                      } else {
+                        x = parseFloat(layer.x) || 0
+                        const fontSize = parseFloat(layer.font_size) || 20
+                        const hasExplicitHeight = !!layer.height
+                        h = hasExplicitHeight ? parseFloat(layer.height) : fontSize * 1.4
+                        y = hasExplicitHeight ? parseFloat(layer.y) || 0 : (parseFloat(layer.y) || 0) - fontSize
+                        w = parseFloat(layer.width) || Math.max(fontSize * 0.6 * (layer.content?.length || 5), 30)
+                      }
+                      const isSelected = selectedLayerId === layer.id
+                      const pad = 3
+                      return (
+                        <g
+                          key={layer.id || i}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
+                        >
+                          <rect
+                            x={x - pad}
+                            y={y - pad}
+                            width={w + pad * 2}
+                            height={h + pad * 2}
+                            fill="transparent"
+                            stroke={isSelected ? '#00b4d8' : baseStroke}
+                            strokeWidth={isSelected ? 2.5 : 1.5}
+                            strokeOpacity={isSelected ? 1 : 0.7}
+                            strokeDasharray={isSelected ? 'none' : '8,4'}
+                            rx={2}
+                          />
+                        </g>
+                      )
+                    })}
+                    {imageLayers.map((layer, i) => {
+                      const bbox = bboxByLayerId[layer.id]
+                      const x = bbox ? bbox.x : (parseFloat(layer.x) || 0)
+                      const y = bbox ? bbox.y : (parseFloat(layer.y) || 0)
+                      const w = bbox ? bbox.width : (parseFloat(layer.width) || 60)
+                      const h = bbox ? bbox.height : (parseFloat(layer.height) || 60)
+                      const isSelected = selectedLayerId === layer.id
+                      const isUploaded = layer.id === 'uploaded_logo'
+                      const pad = 3
+                      return (
+                        <g
+                          key={layer.id || `img-${i}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
+                        >
+                          {isUploaded && logoUrl && (
+                            <image
+                              href={logoUrl}
+                              x={x}
+                              y={y}
+                              width={w}
+                              height={h}
+                              preserveAspectRatio="xMidYMid meet"
+                              style={{ pointerEvents: 'none' }}
+                            />
+                          )}
+                          <rect
+                            x={x - pad}
+                            y={y - pad}
+                            width={w + pad * 2}
+                            height={h + pad * 2}
+                            fill="transparent"
+                            stroke={isSelected ? '#0d6efd' : baseStroke}
+                            strokeWidth={isSelected ? 2.5 : 1.5}
+                            strokeOpacity={isSelected ? 1 : 0.7}
+                            strokeDasharray={isSelected ? 'none' : '8,4'}
+                            rx={2}
+                          />
+                        </g>
+                      )
+                    })}
+                  </>
                 )
-              })}
-              {imageLayers.map((layer, i) => {
-                const bbox = bboxByLayerId[layer.id]
-                const x = bbox ? bbox.x : (parseFloat(layer.x) || 0)
-                const y = bbox ? bbox.y : (parseFloat(layer.y) || 0)
-                const w = bbox ? bbox.width : (parseFloat(layer.width) || 60)
-                const h = bbox ? bbox.height : (parseFloat(layer.height) || 60)
-                const isSelected = selectedLayerId === layer.id
-                const isUploaded = layer.id === 'uploaded_logo'
-                const pad = 3
-                return (
-                  <g
-                    key={layer.id || `img-${i}`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
-                  >
-                    {isUploaded && logoUrl && (
-                      <image
-                        href={logoUrl}
-                        x={x}
-                        y={y}
-                        width={w}
-                        height={h}
-                        preserveAspectRatio="xMidYMid meet"
-                        style={{ pointerEvents: 'none' }}
-                      />
-                    )}
-                    <rect
-                      x={x - pad}
-                      y={y - pad}
-                      width={w + pad * 2}
-                      height={h + pad * 2}
-                      fill="transparent"
-                      stroke={isSelected ? '#0d6efd' : 'none'}
-                      strokeWidth={isSelected ? 2 : 0}
-                      rx={2}
-                    />
-                  </g>
-                )
-              })}
+              })()}
             </svg>
           </div>
         ) : (
@@ -441,6 +470,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
             const conf = confidenceLabel(layer.confidence || 0)
             const isSelected = selectedLayerId === layer.id
             const isContinuation = !!layer.continuation_of
+            const isJoined = !!layer.wordmark_group_id
             // All preceding text layers are eligible parents
             const candidateParents = []
             for (let j = 0; j < globalIndex; j++) {
@@ -452,6 +482,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
             const currentParent = isContinuation
               ? candidateParents.find((p) => p.id === layer.continuation_of)
               : null
+            const canJoin = textLayers.filter((tl) => tl.id !== layer.id).length > 0
             return (
               <div
                 key={layer.id || i}
@@ -489,69 +520,90 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                     {layer.id}
                     {layer.x && layer.y && ` · (${layer.x}, ${layer.y})`}
                   </small>
-                  {canContinue && (
+                  {(canContinue || canJoin) && (
                     <div className="mt-1" onClick={(e) => e.stopPropagation()}>
-                      <div className="form-check d-inline-block me-2">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id={`continues-${layer.id}`}
-                          checked={isContinuation}
-                          onChange={() => toggleContinuation(globalIndex)}
-                        />
-                        <label
-                          className="form-check-label text-muted"
-                          htmlFor={`continues-${layer.id}`}
-                          style={{ fontSize: '0.7rem' }}
-                        >
-                          Continues from
-                        </label>
-                      </div>
-                      {isContinuation && (
-                        <select
-                          className="form-select form-select-sm d-inline-block"
-                          style={{ width: 'auto', maxWidth: 220, fontSize: '0.7rem' }}
-                          value={layer.continuation_of || ''}
-                          onChange={(e) => setContinuationOf(globalIndex, e.target.value)}
-                        >
-                          {!currentParent && layer.continuation_of && (
-                            <option value={layer.continuation_of}>(unknown)</option>
+                      {canContinue && (
+                        <>
+                          <div className="form-check d-inline-block me-2">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id={`continues-${layer.id}`}
+                              checked={isContinuation}
+                              onChange={() => toggleContinuation(globalIndex)}
+                            />
+                            <label
+                              className="form-check-label text-muted"
+                              htmlFor={`continues-${layer.id}`}
+                              style={{ fontSize: '0.7rem' }}
+                            >
+                              Continues from
+                            </label>
+                          </div>
+                          {isContinuation && (
+                            <select
+                              className="form-select form-select-sm d-inline-block"
+                              style={{ width: 'auto', maxWidth: 220, fontSize: '0.7rem' }}
+                              value={layer.continuation_of || ''}
+                              onChange={(e) => setContinuationOf(globalIndex, e.target.value)}
+                            >
+                              {!currentParent && layer.continuation_of && (
+                                <option value={layer.continuation_of}>(unknown)</option>
+                              )}
+                              {candidateParents.map((p) => {
+                                const label = (p.content || '').slice(0, 40)
+                                return (
+                                  <option key={p.id} value={p.id}>
+                                    {label}{(p.content || '').length > 40 ? '…' : ''}
+                                  </option>
+                                )
+                              })}
+                            </select>
                           )}
-                          {candidateParents.map((p) => {
-                            const label = (p.content || '').slice(0, 40)
-                            return (
-                              <option key={p.id} value={p.id}>
-                                {label}{(p.content || '').length > 40 ? '…' : ''}
-                              </option>
-                            )
-                          })}
-                        </select>
+                        </>
+                      )}
+                      {canJoin && (
+                        <>
+                          <div className="form-check d-inline-block me-2">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id={`joins-${layer.id}`}
+                              checked={isJoined}
+                              onChange={() => toggleJoins(globalIndex)}
+                            />
+                            <label
+                              className="form-check-label text-muted"
+                              htmlFor={`joins-${layer.id}`}
+                              style={{ fontSize: '0.7rem' }}
+                            >
+                              Joins
+                            </label>
+                          </div>
+                          {isJoined && (
+                            <select
+                              className="form-select form-select-sm d-inline-block"
+                              style={{ width: 'auto', maxWidth: 220, fontSize: '0.7rem' }}
+                              value={layer.wordmark_group_id || ''}
+                              onChange={(e) => setJoinGroup(globalIndex, e.target.value)}
+                            >
+                              {textLayers
+                                .filter((tl) => tl.id !== layer.id)
+                                .map((tl) => {
+                                  const label = (tl.content || '').slice(0, 40)
+                                  return (
+                                    <option key={tl.id} value={tl.id}>
+                                      {label}{(tl.content || '').length > 40 ? '…' : ''}
+                                    </option>
+                                  )
+                                })}
+                            </select>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
                 </div>
-
-                {/* Wordmark group control — visible only for wordmark layers */}
-                {layer.role === 'wordmark' && (
-                  <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
-                    <select
-                      className="form-select form-select-sm"
-                      style={{ width: 140, fontSize: '0.7rem' }}
-                      title="Wordmark group — members lay out together"
-                      value={layer.wordmark_group_id || layer.id}
-                      onChange={(e) => setWordmarkGroup(globalIndex, e.target.value)}
-                    >
-                      <option value={layer.id}>Solo group</option>
-                      {textLayers
-                        .filter((tl) => tl.id !== layer.id && tl.role === 'wordmark')
-                        .map((tl) => (
-                          <option key={tl.id} value={tl.wordmark_group_id || tl.id}>
-                            Join: {(tl.content || '').slice(0, 18)}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                )}
 
                 {/* Role dropdown — disabled when this row inherits role from chain head */}
                 <select

@@ -146,7 +146,7 @@ export default function EmailsIndex() {
   const modelsForService = (serviceId) => {
     if (!serviceId) return []
     const service = aiServices.find((s) => s.id === serviceId)
-    return service ? service.models : []
+    return service ? service.models.filter((m) => m.for_text) : []
   }
 
   const stateBadge = (state) => {

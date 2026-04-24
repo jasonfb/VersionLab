@@ -17,7 +17,6 @@ class AdClassifyService
 
     classified_text = classify_text_layers(text_layers)
     attach_cta_backgrounds(classified_text, shape_layers)
-    detect_wordmarks!(classified_text)
 
     classified = classified_text + classify_non_text_layers(non_text_layers)
     link_continuations!(classified)
@@ -174,75 +173,6 @@ class AdClassifyService
       # Capture original shape aspect for centering hints (optional, unused for now)
       layer["cta_background_aspect"] = (h > 0 && w > 0) ? (w / h) : nil
     end
-  end
-
-  # Heuristic wordmark detection. A wordmark is a text element (or small
-  # group of stacked elements with possibly different fonts/sizes) that lives
-  # like a brand mark in the upper portion of the ad. Detection is purely
-  # spatial — we do NOT require members to share font family or size.
-  #
-  # Pre-selects wordmarks during classification; user can confirm/override
-  # in the classify UI. Members of a group share `wordmark_group_id` (the
-  # head member's id).
-  def detect_wordmarks!(classified)
-    return unless @ad.width.present? && @ad.height.present?
-
-    # Candidates: short text in the top 30% of the canvas, not already
-    # locked into a high-confidence role like CTA or background.
-    top_band_y = @ad.height * 0.30
-    candidates = classified.select do |l|
-      next false unless l["type"] == "text" && l["content"].present?
-      next false if %w[cta background].include?(l["role"])
-      next false if l["y"].to_f > top_band_y
-      word_count = l["content"].to_s.split(/\s+/).size
-      word_count <= 3
-    end
-    return if candidates.empty?
-
-    # Cluster by spatial proximity. Two candidates join the same cluster if
-    # they're within ~2x the larger font size vertically and overlap or are
-    # close horizontally (within 1x font size).
-    sorted = candidates.sort_by { |l| [l["y"].to_f, l["x"].to_f] }
-    clusters = []
-    sorted.each do |layer|
-      placed = false
-      clusters.each do |cluster|
-        if cluster.any? { |c| wordmark_adjacent?(c, layer) }
-          cluster << layer
-          placed = true
-          break
-        end
-      end
-      clusters << [layer] unless placed
-    end
-
-    # Only mark as wordmark if the cluster has 2+ members (the joining is
-    # the whole point of the feature). Single-element top-corner brand text
-    # stays as headline/subhead unless the user reclassifies manually.
-    clusters.each do |cluster|
-      next if cluster.size < 2
-      head_id = cluster.first["id"]
-      cluster.each do |member|
-        member["role"] = "wordmark"
-        member["confidence"] = 0.75
-        member["wordmark_group_id"] = head_id
-      end
-    end
-  end
-
-  def wordmark_adjacent?(a, b)
-    ax = a["x"].to_f
-    ay = a["y"].to_f
-    bx = b["x"].to_f
-    by = b["y"].to_f
-    a_size = [a["font_size"].to_f, 8.0].max
-    b_size = [b["font_size"].to_f, 8.0].max
-    max_size = [a_size, b_size].max
-
-    vertical_gap = (ay - by).abs
-    horizontal_gap = (ax - bx).abs
-
-    vertical_gap <= max_size * 2.5 && horizontal_gap <= max_size * 4.0
   end
 
   def classify_non_text_layers(layers)

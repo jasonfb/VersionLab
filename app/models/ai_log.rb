@@ -45,16 +45,16 @@ class AiLog < ApplicationRecord
   def compute_cost
     return unless ai_model&.input_cost_per_mtok_cents && ai_model&.output_cost_per_mtok_cents
 
-    input_cost = (prompt_tokens.to_i * ai_model.input_cost_per_mtok_cents) / 1_000_000.0
-    output_cost = (completion_tokens.to_i * ai_model.output_cost_per_mtok_cents) / 1_000_000.0
-    self._cost_to_us_cents = (input_cost + output_cost).ceil
+    input_cost  = BigDecimal(prompt_tokens.to_i.to_s)     * ai_model.input_cost_per_mtok_cents  / 1_000_000
+    output_cost = BigDecimal(completion_tokens.to_i.to_s) * ai_model.output_cost_per_mtok_cents / 1_000_000
+    self._cost_to_us_cents = input_cost + output_cost
   end
 
   def update_usage_summary
     return unless ai_model_id.present?
 
     month = created_at.beginning_of_month.to_date
-    cost = _cost_to_us_cents.to_i
+    cost = _cost_to_us_cents || 0
 
     AiUsageSummary.upsert(
       {

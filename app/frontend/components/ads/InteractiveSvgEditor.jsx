@@ -91,7 +91,12 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
   const containerRef = useRef(null)
   const dragRef = useRef(null) // current drag state (non-reactive for perf)
   const layerOffsets = useRef({}) // { layerId: { x, y } }
+  const deletedIds = useRef(new Set()) // layers hidden by the user in this resize
+  const outlineColorRef = useRef('#dd0000') // current outline stroke color (ref so buildInteractiveLayer can read it)
+  const [outlineColor, setOutlineColor] = useState('red') // 'red' | 'white' — controls toggle button state
+  const [showGrid, setShowGrid] = useState(false)
   const [hoveredId, setHoveredId] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
   const [editingLayer, setEditingLayer] = useState(null)
   const [editorClickPos, setEditorClickPos] = useState(null) // { x, y } screen coords of dblclick
   const [ready, setReady] = useState(false)
@@ -145,6 +150,8 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
     }
 
     interactiveEls.forEach(({ el, layerId, type }) => {
+      if (deletedIds.current.has(layerId)) return
+
       let bbox
 
       // For clipped regions (PDF-converted), use clip-path bounds instead of getBBox
@@ -173,13 +180,16 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       const rw = bbox.width + pad * 2
       const rh = bbox.height + pad * 2
 
+      const stroke = outlineColorRef.current
+      const fillAlpha = stroke === '#ffffff' ? 'rgba(255,255,255,0.06)' : 'rgba(220,0,0,0.06)'
+
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
       rect.setAttribute('x', rx)
       rect.setAttribute('y', ry)
       rect.setAttribute('width', rw)
       rect.setAttribute('height', rh)
-      rect.setAttribute('fill', 'rgba(220,0,0,0.06)')
-      rect.setAttribute('stroke', '#dd0000')
+      rect.setAttribute('fill', fillAlpha)
+      rect.setAttribute('stroke', stroke)
       rect.setAttribute('stroke-width', '4')
       rect.setAttribute('stroke-dasharray', '10,5')
       rect.setAttribute('rx', '4')
@@ -290,12 +300,14 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
   useEffect(() => {
     if (!svgUrl) return
     setReady(false)
-    // Seed offsets from persisted overrides
+    deletedIds.current = new Set()
+    // Seed offsets and deletions from persisted overrides
     if (initialOverrides) {
       Object.entries(initialOverrides).forEach(([id, ov]) => {
         if (ov.x_offset !== undefined || ov.y_offset !== undefined) {
           layerOffsets.current[id] = { x: ov.x_offset || 0, y: ov.y_offset || 0 }
         }
+        if (ov.deleted) deletedIds.current.add(id)
       })
     }
     fetch(svgUrl, { credentials: 'same-origin' })
@@ -317,6 +329,12 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           Object.entries(layerOffsets.current).forEach(([id, { x, y }]) => {
             const el = svg.getElementById(id)
             if (el && (x || y)) el.setAttribute('transform', `translate(${x}, ${y})`)
+          })
+
+          // Hide elements that were previously deleted
+          deletedIds.current.forEach((id) => {
+            const el = svg.getElementById(id) || svg.querySelector(`[data-vl-region="${id}"]`)
+            if (el) el.style.display = 'none'
           })
 
           // Inject uploaded logo as an <image> element if not already in the SVG
@@ -368,11 +386,17 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         nx = startOffsetX + (pt.x - startSvgX)
         ny = startOffsetY + (pt.y - startSvgY)
       }
+      const moved = Math.abs(nx - startOffsetX) > 3 || Math.abs(ny - startOffsetY) > 3
       layerOffsets.current[layerId] = { x: nx, y: ny }
       textEl.setAttribute('transform', `translate(${nx}, ${ny})`)
       dragRef.current = null
       setHoveredId(null)
-      onLayerOverridesChange?.(layerId, { x_offset: nx, y_offset: ny })
+      if (moved) {
+        onLayerOverridesChange?.(layerId, { x_offset: nx, y_offset: ny })
+      } else {
+        // It was a click without meaningful drag — toggle selection
+        setSelectedId((prev) => (prev === layerId ? null : layerId))
+      }
     }
 
     window.addEventListener('mousemove', onMove)
@@ -382,6 +406,54 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       window.removeEventListener('mouseup', onUp)
     }
   }, [onLayerOverridesChange])
+
+  // Update overlay rect appearance when selection or outline color changes
+  useEffect(() => {
+    if (!ready) return
+    const svg = containerRef.current?.querySelector('svg')
+    if (!svg) return
+    const stroke = outlineColor === 'white' ? '#ffffff' : '#dd0000'
+    const fill = outlineColor === 'white' ? 'rgba(255,255,255,0.06)' : 'rgba(220,0,0,0.06)'
+    svg.querySelectorAll('#vl-interactive rect[data-layer-id]').forEach((rect) => {
+      const lid = rect.getAttribute('data-layer-id')
+      if (lid === selectedId) {
+        rect.setAttribute('stroke', '#0d6efd')
+        rect.setAttribute('stroke-dasharray', 'none')
+        rect.setAttribute('fill', 'rgba(13,110,253,0.1)')
+      } else {
+        rect.setAttribute('stroke', stroke)
+        rect.setAttribute('stroke-dasharray', '10,5')
+        rect.setAttribute('fill', fill)
+      }
+    })
+  }, [selectedId, ready, outlineColor])
+
+  // Delete selected element with the Delete key
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      if (!selectedId) return
+      if (editingLayer) return
+      const active = document.activeElement
+      if (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA' || active?.isContentEditable) return
+
+      e.preventDefault()
+
+      const svg = containerRef.current?.querySelector('svg')
+      if (svg) {
+        const target = svg.getElementById(selectedId) || svg.querySelector(`[data-vl-region="${selectedId}"]`)
+        if (target) target.style.display = 'none'
+        svg.querySelector(`#vl-interactive rect[data-layer-id="${selectedId}"]`)?.remove()
+      }
+
+      deletedIds.current.add(selectedId)
+      onLayerOverridesChange?.(selectedId, { deleted: true })
+      setSelectedId(null)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedId, editingLayer, onLayerOverridesChange])
 
   const openEditor = (textEl, layerId, svg) => {
     const bbox = textEl.getBBox()
@@ -521,10 +593,85 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
   }
 
   return (
-    <div style={{ position: 'relative', maxWidth: '100%', lineHeight: 0 }}>
+    <div
+      style={{ position: 'relative', maxWidth: '100%', lineHeight: 0 }}
+      onClick={(e) => {
+        // Deselect when clicking SVG background (not an interactive overlay rect)
+        if (!(e.target instanceof SVGElement) || !e.target.hasAttribute('data-layer-id')) {
+          setSelectedId(null)
+        }
+      }}
+    >
 
       {/* Inline SVG container */}
       <div ref={containerRef} style={{ maxWidth: '100%', display: 'block' }} />
+
+      {/* Graph-paper grid overlay */}
+      {showGrid && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            zIndex: 4,
+            backgroundImage: [
+              'linear-gradient(to right,  rgba(255,255,255,0.30) 1px, transparent 1px)',
+              'linear-gradient(to bottom, rgba(255,255,255,0.30) 1px, transparent 1px)',
+              'linear-gradient(to right,  rgba(255,255,255,0.10) 1px, transparent 1px)',
+              'linear-gradient(to bottom, rgba(255,255,255,0.10) 1px, transparent 1px)',
+            ].join(','),
+            backgroundSize: '25% 25%, 25% 25%, 5% 5%, 5% 5%',
+          }}
+        />
+      )}
+
+      {/* Editor toolbar: grid toggle + outline color toggle */}
+      <div
+        style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, lineHeight: 'normal', display: 'flex', gap: 4 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          className={`btn btn-sm ${showGrid ? 'btn-info' : 'btn-outline-secondary'}`}
+          title="Toggle gridlines"
+          onClick={() => setShowGrid((g) => !g)}
+        >
+          <i className="bi bi-grid-3x3" />
+        </button>
+        <button
+          className={`btn btn-sm ${outlineColor === 'white' ? 'btn-light' : 'btn-danger'}`}
+          title="Toggle outline color (red / white)"
+          onClick={() => {
+            const next = outlineColor === 'red' ? 'white' : 'red'
+            outlineColorRef.current = next === 'white' ? '#ffffff' : '#dd0000'
+            setOutlineColor(next)
+          }}
+        >
+          <i className="bi bi-border-outer" />
+        </button>
+      </div>
+
+      {/* Delete hint — shown when an element is selected */}
+      {selectedId && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.72)',
+            color: '#fff',
+            fontSize: '0.7rem',
+            padding: '3px 12px',
+            borderRadius: 12,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            zIndex: 10,
+            lineHeight: 'normal',
+          }}
+        >
+          Press Delete to remove element
+        </div>
+      )}
 
       {/* Style editor — rendered via portal to break free of overflow containers */}
       {editingLayer && createPortal(

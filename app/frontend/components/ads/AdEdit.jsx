@@ -248,6 +248,8 @@ export default function AdEdit() {
       )
       // Replace the old resize (by old id) with the new one
       setResizes((prev) => prev.map((r) => r.id === resize.id ? rebuilt : r))
+      // Keep the editing modal in sync if this resize is currently open
+      if (editingResize?.id === resize.id) setEditingResize(rebuilt)
     } catch (e) {
       alert(e.message || 'Failed to rebuild resize')
       // Restore prior state on failure
@@ -284,7 +286,7 @@ export default function AdEdit() {
   const modelsForService = (serviceId) => {
     if (!serviceId) return []
     const service = aiServices.find((s) => s.id === serviceId)
-    return service ? service.models : []
+    return service ? service.models.filter((m) => m.for_text) : []
   }
 
   const toggleAudience = (id) => {
@@ -1065,6 +1067,26 @@ export default function AdEdit() {
                     <small>No SVG available for this resize</small>
                   </div>
                 )}
+              </div>
+              <div className="modal-footer justify-content-between">
+                <div>
+                  <button
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={() => handleRebuildResize(editingResize)}
+                    disabled={editingResize.state === 'pending'}
+                    title="Discard all edits and restore the original heuristic layout"
+                  >
+                    {editingResize.state === 'pending' ? (
+                      <><span className="spinner-border spinner-border-sm me-1" />Restoring…</>
+                    ) : (
+                      <><i className="bi bi-arrow-counterclockwise me-1"></i>Restore Layout</>
+                    )}
+                  </button>
+                  <small className="text-muted ms-2">Discards all edits for this size</small>
+                </div>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingResize(null)}>
+                  Done
+                </button>
               </div>
             </div>
           </div>

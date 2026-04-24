@@ -99,7 +99,7 @@ class AiMergeService
     autolinking_rule = has_autolinking ? "\n      - When linking instructions are provided for specific variables, you MAY wrap relevant text phrases in HTML anchor tags (<a href=\"...\">text</a>). This is an exception to the no-HTML rule. Only add links to variables explicitly listed in the linking instructions. For variables marked as subheading/body autolinking enabled, choose contextually relevant phrases to hyperlink. For button and image variables, the entire value should be wrapped in a single anchor tag." : ""
 
     <<~PROMPT
-      You are an expert email copywriter. You will receive an email template with variable placeholders, a target audience, and optional context including a brand profile and campaign summary.
+      You are an expert email copywriter. You will receive the plain-text content of an email template (for context), a list of variable placeholders to rewrite, a target audience, and optional context including a brand profile and campaign summary.
 
       Your task is to rewrite each text variable's content to be specifically tailored for that audience.
 
@@ -145,9 +145,9 @@ class AiMergeService
     sections = []
 
     sections << <<~SECTION
-      ## Email Template HTML
-      ```html
-      #{template_html}
+      ## Email Template Context (plain text)
+      ```
+      #{strip_html_for_context(template_html)}
       ```
 
       ## Text Variables to Rewrite
@@ -324,6 +324,19 @@ class AiMergeService
     end
 
     any_section_added ? lines.join("\n") : nil
+  end
+
+  def strip_html_for_context(html)
+    # Remove style/script blocks — they're pure token waste with no semantic value
+    text = html.gsub(/<style[^>]*>.*?<\/style>/mi, "")
+    text = text.gsub(/<script[^>]*>.*?<\/script>/mi, "")
+    text = text.gsub(/<!--.*?-->/m, "")
+    # Strip remaining HTML tags
+    text = ActionController::Base.helpers.strip_tags(text)
+    # Collapse whitespace
+    text = text.gsub(/[[:space:]]+/, " ").strip
+    # Cap at 2000 chars — enough to convey email topic/tone without blowing up token counts
+    text.length > 2000 ? text.truncate(2000) : text
   end
 
   def parse_response(json_string)

@@ -28,17 +28,25 @@ module AdLayout
       # as a single text block per chain head.
       classified = AdContinuation.collapse(@ad.classified_layers)
 
-      # Wordmark groups: lay out as a single unit (like an image) so members
-      # keep their relative spacing. Process before per-layer iteration and
-      # skip the members in the main loop.
+      # Join groups: lay out as a single unit (like an image) so members
+      # keep their relative spacing. A layer joins a group by having
+      # wordmark_group_id set to the head layer's id. Process before the
+      # per-layer iteration and skip all group members in the main loop.
       wordmark_template = template[:wordmark]
       wordmark_member_ids = Set.new
-      if placed_roles.include?("wordmark") && wordmark_template && !wordmark_template[:drop]
-        wordmark_groups = classified
-          .select { |l| l["role"] == "wordmark" && l["wordmark_group_id"].present? }
+      if wordmark_template && !wordmark_template[:drop]
+        # Collect layers that explicitly reference a group head
+        explicit_by_gid = classified
+          .select { |l| l["wordmark_group_id"].present? }
           .group_by { |l| l["wordmark_group_id"] }
 
-        wordmark_groups.each do |_group_id, members|
+        join_groups = explicit_by_gid.filter_map do |gid, explicit_members|
+          head = classified.find { |l| l["id"] == gid }
+          all = ([head] + explicit_members).compact.uniq { |l| l["id"] }
+          [gid, all] if all.size >= 2
+        end.to_h
+
+        join_groups.each do |_group_id, members|
           anchor_px = LayoutTemplate.anchor_to_pixels(
             wordmark_template[:anchor], target_width, target_height
           )
@@ -52,7 +60,6 @@ module AdLayout
         next if wordmark_member_ids.include?(layer["id"])
         role = layer["role"]
         next unless role
-        next if role == "wordmark" # ungrouped wordmarks fall through silently
         next unless placed_roles.include?(role)
 
         role_template = template[role.to_sym]

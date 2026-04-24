@@ -154,28 +154,31 @@ RSpec.describe AdLayout::LayoutEngine do
     end
   end
 
-  describe "with wordmark groups" do
+  describe "with join groups" do
     let(:classified_layers) do
       [
+        # w1 is the group head — no wordmark_group_id needed
         { "id" => "w1", "type" => "text", "content" => "BRAND", "font_size" => "20",
           "x" => "50", "y" => "30", "width" => "100", "height" => "30",
-          "role" => "wordmark", "wordmark_group_id" => "w1", "confidence" => 0.75 },
+          "role" => "headline", "confidence" => 0.85 },
+        # w2 joins w1 via wordmark_group_id
         { "id" => "w2", "type" => "text", "content" => "NAME", "font_size" => "14",
           "x" => "50", "y" => "65", "width" => "80", "height" => "20",
-          "role" => "wordmark", "wordmark_group_id" => "w1", "confidence" => 0.75 },
+          "role" => "subhead", "wordmark_group_id" => "w1", "confidence" => 0.75 },
         { "id" => "h1", "type" => "text", "content" => "Headline Text",
           "font_size" => "48", "x" => "100", "y" => "200",
           "role" => "headline", "confidence" => 0.85 }
       ]
     end
 
-    it "positions wordmark group members together" do
+    it "positions join group members together in the wordmark anchor" do
       result = engine.compute_layout(1080, 1080)
-      wm_layers = result.layers.select { |l| l["role"] == "wordmark" }
-      # May be 0 if wordmark is dropped in square template
-      if wm_layers.any?
-        expect(wm_layers.size).to eq(2)
-        expect(wm_layers.all? { |l| l["wrapped_lines"] }).to be true
+      group_ids = %w[w1 w2]
+      group_layers = result.layers.select { |l| group_ids.include?(l["id"]) }
+      # May be 0 if wordmark anchor is dropped in this template bucket
+      if group_layers.any?
+        expect(group_layers.size).to eq(2)
+        expect(group_layers.all? { |l| l["wrapped_lines"] }).to be true
       end
     end
   end

@@ -214,25 +214,4 @@ RSpec.describe AdClassifyService do
     end
   end
 
-  describe "wordmark detection" do
-    let(:parsed_layers) do
-      [
-        { "id" => "w1", "type" => "text", "content" => "BRAND", "font_size" => "20", "x" => "50", "y" => "30",
-          "font_family" => "Georgia", "fill" => "#000" },
-        { "id" => "w2", "type" => "text", "content" => "NAME", "font_size" => "14", "x" => "50", "y" => "55",
-          "font_family" => "Arial", "fill" => "#000" },
-        { "id" => "h1", "type" => "text", "content" => "Main headline text here", "font_size" => "48", "x" => "50", "y" => "400" }
-      ]
-    end
-
-    it "detects multi-member wordmark groups" do
-      result = subject
-      w1 = result.find { |l| l["id"] == "w1" }
-      w2 = result.find { |l| l["id"] == "w2" }
-      expect(w1["role"]).to eq("wordmark")
-      expect(w2["role"]).to eq("wordmark")
-      expect(w1["wordmark_group_id"]).to be_present
-      expect(w2["wordmark_group_id"]).to eq(w1["wordmark_group_id"])
-    end
-  end
 end
