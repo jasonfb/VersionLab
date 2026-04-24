@@ -31,7 +31,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
   const [svgMarkup, setSvgMarkup] = useState(null)
   const [bboxByLayerId, setBboxByLayerId] = useState({})
   const [viewMode, setViewMode] = useState('fit') // 'fit' or 'natural'
-  const [outlineColor, setOutlineColor] = useState('red') // 'red' | 'white'
+  const [outlineColor, setOutlineColor] = useState('red') // 'red' | 'white' | 'off'
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoUrl, setLogoUrl] = useState(ad?.logo_url || null)
   const [askingAi, setAskingAi] = useState(false)
@@ -322,13 +322,29 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                 100%
               </button>
             </div>
-            <button
-              className={`btn btn-sm ${outlineColor === 'white' ? 'btn-light' : 'btn-outline-danger'}`}
-              onClick={() => setOutlineColor((c) => (c === 'red' ? 'white' : 'red'))}
-              title="Toggle outline color (red / white)"
-            >
-              <i className="bi bi-border-outer" />
-            </button>
+            <div className="d-flex align-items-center gap-1">
+              <small className="text-muted text-nowrap">Element outline:</small>
+              <div className="btn-group btn-group-sm">
+                <button
+                  className={`btn ${outlineColor === 'red' ? 'btn-danger' : 'btn-outline-secondary'}`}
+                  onClick={() => setOutlineColor('red')}
+                >
+                  Red
+                </button>
+                <button
+                  className={`btn ${outlineColor === 'white' ? 'btn-light' : 'btn-outline-secondary'}`}
+                  onClick={() => setOutlineColor('white')}
+                >
+                  White
+                </button>
+                <button
+                  className={`btn ${outlineColor === 'off' ? 'btn-dark' : 'btn-outline-secondary'}`}
+                  onClick={() => setOutlineColor('off')}
+                >
+                  Off
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         {ad.svg_url ? (
@@ -354,6 +370,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
               }}
             >
               {(() => {
+                if (outlineColor === 'off') return null
                 const baseStroke = outlineColor === 'white' ? '#ffffff' : '#dd0000'
                 return (
                   <>

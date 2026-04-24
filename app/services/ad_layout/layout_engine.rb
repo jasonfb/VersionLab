@@ -75,6 +75,8 @@ module AdLayout
         positioned << positioned_layer
       end
 
+      positioned = resolve_overlaps(positioned, target_width, target_height)
+
       Result.new(
         layers: positioned,
         bucket: bucket,
@@ -84,6 +86,79 @@ module AdLayout
     end
 
     private
+
+    GAP = 6 # pixels of breathing room between elements after overlap resolution
+
+    # Resolve overlapping elements by pushing them downward. Processes elements
+    # top-to-bottom: for each element, if it overlaps any already-finalized
+    # element, shift it below the bottom of the overlapper. This naturally
+    # handles cascading overlaps since top elements are finalized first.
+    def resolve_overlaps(positioned, canvas_width, canvas_height)
+      return positioned if positioned.size < 2
+
+      # Skip background-role layers — they're full-canvas and shouldn't participate
+      elements = positioned.reject { |l| l["role"] == "background" || l["role"] == "decoration" }
+      passthrough = positioned.select { |l| l["role"] == "background" || l["role"] == "decoration" }
+      return positioned if elements.size < 2
+
+      # Sort by y-position (top to bottom)
+      elements.sort_by! { |l| l["y"].to_f }
+
+      # Compute actual bounding boxes
+      bboxes = elements.map { |l| actual_bbox(l) }
+
+      # Greedy top-to-bottom resolution
+      elements.each_with_index do |layer, i|
+        bbox = bboxes[i]
+        # Check against all previously finalized elements
+        (0...i).each do |j|
+          other = bboxes[j]
+          if rects_overlap?(bbox, other)
+            shift = other[:y] + other[:h] + GAP - bbox[:y]
+            if shift > 0
+              bbox[:y] += shift
+              layer["y"] = bbox[:y].round.to_s
+            end
+          end
+        end
+
+        # Clamp to canvas bottom — don't let elements fall off
+        if bbox[:y] + bbox[:h] > canvas_height
+          layer["y"] = [canvas_height - bbox[:h], 0].max.round.to_s
+          bbox[:y] = layer["y"].to_f
+        end
+      end
+
+      passthrough + elements
+    end
+
+    # Compute the actual rendered bounding box for a positioned layer.
+    # For text, this uses wrapped_lines and font_size to get the real height
+    # rather than the anchor region height.
+    def actual_bbox(layer)
+      x = layer["x"].to_f
+      y = layer["y"].to_f
+      w = layer["width"].to_f
+
+      if layer["type"] == "text"
+        font_size = layer["font_size"].to_f
+        lines = layer["wrapped_lines"] || [layer["content"]]
+        line_count = [lines.size, 1].max
+        line_height = font_size * 1.3
+        h = font_size + (line_count - 1) * line_height
+      else
+        h = layer["height"].to_f
+      end
+
+      { x: x, y: y, w: w, h: h }
+    end
+
+    def rects_overlap?(a, b)
+      a[:x] < b[:x] + b[:w] &&
+        a[:x] + a[:w] > b[:x] &&
+        a[:y] < b[:y] + b[:h] &&
+        a[:y] + a[:h] > b[:y]
+    end
 
     # Position a wordmark group as a single unit. Members may have different
     # font sizes/families — we treat the group's combined bounding box like

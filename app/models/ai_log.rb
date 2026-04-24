@@ -45,16 +45,15 @@ class AiLog < ApplicationRecord
   def compute_cost
     return unless ai_model&.input_cost_per_mtok_cents && ai_model&.output_cost_per_mtok_cents
 
-    input_cost  = BigDecimal(prompt_tokens.to_i.to_s)     * ai_model.input_cost_per_mtok_cents  / 1_000_000
-    output_cost = BigDecimal(completion_tokens.to_i.to_s) * ai_model.output_cost_per_mtok_cents / 1_000_000
-    self._cost_to_us_cents = input_cost + output_cost
+    self._input_cost_cents  = BigDecimal(prompt_tokens.to_i.to_s)     * ai_model.input_cost_per_mtok_cents  / 1_000_000
+    self._output_cost_cents = BigDecimal(completion_tokens.to_i.to_s) * ai_model.output_cost_per_mtok_cents / 1_000_000
+    self._cost_to_us_cents  = _input_cost_cents + _output_cost_cents
   end
 
   def update_usage_summary
     return unless ai_model_id.present?
 
     month = created_at.beginning_of_month.to_date
-    cost = _cost_to_us_cents || 0
 
     AiUsageSummary.upsert(
       {
@@ -64,7 +63,9 @@ class AiLog < ApplicationRecord
         _input_tokens: prompt_tokens.to_i,
         _output_tokens: completion_tokens.to_i,
         _total_tokens: total_tokens.to_i,
-        _cost_to_us_cents: cost,
+        _input_cost_cents: _input_cost_cents || 0,
+        _output_cost_cents: _output_cost_cents || 0,
+        _cost_to_us_cents: _cost_to_us_cents || 0,
         created_at: Time.current,
         updated_at: Time.current
       },
@@ -73,6 +74,8 @@ class AiLog < ApplicationRecord
         "_input_tokens = ai_usage_summaries._input_tokens + EXCLUDED._input_tokens, " \
         "_output_tokens = ai_usage_summaries._output_tokens + EXCLUDED._output_tokens, " \
         "_total_tokens = ai_usage_summaries._total_tokens + EXCLUDED._total_tokens, " \
+        "_input_cost_cents = ai_usage_summaries._input_cost_cents + EXCLUDED._input_cost_cents, " \
+        "_output_cost_cents = ai_usage_summaries._output_cost_cents + EXCLUDED._output_cost_cents, " \
         "_cost_to_us_cents = ai_usage_summaries._cost_to_us_cents + EXCLUDED._cost_to_us_cents, " \
         "updated_at = EXCLUDED.updated_at"
       )

@@ -93,7 +93,7 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
   const layerOffsets = useRef({}) // { layerId: { x, y } }
   const deletedIds = useRef(new Set()) // layers hidden by the user in this resize
   const outlineColorRef = useRef('#dd0000') // current outline stroke color (ref so buildInteractiveLayer can read it)
-  const [outlineColor, setOutlineColor] = useState('red') // 'red' | 'white' — controls toggle button state
+  const [outlineColor, setOutlineColor] = useState('red') // 'red' | 'white' | 'off' — controls toggle button state
   const [showGrid, setShowGrid] = useState(false)
   const [hoveredId, setHoveredId] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
@@ -300,6 +300,7 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
   useEffect(() => {
     if (!svgUrl) return
     setReady(false)
+    layerOffsets.current = {}
     deletedIds.current = new Set()
     // Seed offsets and deletions from persisted overrides
     if (initialOverrides) {
@@ -416,7 +417,10 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
     const fill = outlineColor === 'white' ? 'rgba(255,255,255,0.06)' : 'rgba(220,0,0,0.06)'
     svg.querySelectorAll('#vl-interactive rect[data-layer-id]').forEach((rect) => {
       const lid = rect.getAttribute('data-layer-id')
-      if (lid === selectedId) {
+      if (outlineColor === 'off' && lid !== selectedId) {
+        rect.setAttribute('stroke', 'transparent')
+        rect.setAttribute('fill', 'transparent')
+      } else if (lid === selectedId) {
         rect.setAttribute('stroke', '#0d6efd')
         rect.setAttribute('stroke-dasharray', 'none')
         rect.setAttribute('fill', 'rgba(13,110,253,0.1)')
@@ -593,15 +597,59 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
   }
 
   return (
-    <div
-      style={{ position: 'relative', maxWidth: '100%', lineHeight: 0 }}
-      onClick={(e) => {
-        // Deselect when clicking SVG background (not an interactive overlay rect)
-        if (!(e.target instanceof SVGElement) || !e.target.hasAttribute('data-layer-id')) {
-          setSelectedId(null)
-        }
-      }}
-    >
+    <div>
+      {/* Editor toolbar: grid toggle + outline color toggle — above the image */}
+      <div className="d-flex align-items-center justify-content-end gap-2 mb-1">
+        <button
+          className={`btn btn-sm ${showGrid ? 'btn-info' : 'btn-outline-secondary'}`}
+          title="Toggle gridlines"
+          onClick={() => setShowGrid((g) => !g)}
+        >
+          <i className="bi bi-grid-3x3" />
+        </button>
+        <div className="d-flex align-items-center gap-1">
+          <small className="text-muted text-nowrap">Element outline:</small>
+          <div className="btn-group btn-group-sm">
+            <button
+              className={`btn ${outlineColor === 'red' ? 'btn-danger' : 'btn-outline-secondary'}`}
+              onClick={() => {
+                outlineColorRef.current = '#dd0000'
+                setOutlineColor('red')
+              }}
+            >
+              Red
+            </button>
+            <button
+              className={`btn ${outlineColor === 'white' ? 'btn-light' : 'btn-outline-secondary'}`}
+              onClick={() => {
+                outlineColorRef.current = '#ffffff'
+                setOutlineColor('white')
+              }}
+            >
+              White
+            </button>
+            <button
+              className={`btn ${outlineColor === 'off' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => {
+                outlineColorRef.current = 'transparent'
+                setOutlineColor('off')
+              }}
+            >
+              Off
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{ position: 'relative', maxWidth: '100%', lineHeight: 0 }}
+        onClick={(e) => {
+          // Deselect when clicking SVG background (not an interactive overlay rect)
+          if (!(e.target instanceof SVGElement) || !e.target.hasAttribute('data-layer-id')) {
+            setSelectedId(null)
+          }
+        }}
+      >
 
       {/* Inline SVG container */}
       <div ref={containerRef} style={{ maxWidth: '100%', display: 'block' }} />
@@ -625,30 +673,6 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         />
       )}
 
-      {/* Editor toolbar: grid toggle + outline color toggle */}
-      <div
-        style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, lineHeight: 'normal', display: 'flex', gap: 4 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          className={`btn btn-sm ${showGrid ? 'btn-info' : 'btn-outline-secondary'}`}
-          title="Toggle gridlines"
-          onClick={() => setShowGrid((g) => !g)}
-        >
-          <i className="bi bi-grid-3x3" />
-        </button>
-        <button
-          className={`btn btn-sm ${outlineColor === 'white' ? 'btn-light' : 'btn-danger'}`}
-          title="Toggle outline color (red / white)"
-          onClick={() => {
-            const next = outlineColor === 'red' ? 'white' : 'red'
-            outlineColorRef.current = next === 'white' ? '#ffffff' : '#dd0000'
-            setOutlineColor(next)
-          }}
-        >
-          <i className="bi bi-border-outer" />
-        </button>
-      </div>
 
       {/* Delete hint — shown when an element is selected */}
       {selectedId && (
@@ -684,6 +708,7 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         document.body
       )}
 
+      </div>
     </div>
   )
 }

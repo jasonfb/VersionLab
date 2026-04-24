@@ -73,6 +73,7 @@ class AdResizeService
 
   def generate_preview(resize)
     svg_data = resize.resized_svg.blob.download
+    svg_data = inline_external_images(svg_data)
     binary = rasterize(svg_data)
 
     format = @ad.jpg? ? "jpg" : "png"
@@ -83,6 +84,47 @@ class AdResizeService
       filename: "preview-#{resize.width}x#{resize.height}.#{format}",
       content_type: content_type
     )
+  end
+
+  # Replace external <image href="..."> URLs with inline data URIs so the
+  # rasterizer (vips/librsvg) can render them without network access.
+  def inline_external_images(svg_string)
+    doc = Nokogiri::XML(svg_string)
+    doc.xpath("//xmlns:image|//image", "xmlns" => "http://www.w3.org/2000/svg").each do |img|
+      href = img["href"] || img["xlink:href"]
+      next if href.blank? || href.start_with?("data:")
+
+      begin
+        image_data = download_image(href)
+        content_type = Marcel::MimeType.for(image_data)
+        data_uri = "data:#{content_type};base64,#{Base64.strict_encode64(image_data)}"
+        if img["href"]
+          img["href"] = data_uri
+        else
+          img["xlink:href"] = data_uri
+        end
+      rescue => e
+        Rails.logger.warn("AdResizeService: could not inline image #{href}: #{e.message}")
+      end
+    end
+    doc.to_xml
+  end
+
+  def download_image(href)
+    require "open-uri"
+    # Active Storage blob path — extract the signed ID and download directly
+    if (match = href.match(%r{/rails/active_storage/blobs/(?:redirect|proxy)/([^/]+)}))
+      blob = ActiveStorage::Blob.find_signed!(match[1])
+      return blob.download
+    end
+
+    # Full URL — fetch it
+    if href.start_with?("http://", "https://")
+      return URI.parse(href).open.read
+    end
+
+    # Relative path — read from public/
+    File.binread(Rails.root.join("public", href.sub(%r{^/}, "")))
   end
 
   def build_resized_svg(resize, layout_result)

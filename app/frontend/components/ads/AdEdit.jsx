@@ -1055,6 +1055,7 @@ export default function AdEdit() {
               <div className="modal-body">
                 {editingResize.resized_svg_url ? (
                   <InteractiveSvgEditor
+                    key={`${editingResize.id}-${editingResize.updated_at || ''}`}
                     svgUrl={editingResize.resized_svg_url}
                     layers={editingResize.resized_layers}
                     classifiedLayers={editingResize.resized_layers}
