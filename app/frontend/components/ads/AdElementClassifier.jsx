@@ -322,8 +322,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                 100%
               </button>
             </div>
-            <div className="d-flex align-items-center gap-1">
-              <small className="text-muted text-nowrap">Element outline:</small>
+            <div className="text-center">
               <div className="btn-group btn-group-sm">
                 <button
                   className={`btn ${outlineColor === 'red' ? 'btn-danger' : 'btn-outline-secondary'}`}
@@ -344,6 +343,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                   Off
                 </button>
               </div>
+              <div className="text-muted" style={{ fontSize: '0.6rem' }}>Element outline</div>
             </div>
           </div>
         </div>

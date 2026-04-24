@@ -10,7 +10,10 @@ module AdLayout
 
     # Compute layout for target dimensions. Returns a Result with positioned layers.
     # Falls back to legacy proportional scaling if classifications aren't confirmed.
-    def compute_layout(target_width, target_height)
+    #
+    # layout_variant: "left", "center", or "right" — overrides the per-role text
+    # alignment from the template so the designer can pick a starting layout.
+    def compute_layout(target_width, target_height, layout_variant: "center")
       unless @ad.classifications_confirmed? && @ad.classified_layers.present?
         return legacy_layout(target_width, target_height)
       end
@@ -65,12 +68,15 @@ module AdLayout
         role_template = template[role.to_sym]
         next unless role_template && !role_template[:drop]
 
+        # Apply layout variant alignment override for text roles
+        effective_template = apply_variant_alignment(role_template, role, layout_variant)
+
         anchor_px = LayoutTemplate.anchor_to_pixels(
-          role_template[:anchor], target_width, target_height
+          effective_template[:anchor], target_width, target_height
         )
 
         positioned_layer = position_layer(
-          layer, role_template, anchor_px, base_scale, font_lookup
+          layer, effective_template, anchor_px, base_scale, font_lookup
         )
         positioned << positioned_layer
       end
@@ -86,6 +92,45 @@ module AdLayout
     end
 
     private
+
+    # Roles whose alignment the layout variant can override. Wordmark and
+    # decoration keep their template-defined alignment regardless of variant.
+    VARIANT_ALIGNABLE_ROLES = %w[headline subhead body cta logo].to_set.freeze
+
+    # Override a role_template's align (and optionally anchor x-position) based
+    # on the chosen layout variant. Returns the original template if no override
+    # applies (e.g. for wordmark, decoration, or "center" variant which matches
+    # most templates already).
+    def apply_variant_alignment(role_template, role, layout_variant)
+      return role_template unless VARIANT_ALIGNABLE_ROLES.include?(role)
+      return role_template if layout_variant.nil?
+
+      target_align = layout_variant # "left", "center", or "right"
+      return role_template if role_template[:align] == target_align &&
+        target_align != "center" # always re-center for "center" variant
+
+      # Shallow-dup so we don't mutate the frozen template
+      overridden = role_template.dup
+      overridden[:align] = target_align
+
+      anchor = role_template[:anchor]
+      margin = 0.05
+      case target_align
+      when "left"
+        overridden[:anchor] = anchor.merge(x: margin)
+      when "center"
+        # Center the anchor region horizontally on the canvas
+        new_x = (1.0 - anchor[:w]) / 2.0
+        overridden[:anchor] = anchor.merge(x: new_x)
+      when "right"
+        # Push region rightward so its right edge sits at (1.0 - margin)
+        new_x = 1.0 - margin - anchor[:w]
+        new_x = margin if new_x < margin
+        overridden[:anchor] = anchor.merge(x: new_x)
+      end
+
+      overridden
+    end
 
     GAP = 6 # pixels of breathing room between elements after overlap resolution
 

@@ -157,6 +157,11 @@ class Api::AdsController < Api::BaseController
       return render json: { error: "Ad must be in setup or resizing state to run" }, status: :unprocessable_entity
     end
 
+    # Apply account AI defaults when customer doesn't choose
+    unless @current_account.customer_chooses_ai?
+      @ad.update!(ai_service_id: @current_account.ai_service_id, ai_model_id: @current_account.ai_model_id)
+    end
+
     unless @ad.ai_service_id.present? && @ad.ai_model_id.present?
       return render json: { error: "Ad must have an AI service and model selected" }, status: :unprocessable_entity
     end

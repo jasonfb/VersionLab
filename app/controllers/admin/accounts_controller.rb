@@ -10,6 +10,7 @@ class Admin::AccountsController < Admin::BaseController
 
   
   before_action :load_account, only: %i[show edit update destroy]
+  before_action :load_ai_services, only: %i[new edit create update ai_models]
   after_action -> { flash.discard }, if: -> { request.format.symbol == :turbo_stream }
   
   def load_account
@@ -19,7 +20,7 @@ class Admin::AccountsController < Admin::BaseController
   
   
   def load_all_accounts
-    @accounts = Account.reverse_sort
+    @accounts = Account.includes(:ai_service, :ai_model).reverse_sort
     @pagy, @accounts = pagy(@accounts)
   end
 
@@ -102,6 +103,12 @@ class Admin::AccountsController < Admin::BaseController
     end
   end
 
+  def ai_models
+    service = @ai_services.find_by(id: params[:ai_service_id])
+    models = service ? service.ai_models.where(for_text: true).order(:name) : []
+    render json: models.map { |m| { id: m.id, name: m.name } }
+  end
+
   def destroy
     
     begin
@@ -117,19 +124,23 @@ class Admin::AccountsController < Admin::BaseController
 
 
   def account_params
-    fields = :name, :is_agency, :stripe_customer_id
+    fields = :name, :is_agency, :stripe_customer_id, :customer_chooses_ai, :ai_service_id, :ai_model_id
     params.require(:account).permit(fields)
   end
 
-  
+
   def update_account_params
-    fields = :name, :is_agency, :stripe_customer_id
-    
+    fields = :name, :is_agency, :stripe_customer_id, :customer_chooses_ai, :ai_service_id, :ai_model_id
+
     params.require(:account).permit(fields)
   end
   
 
   
+  def load_ai_services
+    @ai_services = AiService.includes(:ai_models).order(:name)
+  end
+
   def namespace
     'admin/'
   end

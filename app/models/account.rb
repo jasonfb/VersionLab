@@ -15,6 +15,9 @@
 #  index_accounts_on_stripe_customer_id  (stripe_customer_id) UNIQUE
 #
 class Account < ApplicationRecord
+  belongs_to :ai_service, optional: true
+  belongs_to :ai_model, optional: true
+
   has_many :clients, dependent: :destroy
   has_many :account_users, dependent: :destroy
   has_many :users, through: :account_users

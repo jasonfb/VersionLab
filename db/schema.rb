@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_24_161517) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_24_223920) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -53,7 +53,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_161517) do
   end
 
   create_table "accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ai_model_id"
+    t.uuid "ai_service_id"
     t.datetime "created_at", null: false
+    t.boolean "customer_chooses_ai", default: false, null: false
     t.boolean "is_agency", default: false, null: false
     t.string "name"
     t.string "stripe_customer_id"
@@ -112,6 +115,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_161517) do
     t.datetime "created_at", null: false
     t.integer "height", null: false
     t.jsonb "layer_overrides", default: {}
+    t.string "layout_variant", default: "center", null: false
     t.jsonb "platform_labels", default: [], null: false
     t.jsonb "resized_layers", default: []
     t.enum "state", default: "pending", null: false, enum_type: "ad_resize_state"
@@ -786,6 +790,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_161517) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  add_foreign_key "accounts", "ai_models"
+  add_foreign_key "accounts", "ai_services"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "ad_audiences", "ads"

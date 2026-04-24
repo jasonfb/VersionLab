@@ -85,12 +85,106 @@ function getClipBounds(svg, clipPathRef) {
   return null
 }
 
+// ─── Text fitting ────────────────────────────────────────────────────────────
+
+// Simple word-wrap: split text into lines that fit within charsPerLine
+function wordWrapText(text, charsPerLine) {
+  const words = (text || '').split(/\s+/).filter(Boolean)
+  if (!words.length) return ['']
+  const lines = []
+  let current = []
+  let currentLen = 0
+  words.forEach((w) => {
+    if (current.length === 0 || currentLen + 1 + w.length <= charsPerLine) {
+      current.push(w)
+      currentLen += (current.length === 1 ? 0 : 1) + w.length
+    } else {
+      lines.push(current.join(' '))
+      current = [w]
+      currentLen = w.length
+    }
+  })
+  if (current.length) lines.push(current.join(' '))
+  return lines.length ? lines : ['']
+}
+
+// Compute the best font size (and wrapped lines) that fits text within a box.
+// Returns { fontSize, lines }
+function fitTextToBox(content, boxWidth, boxHeight, maxFontSize, enableWordWrap) {
+  if (!content || boxWidth <= 0 || boxHeight <= 0) return { fontSize: maxFontSize, lines: [content || ''] }
+
+  let fontSize = maxFontSize
+  const LINE_HEIGHT_RATIO = 1.3
+  const CHAR_WIDTH_RATIO = 0.55
+
+  if (enableWordWrap) {
+    // With word wrap: wrap at box width, then shrink font if total height overflows
+    for (let iter = 0; iter < 3; iter++) {
+      const charWidth = fontSize * CHAR_WIDTH_RATIO
+      const charsPerLine = Math.max(1, Math.floor(boxWidth / charWidth))
+      const lines = wordWrapText(content, charsPerLine)
+      const totalHeight = fontSize + (lines.length - 1) * fontSize * LINE_HEIGHT_RATIO
+      if (totalHeight <= boxHeight) return { fontSize, lines }
+      // Shrink font to fit
+      fontSize = fontSize * (boxHeight / totalHeight)
+      fontSize = Math.max(fontSize, 6)
+    }
+    // Final pass with clamped size
+    const charWidth = fontSize * CHAR_WIDTH_RATIO
+    const charsPerLine = Math.max(1, Math.floor(boxWidth / charWidth))
+    return { fontSize, lines: wordWrapText(content, charsPerLine) }
+  } else {
+    // No word wrap: single line, shrink if too wide or too tall
+    const textWidth = content.length * fontSize * CHAR_WIDTH_RATIO
+    if (textWidth > boxWidth) {
+      fontSize = Math.min(fontSize, maxFontSize * (boxWidth / textWidth))
+    }
+    if (fontSize > boxHeight * 0.85) {
+      fontSize = boxHeight * 0.85
+    }
+    return { fontSize: Math.max(fontSize, 6), lines: [content] }
+  }
+}
+
+// Apply fitted text to an SVG <text> element — update font-size and tspan layout
+function applyFittedText(textEl, fontSize, lines, boxX, boxWidth, align) {
+  textEl.setAttribute('font-size', fontSize.toFixed(1))
+
+  const anchor = ALIGN_TO_ANCHOR[align] || textEl.getAttribute('text-anchor') || 'start'
+  let textX = boxX
+  if (anchor === 'middle') textX = boxX + boxWidth / 2
+  else if (anchor === 'end') textX = boxX + boxWidth
+  textEl.setAttribute('text-anchor', anchor)
+  textEl.setAttribute('x', textX)
+
+  const lineHeight = fontSize * 1.3
+  // Clear existing tspans
+  const existingTspans = textEl.querySelectorAll('tspan')
+  Array.from(existingTspans).forEach((t) => t.remove())
+  textEl.textContent = ''
+
+  lines.forEach((line, i) => {
+    const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan')
+    tspan.setAttribute('x', textX)
+    if (i === 0) {
+      // First line positioned by the parent <text> y
+    } else {
+      tspan.setAttribute('dy', lineHeight)
+    }
+    tspan.textContent = line
+    textEl.appendChild(tspan)
+  })
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers, onLayerOverridesChange, initialOverrides, transparentBackground }) {
+export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers, onLayerOverridesChange, initialOverrides, transparentBackground, renderToolbar }) {
   const containerRef = useRef(null)
   const dragRef = useRef(null) // current drag state (non-reactive for perf)
   const layerOffsets = useRef({}) // { layerId: { x, y } }
+  const layerBoxes = useRef({}) // { layerId: { width, height } } — custom box dimensions from resize
+  const maxFontSizes = useRef({}) // { layerId: fontSize } — native/original font size ceiling
+  const wordWrapFlags = useRef({}) // { layerId: boolean }
   const deletedIds = useRef(new Set()) // layers hidden by the user in this resize
   const outlineColorRef = useRef('#dd0000') // current outline stroke color (ref so buildInteractiveLayer can read it)
   const [outlineColor, setOutlineColor] = useState('red') // 'red' | 'white' | 'off' — controls toggle button state
@@ -100,6 +194,10 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
   const [editingLayer, setEditingLayer] = useState(null)
   const [editorClickPos, setEditorClickPos] = useState(null) // { x, y } screen coords of dblclick
   const [ready, setReady] = useState(false)
+  const [, forceUpdate] = useState(0)
+
+  // Force a re-render after mount so renderToolbar portal target is available
+  useEffect(() => { if (renderToolbar) forceUpdate((n) => n + 1) }, [])
 
   const buildInteractiveLayer = useCallback(() => {
     const svg = containerRef.current?.querySelector('svg')
@@ -150,7 +248,10 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
     }
 
     interactiveEls.forEach(({ el, layerId, type }) => {
-      if (deletedIds.current.has(layerId)) return
+      if (deletedIds.current.has(layerId)) {
+        el.style.display = 'none'
+        return
+      }
 
       let bbox
 
@@ -175,10 +276,35 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
 
       const pad = 6
       const offset = layerOffsets.current[layerId] || { x: 0, y: 0 }
+      const customBox = layerBoxes.current[layerId]
+      // Position always derived from element bbox + offset; custom box only overrides width/height
       const rx = bbox.x - pad + offset.x
       const ry = bbox.y - pad + offset.y
-      const rw = bbox.width + pad * 2
-      const rh = bbox.height + pad * 2
+      const rw = customBox ? customBox.width : bbox.width + pad * 2
+      const rh = customBox ? customBox.height : bbox.height + pad * 2
+
+      // Capture native font size on first build (before any user resize)
+      if (type === 'text' && !maxFontSizes.current[layerId]) {
+        const nativeSize = parseFloat(el.getAttribute('font-size')) || 16
+        maxFontSizes.current[layerId] = nativeSize
+      }
+
+      // If custom box exists, refit text to match the persisted box dimensions
+      if (customBox && type === 'text') {
+        const innerW = rw - pad * 2
+        const innerH = rh - pad * 2
+        const maxFs = maxFontSizes.current[layerId] || parseFloat(el.getAttribute('font-size')) || 16
+        const ww = wordWrapFlags.current[layerId] || false
+        const elTspans = el.querySelectorAll('tspan')
+        const content = elTspans.length > 0
+          ? Array.from(elTspans).map(t => t.textContent).join(' ')
+          : el.textContent
+        const { fontSize, lines } = fitTextToBox(content, innerW, innerH, maxFs, ww)
+        const align = ANCHOR_TO_ALIGN[el.getAttribute('text-anchor')] || 'left'
+        applyFittedText(el, fontSize, lines, rx + pad, innerW, align)
+        el.setAttribute('y', ry + pad + fontSize)
+        el.removeAttribute('transform')
+      }
 
       const stroke = outlineColorRef.current
       const fillAlpha = stroke === '#ffffff' ? 'rgba(255,255,255,0.06)' : 'rgba(220,0,0,0.06)'
@@ -190,8 +316,8 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       rect.setAttribute('height', rh)
       rect.setAttribute('fill', fillAlpha)
       rect.setAttribute('stroke', stroke)
-      rect.setAttribute('stroke-width', '4')
-      rect.setAttribute('stroke-dasharray', '10,5')
+      rect.setAttribute('stroke-width', '1')
+      rect.setAttribute('stroke-dasharray', '6,4')
       rect.setAttribute('rx', '4')
       rect.setAttribute('data-layer-id', layerId)
       rect.style.cursor = 'move'
@@ -207,19 +333,73 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
 
       g.appendChild(rect)
 
+      // Resize handles (4 corners) — initially hidden, shown when selected
+      const vb = svg.getAttribute('viewBox')?.split(/\s+/).map(Number)
+      const handleSize = vb && vb.length === 4 ? Math.max(8, Math.min(vb[2], vb[3]) * 0.015) : 10
+      const corners = [
+        { name: 'nw', cx: rx,      cy: ry,      cursor: 'nwse-resize' },
+        { name: 'ne', cx: rx + rw, cy: ry,      cursor: 'nesw-resize' },
+        { name: 'sw', cx: rx,      cy: ry + rh, cursor: 'nesw-resize' },
+        { name: 'se', cx: rx + rw, cy: ry + rh, cursor: 'nwse-resize' },
+      ]
+      corners.forEach(({ name, cx, cy, cursor }) => {
+        const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+        handle.setAttribute('x', cx - handleSize / 2)
+        handle.setAttribute('y', cy - handleSize / 2)
+        handle.setAttribute('width', handleSize)
+        handle.setAttribute('height', handleSize)
+        handle.setAttribute('fill', '#0d6efd')
+        handle.setAttribute('stroke', '#ffffff')
+        handle.setAttribute('stroke-width', '2')
+        handle.setAttribute('data-handle', name)
+        handle.setAttribute('data-layer-id', layerId)
+        handle.style.cursor = cursor
+        handle.style.display = 'none' // hidden until selected
+
+        handle.addEventListener('mousedown', (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          const svgPt = screenToSvg(svg, e.clientX, e.clientY)
+          // Capture text content at drag start so we don't re-read from mutated DOM
+          const elTspans = el.querySelectorAll('tspan')
+          const textContent = elTspans.length > 0
+            ? Array.from(elTspans).map(t => t.textContent).join(' ')
+            : el.textContent
+          dragRef.current = {
+            mode: 'resize',
+            corner: name,
+            svg,
+            textEl: el,
+            rect,
+            layerId,
+            elType: type,
+            textContent,
+            startSvgX: svgPt.x,
+            startSvgY: svgPt.y,
+            origBox: { x: rx, y: ry, w: rw, h: rh },
+            origBbox: bbox,
+            maxFontSize: maxFontSizes.current[layerId] || parseFloat(el.getAttribute('font-size')) || 16,
+            wordWrap: wordWrapFlags.current[layerId] || false,
+          }
+        })
+
+        g.appendChild(handle)
+      })
+
       // Hover events
       rect.addEventListener('mouseenter', () => setHoveredId(layerId))
       rect.addEventListener('mouseleave', () => {
         if (!dragRef.current) setHoveredId(null)
       })
 
-      // Drag start
+      // Drag start (move mode)
       rect.addEventListener('mousedown', (e) => {
         e.preventDefault()
         e.stopPropagation()
         const svgPt = screenToSvg(svg, e.clientX, e.clientY)
         const cur = layerOffsets.current[layerId] || { x: 0, y: 0 }
         dragRef.current = {
+          mode: 'move',
           svg,
           textEl: el,
           rect,
@@ -301,12 +481,24 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
     if (!svgUrl) return
     setReady(false)
     layerOffsets.current = {}
+    layerBoxes.current = {}
+    maxFontSizes.current = {}
+    wordWrapFlags.current = {}
     deletedIds.current = new Set()
-    // Seed offsets and deletions from persisted overrides
+    // Seed offsets, boxes, and deletions from persisted overrides
     if (initialOverrides) {
       Object.entries(initialOverrides).forEach(([id, ov]) => {
         if (ov.x_offset !== undefined || ov.y_offset !== undefined) {
           layerOffsets.current[id] = { x: ov.x_offset || 0, y: ov.y_offset || 0 }
+        }
+        if (ov.box_width !== undefined && ov.box_height !== undefined) {
+          layerBoxes.current[id] = { width: ov.box_width, height: ov.box_height }
+        }
+        if (ov.max_font_size !== undefined) {
+          maxFontSizes.current[id] = ov.max_font_size
+        }
+        if (ov.word_wrap !== undefined) {
+          wordWrapFlags.current[id] = ov.word_wrap
         }
         if (ov.deleted) deletedIds.current.add(id)
       })
@@ -332,11 +524,8 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
             if (el && (x || y)) el.setAttribute('transform', `translate(${x}, ${y})`)
           })
 
-          // Hide elements that were previously deleted
-          deletedIds.current.forEach((id) => {
-            const el = svg.getElementById(id) || svg.querySelector(`[data-vl-region="${id}"]`)
-            if (el) el.style.display = 'none'
-          })
+          // Note: deleted elements are hidden inside buildInteractiveLayer,
+          // which runs after this effect via setReady(true).
 
           // Inject uploaded logo as an <image> element if not already in the SVG
           const uploadedLogo = layers?.find((l) => l.id === 'uploaded_logo' && l.type === 'image')
@@ -359,44 +548,151 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       .catch(() => {})
   }, [svgUrl, buildInteractiveLayer])
 
-  // Global mouse move + up for drag
+  // Global mouse move + up for drag (move + resize modes)
   useEffect(() => {
     const onMove = (e) => {
       if (!dragRef.current) return
-      const { svg, textEl, rect, layerId, startSvgX, startSvgY, startOffsetX, startOffsetY, origBbox } = dragRef.current
-      const pt = screenToSvg(svg, e.clientX, e.clientY)
-      const dx = pt.x - startSvgX
-      const dy = pt.y - startSvgY
-      const nx = startOffsetX + dx
-      const ny = startOffsetY + dy
+      const d = dragRef.current
+      const pt = screenToSvg(d.svg, e.clientX, e.clientY)
 
-      // Move the text element via transform
-      textEl.setAttribute('transform', `translate(${nx}, ${ny})`)
+      if (d.mode === 'resize') {
+        // Corner resize
+        const dx = pt.x - d.startSvgX
+        const dy = pt.y - d.startSvgY
+        let { x, y, w, h } = d.origBox
+        const minDim = 20
 
-      // Move the overlay rect
-      rect.setAttribute('x', origBbox.x - 4 + nx)
-      rect.setAttribute('y', origBbox.y - 4 + ny)
+        switch (d.corner) {
+          case 'se': w = Math.max(minDim, w + dx); h = Math.max(minDim, h + dy); break
+          case 'sw': x += dx; w = Math.max(minDim, w - dx); h = Math.max(minDim, h + dy); break
+          case 'ne': y += dy; w = Math.max(minDim, w + dx); h = Math.max(minDim, h - dy); break
+          case 'nw': x += dx; y += dy; w = Math.max(minDim, w - dx); h = Math.max(minDim, h - dy); break
+        }
+
+        // Update overlay rect
+        d.rect.setAttribute('x', x)
+        d.rect.setAttribute('y', y)
+        d.rect.setAttribute('width', w)
+        d.rect.setAttribute('height', h)
+
+        // Update handle positions
+        const svg = d.svg
+        const handles = svg.querySelectorAll(`#vl-interactive rect[data-handle][data-layer-id="${d.layerId}"]`)
+        handles.forEach((handle) => {
+          const hs = parseFloat(handle.getAttribute('width'))
+          const name = handle.getAttribute('data-handle')
+          let cx, cy
+          switch (name) {
+            case 'nw': cx = x; cy = y; break
+            case 'ne': cx = x + w; cy = y; break
+            case 'sw': cx = x; cy = y + h; break
+            case 'se': cx = x + w; cy = y + h; break
+          }
+          handle.setAttribute('x', cx - hs / 2)
+          handle.setAttribute('y', cy - hs / 2)
+        })
+
+        // Smart text fitting during resize (text elements only)
+        if (d.elType === 'text') {
+          const pad = 6
+          const innerW = w - pad * 2
+          const innerH = h - pad * 2
+          const content = d.textContent
+          const { fontSize, lines } = fitTextToBox(content, innerW, innerH, d.maxFontSize, d.wordWrap)
+          const align = ANCHOR_TO_ALIGN[d.textEl.getAttribute('text-anchor')] || 'left'
+          applyFittedText(d.textEl, fontSize, lines, x + pad, innerW, align)
+          // Update y to position text within the box
+          d.textEl.setAttribute('y', y + pad + fontSize)
+          // Remove any transform since we're positioning absolutely
+          d.textEl.removeAttribute('transform')
+        }
+      } else {
+        // Move mode (existing behavior)
+        const dx = pt.x - d.startSvgX
+        const dy = pt.y - d.startSvgY
+        const nx = d.startOffsetX + dx
+        const ny = d.startOffsetY + dy
+        d.textEl.setAttribute('transform', `translate(${nx}, ${ny})`)
+        d.rect.setAttribute('x', d.origBbox.x - 4 + nx)
+        d.rect.setAttribute('y', d.origBbox.y - 4 + ny)
+
+        // Move resize handles too
+        const handles = d.svg.querySelectorAll(`#vl-interactive rect[data-handle][data-layer-id="${d.layerId}"]`)
+        const rw = parseFloat(d.rect.getAttribute('width'))
+        const rh = parseFloat(d.rect.getAttribute('height'))
+        const rx = d.origBbox.x - 4 + nx
+        const ry = d.origBbox.y - 4 + ny
+        handles.forEach((handle) => {
+          const hs = parseFloat(handle.getAttribute('width'))
+          const name = handle.getAttribute('data-handle')
+          let cx, cy
+          switch (name) {
+            case 'nw': cx = rx; cy = ry; break
+            case 'ne': cx = rx + rw; cy = ry; break
+            case 'sw': cx = rx; cy = ry + rh; break
+            case 'se': cx = rx + rw; cy = ry + rh; break
+          }
+          handle.setAttribute('x', cx - hs / 2)
+          handle.setAttribute('y', cy - hs / 2)
+        })
+      }
     }
 
     const onUp = (e) => {
       if (!dragRef.current) return
-      const { svg, textEl, layerId, startSvgX, startSvgY, startOffsetX, startOffsetY } = dragRef.current
-      let nx = startOffsetX, ny = startOffsetY
-      if (e.clientX !== undefined) {
-        const pt = screenToSvg(svg, e.clientX, e.clientY)
-        nx = startOffsetX + (pt.x - startSvgX)
-        ny = startOffsetY + (pt.y - startSvgY)
-      }
-      const moved = Math.abs(nx - startOffsetX) > 3 || Math.abs(ny - startOffsetY) > 3
-      layerOffsets.current[layerId] = { x: nx, y: ny }
-      textEl.setAttribute('transform', `translate(${nx}, ${ny})`)
-      dragRef.current = null
-      setHoveredId(null)
-      if (moved) {
-        onLayerOverridesChange?.(layerId, { x_offset: nx, y_offset: ny })
+      const d = dragRef.current
+
+      if (d.mode === 'resize') {
+        // Finalize resize
+        const finalW = parseFloat(d.rect.getAttribute('width'))
+        const finalH = parseFloat(d.rect.getAttribute('height'))
+        const finalX = parseFloat(d.rect.getAttribute('x'))
+        const finalY = parseFloat(d.rect.getAttribute('y'))
+
+        layerBoxes.current[d.layerId] = { width: finalW, height: finalH }
+
+        // Update offset so that bbox + offset = finalX/finalY (for NW/SW/NE corners that shift position)
+        const pad = 6
+        const newOffsetX = finalX - (d.origBbox.x - pad)
+        const newOffsetY = finalY - (d.origBbox.y - pad)
+        layerOffsets.current[d.layerId] = { x: newOffsetX, y: newOffsetY }
+
+        const overrides = {
+          x_offset: newOffsetX,
+          y_offset: newOffsetY,
+          box_width: finalW,
+          box_height: finalH,
+        }
+
+        // For text elements, persist the computed font size
+        if (d.elType === 'text') {
+          const currentFontSize = parseFloat(d.textEl.getAttribute('font-size'))
+          overrides.font_size = currentFontSize.toFixed(1)
+          overrides.max_font_size = d.maxFontSize
+          overrides.word_wrap = d.wordWrap
+        }
+
+        onLayerOverridesChange?.(d.layerId, overrides)
+        dragRef.current = null
+        setHoveredId(null)
       } else {
-        // It was a click without meaningful drag — toggle selection
-        setSelectedId((prev) => (prev === layerId ? null : layerId))
+        // Move mode (existing behavior)
+        let nx = d.startOffsetX, ny = d.startOffsetY
+        if (e.clientX !== undefined) {
+          const pt = screenToSvg(d.svg, e.clientX, e.clientY)
+          nx = d.startOffsetX + (pt.x - d.startSvgX)
+          ny = d.startOffsetY + (pt.y - d.startSvgY)
+        }
+        const moved = Math.abs(nx - d.startOffsetX) > 3 || Math.abs(ny - d.startOffsetY) > 3
+        layerOffsets.current[d.layerId] = { x: nx, y: ny }
+        d.textEl.setAttribute('transform', `translate(${nx}, ${ny})`)
+        dragRef.current = null
+        setHoveredId(null)
+        if (moved) {
+          onLayerOverridesChange?.(d.layerId, { x_offset: nx, y_offset: ny })
+        } else {
+          setSelectedId((prev) => (prev === d.layerId ? null : d.layerId))
+        }
       }
     }
 
@@ -408,26 +704,39 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
     }
   }, [onLayerOverridesChange])
 
-  // Update overlay rect appearance when selection or outline color changes
+  // Update overlay rect appearance + show/hide resize handles when selection or outline color changes
   useEffect(() => {
     if (!ready) return
     const svg = containerRef.current?.querySelector('svg')
     if (!svg) return
     const stroke = outlineColor === 'white' ? '#ffffff' : '#dd0000'
     const fill = outlineColor === 'white' ? 'rgba(255,255,255,0.06)' : 'rgba(220,0,0,0.06)'
-    svg.querySelectorAll('#vl-interactive rect[data-layer-id]').forEach((rect) => {
+    // Selected element uses the same outline color but solid (not dashed)
+    const selectedStroke = outlineColor === 'off' ? '#dd0000' : stroke
+    const selectedFill = outlineColor === 'white' ? 'rgba(255,255,255,0.10)' : 'rgba(220,0,0,0.10)'
+    svg.querySelectorAll('#vl-interactive rect[data-layer-id]:not([data-handle])').forEach((rect) => {
       const lid = rect.getAttribute('data-layer-id')
       if (outlineColor === 'off' && lid !== selectedId) {
         rect.setAttribute('stroke', 'transparent')
         rect.setAttribute('fill', 'transparent')
       } else if (lid === selectedId) {
-        rect.setAttribute('stroke', '#0d6efd')
+        rect.setAttribute('stroke', selectedStroke)
+        rect.setAttribute('stroke-width', '3')
         rect.setAttribute('stroke-dasharray', 'none')
-        rect.setAttribute('fill', 'rgba(13,110,253,0.1)')
+        rect.setAttribute('fill', selectedFill)
       } else {
         rect.setAttribute('stroke', stroke)
-        rect.setAttribute('stroke-dasharray', '10,5')
+        rect.setAttribute('stroke-width', '1')
+        rect.setAttribute('stroke-dasharray', '6,4')
         rect.setAttribute('fill', fill)
+      }
+    })
+    // Show handles only for the selected element, matching outline color
+    svg.querySelectorAll('#vl-interactive rect[data-handle]').forEach((handle) => {
+      const lid = handle.getAttribute('data-layer-id')
+      handle.style.display = lid === selectedId ? '' : 'none'
+      if (lid === selectedId) {
+        handle.setAttribute('fill', selectedStroke)
       }
     })
   }, [selectedId, ready, outlineColor])
@@ -447,7 +756,8 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       if (svg) {
         const target = svg.getElementById(selectedId) || svg.querySelector(`[data-vl-region="${selectedId}"]`)
         if (target) target.style.display = 'none'
-        svg.querySelector(`#vl-interactive rect[data-layer-id="${selectedId}"]`)?.remove()
+        // Remove overlay rect and all resize handles for this element
+        svg.querySelectorAll(`#vl-interactive rect[data-layer-id="${selectedId}"]`).forEach((el) => el.remove())
       }
 
       deletedIds.current.add(selectedId)
@@ -492,6 +802,7 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       letter_spacing: letterSpacing || '0',
       line_height: textEl.getAttribute('line-height') || '1.3',
       text_align: ANCHOR_TO_ALIGN[anchor] || 'left',
+      word_wrap: wordWrapFlags.current[layerId] || false,
     })
   }
 
@@ -592,54 +903,65 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       }
     }
 
+    // Track word_wrap in ref so resize handles use the latest value
+    if (newStyles.word_wrap !== undefined) {
+      wordWrapFlags.current[id] = newStyles.word_wrap
+    }
+
     // Always persist overrides (for both native text and PDF regions)
     onLayerOverridesChange?.(id, newStyles)
   }
 
+  const toolbarContent = (
+    <div className="d-flex align-items-center gap-2">
+      <button
+        className={`btn btn-sm ${showGrid ? 'btn-info' : 'btn-outline-secondary'}`}
+        onClick={() => setShowGrid((g) => !g)}
+        title="Gridlines"
+      >
+        <i className="bi bi-grid-3x3" />
+      </button>
+      <div className="btn-group btn-group-sm">
+        <button
+          className={`btn ${outlineColor === 'red' ? 'btn-danger' : 'btn-outline-secondary'}`}
+          onClick={() => {
+            outlineColorRef.current = '#dd0000'
+            setOutlineColor('red')
+          }}
+          title="Red element outline"
+        >
+          Red
+        </button>
+        <button
+          className={`btn ${outlineColor === 'white' ? 'btn-light' : 'btn-outline-secondary'}`}
+          onClick={() => {
+            outlineColorRef.current = '#ffffff'
+            setOutlineColor('white')
+          }}
+          title="White element outline"
+        >
+          White
+        </button>
+        <button
+          className={`btn ${outlineColor === 'off' ? 'btn-dark' : 'btn-outline-secondary'}`}
+          onClick={() => {
+            outlineColorRef.current = 'transparent'
+            setOutlineColor('off')
+          }}
+          title="Hide element outline"
+        >
+          Off
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div>
-      {/* Editor toolbar: grid toggle + outline color toggle — above the image */}
-      <div className="d-flex align-items-center justify-content-end gap-2 mb-1">
-        <button
-          className={`btn btn-sm ${showGrid ? 'btn-info' : 'btn-outline-secondary'}`}
-          title="Toggle gridlines"
-          onClick={() => setShowGrid((g) => !g)}
-        >
-          <i className="bi bi-grid-3x3" />
-        </button>
-        <div className="d-flex align-items-center gap-1">
-          <small className="text-muted text-nowrap">Element outline:</small>
-          <div className="btn-group btn-group-sm">
-            <button
-              className={`btn ${outlineColor === 'red' ? 'btn-danger' : 'btn-outline-secondary'}`}
-              onClick={() => {
-                outlineColorRef.current = '#dd0000'
-                setOutlineColor('red')
-              }}
-            >
-              Red
-            </button>
-            <button
-              className={`btn ${outlineColor === 'white' ? 'btn-light' : 'btn-outline-secondary'}`}
-              onClick={() => {
-                outlineColorRef.current = '#ffffff'
-                setOutlineColor('white')
-              }}
-            >
-              White
-            </button>
-            <button
-              className={`btn ${outlineColor === 'off' ? 'btn-dark' : 'btn-outline-secondary'}`}
-              onClick={() => {
-                outlineColorRef.current = 'transparent'
-                setOutlineColor('off')
-              }}
-            >
-              Off
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Render toolbar: externally via renderToolbar prop, or inline above the image */}
+      {renderToolbar ? renderToolbar(toolbarContent) : (
+        <div className="d-flex justify-content-end mb-1">{toolbarContent}</div>
+      )}
 
       <div
         style={{ position: 'relative', maxWidth: '100%', lineHeight: 0 }}
@@ -764,6 +1086,7 @@ function LayerStyleEditor({ layer, clickPos, onChange, onClose }) {
     letter_spacing: layer.letter_spacing || '0',
     line_height: layer.line_height || '1.3',
     text_align: layer.text_align || 'left',
+    word_wrap: layer.word_wrap || false,
   })
   const [form, setForm] = useState(formRef.current)
 
@@ -951,6 +1274,22 @@ function LayerStyleEditor({ layer, clickPos, onChange, onClose }) {
                 <i className={`bi ${icon}`}></i>
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Word Wrap */}
+        <div className="mb-3">
+          <div className="form-check form-switch">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id="wordWrapToggle"
+              checked={form.word_wrap}
+              onChange={() => toggle('word_wrap')}
+            />
+            <label className="form-check-label text-uppercase text-muted fw-semibold" htmlFor="wordWrapToggle" style={{ fontSize: '0.68rem', letterSpacing: '0.08em' }}>
+              Word Wrap
+            </label>
           </div>
         </div>
 

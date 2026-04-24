@@ -70,6 +70,11 @@ class Api::EmailsController < Api::BaseController
       return render json: { error: "Email must be in setup state to run" }, status: :unprocessable_entity
     end
 
+    # Apply account AI defaults when customer doesn't choose
+    unless @current_account.customer_chooses_ai?
+      @email.update!(ai_service_id: @current_account.ai_service_id, ai_model_id: @current_account.ai_model_id)
+    end
+
     unless @email.ai_service_id.present? && @email.ai_model_id.present?
       return render json: { error: "Email must have an AI service and model selected" }, status: :unprocessable_entity
     end

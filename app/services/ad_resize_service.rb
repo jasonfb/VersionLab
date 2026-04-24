@@ -26,21 +26,22 @@ class AdResizeService
   # Destroy and rebuild a single existing resize, preserving its dimensions
   # and platform_labels. Used when the user changes layer classifications and
   # wants the layout re-flowed without regenerating every size.
-  def self.rebuild(resize)
+  def self.rebuild(resize, layout_variant: nil)
     ad = resize.ad
     width = resize.width
     height = resize.height
     labels = resize.platform_labels
+    variant = layout_variant || resize.layout_variant || "center"
     resize.destroy!
 
     engine = AdLayout::LayoutEngine.new(ad)
-    new(ad, platforms: {}).send(:build_resize, engine, width, height, labels)
+    new(ad, platforms: {}).send(:build_resize, engine, width, height, labels, layout_variant: variant)
   end
 
   private
 
-  def build_resize(engine, width, height, labels)
-    layout_result = engine.compute_layout(width, height)
+  def build_resize(engine, width, height, labels, layout_variant: "center")
+    layout_result = engine.compute_layout(width, height, layout_variant: layout_variant)
 
     resize = @ad.ad_resizes.create!(
       platform_labels: labels,
@@ -48,6 +49,7 @@ class AdResizeService
       height: height,
       aspect_ratio: compute_aspect_ratio(width, height),
       state: :pending,
+      layout_variant: layout_variant,
       resized_layers: layout_result.layers
     )
 

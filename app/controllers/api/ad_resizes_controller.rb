@@ -20,6 +20,20 @@ class Api::AdResizesController < Api::BaseController
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  # Switch the layout variant (left/center/right) and regenerate the resize.
+  def switch_variant
+    variant = params[:layout_variant]
+    unless AdResize::LAYOUT_VARIANTS.include?(variant)
+      return render json: { error: "Invalid variant. Must be one of: #{AdResize::LAYOUT_VARIANTS.join(', ')}" },
+                    status: :unprocessable_entity
+    end
+
+    new_resize = AdResizeService.rebuild(@resize, layout_variant: variant)
+    render json: resize_json(new_resize)
+  rescue AdResizeService::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   private
 
   def set_client
@@ -44,6 +58,7 @@ class Api::AdResizesController < Api::BaseController
       aspect_ratio: resize.aspect_ratio,
       dimensions: resize.dimensions,
       state: resize.state,
+      layout_variant: resize.layout_variant,
       resized_layers: resize.resized_layers,
       layer_overrides: resize.layer_overrides,
       preview_image_url: resize.preview_image.attached? ?

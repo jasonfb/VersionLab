@@ -56,6 +56,8 @@ export default function AdEdit() {
   const [resizes, setResizes] = useState([])
   const [resizing, setResizing] = useState(false)
   const [editingResize, setEditingResize] = useState(null)
+  const [switchingVariant, setSwitchingVariant] = useState(false)
+  const toolbarPortalRef = useRef(null)
   const [stylePreviewResizeId, setStylePreviewResizeId] = useState(null) // null = original, or resize ID
   const [assetPickerOpen, setAssetPickerOpen] = useState(false)
   const [styleEditingLayer, setStyleEditingLayer] = useState(null) // layer being edited in style step
@@ -254,6 +256,23 @@ export default function AdEdit() {
       alert(e.message || 'Failed to rebuild resize')
       // Restore prior state on failure
       setResizes((prev) => prev.map((r) => r.id === resize.id ? resize : r))
+    }
+  }
+
+  const handleSwitchVariant = async (resize, variant) => {
+    if (variant === resize.layout_variant) return
+    setSwitchingVariant(true)
+    try {
+      const rebuilt = await apiFetch(
+        `/api/clients/${clientId}/ads/${adId}/ad_resizes/${resize.id}/switch_variant`,
+        { method: 'POST', body: JSON.stringify({ layout_variant: variant }) }
+      )
+      setResizes((prev) => prev.map((r) => r.id === resize.id ? rebuilt : r))
+      if (editingResize?.id === resize.id) setEditingResize(rebuilt)
+    } catch (e) {
+      alert(e.message || 'Failed to switch layout variant')
+    } finally {
+      setSwitchingVariant(false)
     }
   }
 
@@ -913,36 +932,38 @@ export default function AdEdit() {
                     )}
                   </div>
 
-                  {/* AI Service / Model */}
-                  <div className="row mb-3">
-                    <div className="col-6">
-                      <label className="form-label fw-semibold small">AI Service</label>
-                      <select
-                        className="form-select form-select-sm"
-                        value={form.ai_service_id}
-                        onChange={(e) => setForm({ ...form, ai_service_id: e.target.value, ai_model_id: '' })}
-                      >
-                        <option value="">None</option>
-                        {aiServices.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
+                  {/* AI Service / Model — only shown when customer chooses AI */}
+                  {ctx?.customer_chooses_ai !== false && (
+                    <div className="row mb-3">
+                      <div className="col-6">
+                        <label className="form-label fw-semibold small">AI Service</label>
+                        <select
+                          className="form-select form-select-sm"
+                          value={form.ai_service_id}
+                          onChange={(e) => setForm({ ...form, ai_service_id: e.target.value, ai_model_id: '' })}
+                        >
+                          <option value="">None</option>
+                          {aiServices.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-6">
+                        <label className="form-label fw-semibold small">AI Model</label>
+                        <select
+                          className="form-select form-select-sm"
+                          value={form.ai_model_id}
+                          onChange={(e) => setForm({ ...form, ai_model_id: e.target.value })}
+                          disabled={!form.ai_service_id}
+                        >
+                          <option value="">Select a model…</option>
+                          {modelsForService(form.ai_service_id).map((m) => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <div className="col-6">
-                      <label className="form-label fw-semibold small">AI Model</label>
-                      <select
-                        className="form-select form-select-sm"
-                        value={form.ai_model_id}
-                        onChange={(e) => setForm({ ...form, ai_model_id: e.target.value })}
-                        disabled={!form.ai_service_id}
-                      >
-                        <option value="">Select a model…</option>
-                        {modelsForService(form.ai_service_id).map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                  )}
                 </>
               )}
 
@@ -955,10 +976,10 @@ export default function AdEdit() {
                   <button
                     className="btn btn-danger btn-sm"
                     onClick={runAd}
-                    disabled={running || !form.ai_service_id || !form.ai_model_id || form.audience_ids.length === 0}
+                    disabled={running || (ctx?.customer_chooses_ai !== false && (!form.ai_service_id || !form.ai_model_id)) || form.audience_ids.length === 0}
                     title={
-                      !form.ai_service_id ? 'Select an AI service'
-                      : !form.ai_model_id ? 'Select an AI model'
+                      (ctx?.customer_chooses_ai !== false && !form.ai_service_id) ? 'Select an AI service'
+                      : (ctx?.customer_chooses_ai !== false && !form.ai_model_id) ? 'Select an AI model'
                       : form.audience_ids.length === 0 ? 'Select at least one audience'
                       : undefined
                     }
@@ -1045,12 +1066,49 @@ export default function AdEdit() {
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={(e) => { if (e.target === e.currentTarget) setEditingResize(null) }}>
           <div className="modal-dialog modal-xl modal-dialog-centered">
             <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  Edit Resize — {editingResize.dimensions}
-                  <small className="text-muted ms-2">{editingResize.label}</small>
-                </h5>
+              <div className="modal-header py-2">
+                <h6 className="modal-title mb-0">
+                  {editingResize.dimensions}
+                  <small className="text-muted ms-1">{editingResize.label}</small>
+                </h6>
                 <button type="button" className="btn-close" onClick={() => setEditingResize(null)} />
+              </div>
+              <div className="d-flex align-items-center gap-2 flex-nowrap px-3 py-1 border-bottom bg-light" style={{ fontSize: '0.82rem' }}>
+                <button
+                  className="btn btn-outline-secondary btn-sm"
+                  onClick={() => handleRebuildResize(editingResize)}
+                  disabled={editingResize.state === 'pending' || switchingVariant}
+                  title="Discard all edits and restore the original heuristic layout"
+                >
+                  {editingResize.state === 'pending' ? (
+                    <><span className="spinner-border spinner-border-sm me-1" />Restoring…</>
+                  ) : (
+                    <><i className="bi bi-arrow-counterclockwise me-1"></i>Restore Layout</>
+                  )}
+                </button>
+                <div className="d-flex align-items-center gap-1">
+                  <small className="text-muted text-nowrap">Base layout:</small>
+                  <div className="btn-group btn-group-sm">
+                    {['left', 'center', 'right'].map((v) => (
+                      <button
+                        key={v}
+                        className={`btn ${editingResize.layout_variant === v ? 'btn-dark' : 'btn-outline-secondary'}`}
+                        onClick={() => handleSwitchVariant(editingResize, v)}
+                        disabled={switchingVariant || editingResize.state === 'pending'}
+                      >
+                        {switchingVariant && editingResize.layout_variant !== v ? (
+                          <span className="spinner-border spinner-border-sm" />
+                        ) : (
+                          <i className={`bi bi-text-${v}`} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div ref={toolbarPortalRef}></div>
+                <button type="button" className="btn btn-secondary btn-sm ms-auto" onClick={() => setEditingResize(null)}>
+                  Done
+                </button>
               </div>
               <div className="modal-body">
                 {editingResize.resized_svg_url ? (
@@ -1061,6 +1119,7 @@ export default function AdEdit() {
                     classifiedLayers={editingResize.resized_layers}
                     onLayerOverridesChange={handleResizeOverridesChange}
                     initialOverrides={editingResize.layer_overrides || {}}
+                    renderToolbar={(toolbar) => toolbarPortalRef.current ? ReactDOM.createPortal(toolbar, toolbarPortalRef.current) : null}
                   />
                 ) : (
                   <div className="text-center text-muted py-5">
@@ -1068,26 +1127,6 @@ export default function AdEdit() {
                     <small>No SVG available for this resize</small>
                   </div>
                 )}
-              </div>
-              <div className="modal-footer justify-content-between">
-                <div>
-                  <button
-                    className="btn btn-outline-secondary btn-sm"
-                    onClick={() => handleRebuildResize(editingResize)}
-                    disabled={editingResize.state === 'pending'}
-                    title="Discard all edits and restore the original heuristic layout"
-                  >
-                    {editingResize.state === 'pending' ? (
-                      <><span className="spinner-border spinner-border-sm me-1" />Restoring…</>
-                    ) : (
-                      <><i className="bi bi-arrow-counterclockwise me-1"></i>Restore Layout</>
-                    )}
-                  </button>
-                  <small className="text-muted ms-2">Discards all edits for this size</small>
-                </div>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingResize(null)}>
-                  Done
-                </button>
               </div>
             </div>
           </div>

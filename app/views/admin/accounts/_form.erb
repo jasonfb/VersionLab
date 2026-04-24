@@ -1,34 +1,34 @@
 <div class="row">
-  <div class='col-md-2 cell--account--name' >  
+  <div class='col-md-2 cell--account--name' >
     <div class='<%= "alert alert-danger" if account.errors.details.keys.include?(:name) %>'  >
         <%= f.text_field :name, value: account.name, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
-       
-      
+
+
       <label class='text-muted small form-text' for=''>Name</label>
     </div>
-   
+
   </div>
-  <div class='col-md-2 cell--account--is_agency' >  
+  <div class='col-md-2 cell--account--is_agency' >
     <div class='<%= "alert alert-danger" if account.errors.details.keys.include?(:is_agency) %>'  >
       <span class='form-check '>
         <%= f.radio_button(:is_agency, '0', checked: account.is_agency  ? '' : 'checked', class: 'form-check-input') %>
         <%= f.label(:is_agency, value: 'No', for: 'account_is_agency_0') %>
        <br /> <%= f.radio_button(:is_agency, '1',  checked: account.is_agency  ? 'checked' : '' , class: 'form-check-input') %>
         <%= f.label(:is_agency, value: 'Yes', for: 'account_is_agency_1') %>
-      </span> 
-      
+      </span>
+
       <label class='text-muted small form-text form-check-label' for='account_is_agency'>Is agency</label>
     </div>
-   
+
   </div>
-  <div class='col-md-2 cell--account--stripe_customer_id' >  
+  <div class='col-md-2 cell--account--stripe_customer_id' >
     <div class='<%= "alert alert-danger" if account.errors.details.keys.include?(:stripe_customer_id) %>'  >
         <%= f.text_field :stripe_customer_id, value: account.stripe_customer_id, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
-       
-      
+
+
       <label class='text-muted small form-text' for=''>Stripe customer</label>
     </div>
-   
+
   </div>
 
   <div class="col-md-2">
@@ -36,3 +36,87 @@
     <%= f.submit "Save", class: "btn btn-primary pull-right" %>
   </div>
 </div>
+
+<div class="row mt-3">
+  <div class='col-md-2 cell--account--customer_chooses_ai'>
+    <div class='<%= "alert alert-danger" if account.errors.details.keys.include?(:customer_chooses_ai) %>'>
+      <span class='form-check'>
+        <%= f.radio_button(:customer_chooses_ai, '1', checked: account.customer_chooses_ai ? 'checked' : '', class: 'form-check-input', id: 'account_customer_chooses_ai_1', data: { ai_toggle: 'true' }) %>
+        <%= f.label(:customer_chooses_ai, 'Yes', for: 'account_customer_chooses_ai_1') %>
+        <br />
+        <%= f.radio_button(:customer_chooses_ai, '0', checked: account.customer_chooses_ai ? '' : 'checked', class: 'form-check-input', id: 'account_customer_chooses_ai_0', data: { ai_toggle: 'true' }) %>
+        <%= f.label(:customer_chooses_ai, 'No', for: 'account_customer_chooses_ai_0') %>
+      </span>
+      <label class='text-muted small form-text form-check-label'>Customer chooses AI</label>
+    </div>
+  </div>
+
+  <div class='col-md-2 cell--account--ai_service_id' id="ai-service-field" style="<%= 'display:none;' if account.customer_chooses_ai? %>">
+    <div class='<%= "alert alert-danger" if account.errors.details.keys.include?(:ai_service_id) %>'>
+      <%= f.select :ai_service_id,
+            options_from_collection_for_select(@ai_services, :id, :name, account.ai_service_id),
+            { include_blank: "-- Select service --" },
+            { class: 'form-select', id: 'account_ai_service_id' } %>
+      <label class='text-muted small form-text'>AI Service</label>
+    </div>
+  </div>
+
+  <div class='col-md-2 cell--account--ai_model_id' id="ai-model-field" style="<%= 'display:none;' if account.customer_chooses_ai? %>">
+    <div class='<%= "alert alert-danger" if account.errors.details.keys.include?(:ai_model_id) %>'>
+      <%= f.select :ai_model_id,
+            account.ai_service ? options_from_collection_for_select(account.ai_service.ai_models.where(for_text: true).order(:name), :id, :name, account.ai_model_id) : [],
+            { include_blank: "-- Select model --" },
+            { class: 'form-select', id: 'account_ai_model_id', disabled: account.ai_service_id.blank? } %>
+      <label class='text-muted small form-text'>AI Model</label>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    var serviceSelect = document.getElementById('account_ai_service_id');
+    var modelSelect = document.getElementById('account_ai_model_id');
+    var serviceField = document.getElementById('ai-service-field');
+    var modelField = document.getElementById('ai-model-field');
+    var toggleRadios = document.querySelectorAll('[data-ai-toggle]');
+
+    // Toggle visibility of service/model fields based on customer_chooses_ai
+    toggleRadios.forEach(function(radio) {
+      radio.addEventListener('change', function() {
+        var customerChooses = document.getElementById('account_customer_chooses_ai_1').checked;
+        serviceField.style.display = customerChooses ? 'none' : '';
+        modelField.style.display = customerChooses ? 'none' : '';
+        if (customerChooses) {
+          serviceSelect.value = '';
+          modelSelect.innerHTML = '<option value="">-- Select model --</option>';
+          modelSelect.disabled = true;
+        }
+      });
+    });
+
+    // Dependent dropdown: fetch models when service changes
+    if (serviceSelect) {
+      serviceSelect.addEventListener('change', function() {
+        var serviceId = this.value;
+        modelSelect.innerHTML = '<option value="">-- Select model --</option>';
+        modelSelect.disabled = true;
+
+        if (!serviceId) return;
+
+        fetch('/admin/accounts/ai_models?ai_service_id=' + encodeURIComponent(serviceId), {
+          headers: { 'Accept': 'application/json' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(models) {
+          models.forEach(function(m) {
+            var opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.name;
+            modelSelect.appendChild(opt);
+          });
+          modelSelect.disabled = false;
+        });
+      });
+    }
+  })();
+</script>

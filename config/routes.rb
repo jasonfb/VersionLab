@@ -69,6 +69,7 @@ Rails.application.routes.draw do
         resources :ad_resizes, only: [ :update ], controller: "ad_resizes" do
           member do
             post :rebuild
+            post :switch_variant
           end
         end
       end
@@ -107,6 +108,9 @@ Rails.application.routes.draw do
     resources :users
 
     resources :accounts do
+      collection do
+        get :ai_models
+      end
       resources :account_users
     end
     resources :subscription_tiers

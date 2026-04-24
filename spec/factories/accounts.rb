@@ -17,5 +17,6 @@
 FactoryBot.define do
   factory :account do
     name { "MyString" }
+    customer_chooses_ai { true }
   end
 end

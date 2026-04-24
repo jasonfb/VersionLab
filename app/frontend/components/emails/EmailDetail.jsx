@@ -157,7 +157,8 @@ export default function EmailDetail() {
   const isRunning = email.state === 'pending' || email.state === 'regenerating'
   const hasResults = email.state === 'merged' || email.state === 'regenerating'
   const isSetup = email.state === 'setup'
-  const canRun = isSetup && form.ai_service_id && form.ai_model_id && form.audience_ids?.length > 0
+  const aiResolved = ctx?.customer_chooses_ai === false || (form.ai_service_id && form.ai_model_id)
+  const canRun = isSetup && aiResolved && form.audience_ids?.length > 0
   const runBlockedReason = isSetup && !canRun
     ? (!form.audience_ids?.length ? 'Add an audience to run'
       : !form.ai_service_id ? 'Select an AI service to run'
@@ -231,36 +232,38 @@ export default function EmailDetail() {
         )}
       </div>
 
-      {/* AI Service / Model */}
-      <div className="row mb-3">
-        <div className="col-6">
-          <label className="form-label fw-semibold">AI Service</label>
-          <select
-            className="form-select"
-            value={form.ai_service_id}
-            onChange={(e) => setForm({ ...form, ai_service_id: e.target.value, ai_model_id: '' })}
-          >
-            <option value="">None</option>
-            {aiServices.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+      {/* AI Service / Model — only shown when customer chooses AI */}
+      {ctx?.customer_chooses_ai !== false && (
+        <div className="row mb-3">
+          <div className="col-6">
+            <label className="form-label fw-semibold">AI Service</label>
+            <select
+              className="form-select"
+              value={form.ai_service_id}
+              onChange={(e) => setForm({ ...form, ai_service_id: e.target.value, ai_model_id: '' })}
+            >
+              <option value="">None</option>
+              {aiServices.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="col-6">
+            <label className="form-label fw-semibold">AI Model</label>
+            <select
+              className="form-select"
+              value={form.ai_model_id}
+              onChange={(e) => setForm({ ...form, ai_model_id: e.target.value })}
+              disabled={!form.ai_service_id}
+            >
+              <option value="">Select a model…</option>
+              {modelsForService(form.ai_service_id).map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="col-6">
-          <label className="form-label fw-semibold">AI Model</label>
-          <select
-            className="form-select"
-            value={form.ai_model_id}
-            onChange={(e) => setForm({ ...form, ai_model_id: e.target.value })}
-            disabled={!form.ai_service_id}
-          >
-            <option value="">Select a model…</option>
-            {modelsForService(form.ai_service_id).map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      )}
 
       {/* Campaign */}
       <div className="mb-3">

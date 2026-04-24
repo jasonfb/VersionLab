@@ -33,8 +33,11 @@ class AdResize < ApplicationRecord
 
   enum :state, { pending: "pending", resized: "resized", failed: "failed" }
 
+  LAYOUT_VARIANTS = %w[left center right].freeze
+
   validates :width, :height, presence: true, numericality: { greater_than: 0 }
   validates :platform_labels, presence: true
+  validates :layout_variant, inclusion: { in: LAYOUT_VARIANTS }
 
   def label
     platform_labels.map { |pl| "#{pl['platform']} #{pl['size_name']}" }.join(", ")
