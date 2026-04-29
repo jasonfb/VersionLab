@@ -32,17 +32,19 @@ class AdResizeService
     width = resize.width
     height = resize.height
     labels = resize.platform_labels
+    shape_override = resize.ad_shape&.name&.to_sym
     variant = layout_variant || resize.layout_variant || "center"
     resize.destroy!
 
     engine = AdLayout::LayoutEngine.new(ad)
-    new(ad, platforms: {}).send(:build_resize, engine, width, height, labels, layout_variant: variant)
+    new(ad, platforms: {}).send(:build_resize, engine, width, height, labels, layout_variant: variant, ad_shape: resize.ad_shape)
   end
 
   private
 
-  def build_resize(engine, width, height, labels, layout_variant: "center")
-    layout_result = engine.compute_layout(width, height, layout_variant: layout_variant)
+  def build_resize(engine, width, height, labels, layout_variant: "center", ad_shape: nil)
+    shape_override = ad_shape&.name&.to_sym
+    layout_result = engine.compute_layout(width, height, layout_variant: layout_variant, shape_override: shape_override)
 
     resize = @ad.ad_resizes.create!(
       platform_labels: labels,
@@ -51,7 +53,8 @@ class AdResizeService
       aspect_ratio: compute_aspect_ratio(width, height),
       state: :pending,
       layout_variant: layout_variant,
-      resized_layers: layout_result.layers
+      resized_layers: layout_result.layers,
+      ad_shape: ad_shape
     )
 
     generate_resized_svg(resize, layout_result)

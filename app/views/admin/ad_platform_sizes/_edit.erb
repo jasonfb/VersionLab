@@ -1,0 +1,18 @@
+<%= turbo_frame_tag "admin__#{dom_id(ad_platform_size)}" do  %>
+<div class="cell editable" style="position: relative;">
+  <% if ad_platform_size.errors.any? %>
+  <%= render(partial: "admin/errors", locals: {resource: ad_platform_size }) %>
+  <% end %>
+  <h2>Editing <%= ad_platform_size.name %></h2>
+  <%= form_with model: ad_platform_size,
+   url: admin_ad_platform_ad_platform_size_path(ad_platform,ad_platform_size) do |f| %>
+    <%=  render partial: "admin/ad_platform_sizes/form", locals: {
+      ad_platform_size: ad_platform_size,
+      f: f,
+      ad_platform: ad_platform
+  } %>
+  
+  <% end %>
+  
+</div>
+<% end %>

@@ -1,0 +1,16 @@
+<%= turbo_frame_tag "admin__ad_platform-new" do %>
+  <h3>
+    New Ad Platform
+  </h3>
+  <%= form_with model:  ad_platform,
+         url: admin_ad_platforms_path, method: :post do  |f| %>
+  <%=  render partial: "admin/ad_platforms/form", locals: {
+    ad_platform: ad_platform,
+    f: f,
+    
+} %>
+
+
+<% end %>
+
+<% end %>

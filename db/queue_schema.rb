@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_24_223920) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_27_232350) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -109,8 +109,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_223920) do
     t.index ["ad_id"], name: "index_ad_fonts_on_ad_id"
   end
 
+  create_table "ad_platform_sizes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ad_platform_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "height", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.integer "width", null: false
+    t.index ["ad_platform_id", "name"], name: "index_ad_platform_sizes_on_ad_platform_id_and_name", unique: true
+    t.index ["ad_platform_id"], name: "index_ad_platform_sizes_on_ad_platform_id"
+  end
+
+  create_table "ad_platforms", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_ad_platforms_on_name", unique: true
+    t.index ["position"], name: "index_ad_platforms_on_position"
+  end
+
   create_table "ad_resizes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "ad_id", null: false
+    t.uuid "ad_shape_id"
     t.string "aspect_ratio"
     t.datetime "created_at", null: false
     t.integer "height", null: false
@@ -123,6 +145,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_223920) do
     t.integer "width", null: false
     t.index ["ad_id", "width", "height"], name: "index_ad_resizes_on_ad_id_and_width_and_height", unique: true
     t.index ["ad_id"], name: "index_ad_resizes_on_ad_id"
+    t.index ["ad_shape_id"], name: "index_ad_resizes_on_ad_shape_id"
+  end
+
+  create_table "ad_shape_layout_rules", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ad_shape_id", null: false
+    t.string "align"
+    t.float "anchor_h"
+    t.float "anchor_w"
+    t.float "anchor_x"
+    t.float "anchor_y"
+    t.datetime "created_at", null: false
+    t.boolean "drop", default: false, null: false
+    t.float "font_scale"
+    t.integer "position", default: 0, null: false
+    t.string "role", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ad_shape_id", "role"], name: "index_ad_shape_layout_rules_on_ad_shape_id_and_role", unique: true
+    t.index ["ad_shape_id"], name: "index_ad_shape_layout_rules_on_ad_shape_id"
+  end
+
+  create_table "ad_shapes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.float "max_ratio", null: false
+    t.float "min_ratio", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_ad_shapes_on_name", unique: true
+    t.index ["position"], name: "index_ad_shapes_on_position"
   end
 
   create_table "ad_versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -367,6 +418,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_223920) do
     t.boolean "hidden", default: false, null: false
     t.string "name", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "custom_ad_sizes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ad_shape_id"
+    t.uuid "client_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "height", null: false
+    t.string "label", null: false
+    t.datetime "updated_at", null: false
+    t.integer "width", null: false
+    t.index ["ad_shape_id"], name: "index_custom_ad_sizes_on_ad_shape_id"
+    t.index ["client_id", "width", "height"], name: "index_custom_ad_sizes_on_client_id_and_width_and_height", unique: true
+    t.index ["client_id"], name: "index_custom_ad_sizes_on_client_id"
   end
 
   create_table "data_migrations", id: false, force: :cascade do |t|
@@ -797,7 +861,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_223920) do
   add_foreign_key "ad_audiences", "ads"
   add_foreign_key "ad_audiences", "audiences"
   add_foreign_key "ad_fonts", "ads"
+  add_foreign_key "ad_platform_sizes", "ad_platforms"
+  add_foreign_key "ad_resizes", "ad_shapes"
   add_foreign_key "ad_resizes", "ads"
+  add_foreign_key "ad_shape_layout_rules", "ad_shapes"
   add_foreign_key "ad_versions", "ad_resizes"
   add_foreign_key "ad_versions", "ads"
   add_foreign_key "ad_versions", "audiences"
@@ -818,6 +885,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_223920) do
   add_foreign_key "campaign_documents", "campaigns"
   add_foreign_key "campaign_links", "campaigns"
   add_foreign_key "campaigns", "clients"
+  add_foreign_key "custom_ad_sizes", "ad_shapes"
+  add_foreign_key "custom_ad_sizes", "clients"
   add_foreign_key "email_documents", "emails"
   add_foreign_key "emails", "campaigns"
   add_foreign_key "emails", "clients"

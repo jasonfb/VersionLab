@@ -1,0 +1,18 @@
+<%= turbo_frame_tag "admin__#{dom_id(ad_shape_layout_rule)}" do  %>
+<div class="cell editable" style="position: relative;">
+  <% if ad_shape_layout_rule.errors.any? %>
+  <%= render(partial: "admin/errors", locals: {resource: ad_shape_layout_rule }) %>
+  <% end %>
+  <h2>Editing <%= ad_shape_layout_rule.to_label %></h2>
+  <%= form_with model: ad_shape_layout_rule,
+   url: admin_ad_shape_ad_shape_layout_rule_path(ad_shape, ad_shape_layout_rule) do |f| %>
+    <%=  render partial: "admin/ad_shape_layout_rules/form", locals: {
+      ad_shape_layout_rule: ad_shape_layout_rule,
+      f: f,
+      ad_shape: ad_shape
+  } %>
+
+  <% end %>
+
+</div>
+<% end %>

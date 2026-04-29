@@ -1,0 +1,43 @@
+<div class="row">
+  <div class='col-md-2 cell--ad_shape--name' >  
+    <div class='<%= "alert alert-danger" if ad_shape.errors.details.keys.include?(:name) %>'  >
+        <%= f.text_field :name, value: ad_shape.name, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Name</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--ad_shape--min_ratio' >  
+    <div class='<%= "alert alert-danger" if ad_shape.errors.details.keys.include?(:min_ratio) %>'  >
+        <%= f.text_field :min_ratio, value: ad_shape.min_ratio, autocomplete: 'off', size: 5, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Min ratio</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--ad_shape--max_ratio' >  
+    <div class='<%= "alert alert-danger" if ad_shape.errors.details.keys.include?(:max_ratio) %>'  >
+        <%= f.text_field :max_ratio, value: ad_shape.max_ratio, autocomplete: 'off', size: 5, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Max ratio</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--ad_shape--position' >  
+    <div class='<%= "alert alert-danger" if ad_shape.errors.details.keys.include?(:position) %>'  >
+        <%= f.text_field :position, value: ad_shape.position, autocomplete: 'off', size: 4, class: 'form-control', type: 'number' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Position</label>
+    </div>
+   
+  </div>
+
+  <div class="col-md-2">
+    <%= link_to "Cancel", admin_ad_shapes_path + (params[:page] ? "?page=" + params[:page] : ""),  {class: "btn btn-secondary"} %>
+    <%= f.submit "Save", class: "btn btn-primary pull-right" %>
+  </div>
+</div>

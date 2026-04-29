@@ -50,6 +50,7 @@ export default function AdEdit() {
   const [step, setStepRaw] = useState(STEP_FROM_NAME[stepParam] || 1)
   const setStep = (n) => {
     setStepRaw(n)
+    if (n === 4) setHasVisitedStep4(true)
     setSearchParams({ step: STEP_NAMES[n] || 'classify' }, { replace: true })
   }
   const [selectedPlatforms, setSelectedPlatforms] = useState({})
@@ -62,6 +63,11 @@ export default function AdEdit() {
   const [stylePreviewResizeId, setStylePreviewResizeId] = useState(null) // null = original, or resize ID
   const [assetPickerOpen, setAssetPickerOpen] = useState(false)
   const [styleEditingLayer, setStyleEditingLayer] = useState(null) // layer being edited in style step
+  const [styleEditorOpen, setStyleEditorOpen] = useState(false) // opens InteractiveSvgEditor modal on Style step
+  const styleToolbarRef = useRef(null)
+  const [hasVisitedStep4, setHasVisitedStep4] = useState(false) // tracks if step 3 was completed (user reached step 4)
+  const [versionResults, setVersionResults] = useState(null) // fetched results after merge
+  const [versionAudienceId, setVersionAudienceId] = useState('all') // audience filter on Version tab
 
   useEffect(() => {
     if (!clientId || !adId) return
@@ -167,9 +173,23 @@ export default function AdEdit() {
         if (data.error) {
           setJobError(data.error)
         }
+        // Auto-fetch results when merge completes
+        if (data.state === 'merged') {
+          apiFetch(`/api/clients/${clientId}/ads/${adId}/results`)
+            .then(setVersionResults)
+            .catch(() => {})
+        }
       },
     })
   }, [adId])
+
+  // Fetch version results if ad is already merged
+  useEffect(() => {
+    if (!ad || ad.state !== 'merged') return
+    apiFetch(`/api/clients/${clientId}/ads/${adId}/results`)
+      .then(setVersionResults)
+      .catch(() => {})
+  }, [ad?.state])
 
   // ---- Actions ----
 
@@ -242,6 +262,15 @@ export default function AdEdit() {
 
   const handleContinueToVersioning = () => {
     save().then(() => setStep(4))
+  }
+
+  const handleStepClick = (targetStep) => {
+    if (targetStep === step) return
+    // Warn when leaving step 4 if versioning is in progress
+    if (step === 4 && (ad.state === 'merged' || ad.state === 'regenerating')) {
+      if (!confirm('Going back will discard all generated versions. Continue?')) return
+    }
+    setStep(targetStep)
   }
 
   const handleBackToClassify = () => {
@@ -422,13 +451,17 @@ export default function AdEdit() {
 
       {/* Step indicator */}
       <div className="d-flex align-items-center gap-3 mb-4">
-        <StepIndicator number={1} label="Classify" active={step === 1} completed={step > 1} />
+        <StepIndicator number={1} label="Classify" active={step === 1} completed={step > 1}
+          clickable={true} onClick={() => handleStepClick(1)} />
         <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
-        <StepIndicator number={2} label="Resize" active={step === 2} completed={step > 2 && resizes.length > 0} />
+        <StepIndicator number={2} label="Resize" active={step === 2} completed={step > 2 && resizes.length > 0}
+          clickable={!!ad.classifications_confirmed} onClick={() => handleStepClick(2)} />
         <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
-        <StepIndicator number={3} label="Style" active={step === 3} completed={step > 3} />
+        <StepIndicator number={3} label="Style" active={step === 3} completed={step > 3}
+          clickable={!!ad.classifications_confirmed} onClick={() => handleStepClick(3)} />
         <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
-        <StepIndicator number={4} label="Version" active={step === 4} />
+        <StepIndicator number={4} label="Version" active={step === 4}
+          clickable={hasVisitedStep4} onClick={() => handleStepClick(4)} />
         {step === 4 && resizes.length > 0 && (
           <small className="text-muted ms-2">
             Versioning {resizeCount} size{resizeCount !== 1 ? 's' : ''}
@@ -769,7 +802,9 @@ export default function AdEdit() {
                       {/* Preview container with background + SVG overlay */}
                       <div
                         className="position-relative rounded overflow-hidden border"
-                        style={{ maxWidth: '100%', aspectRatio: `${previewW} / ${previewH}`, maxHeight: 600, background: '#1a1a1a' }}
+                        style={{ maxWidth: '100%', aspectRatio: `${previewW} / ${previewH}`, maxHeight: 600, background: '#1a1a1a', cursor: 'pointer' }}
+                        onClick={() => setStyleEditorOpen(true)}
+                        title="Click to edit"
                       >
                         {/* Background layer */}
                         {form.background_type === 'image' && bgAssetUrl ? (
@@ -795,11 +830,7 @@ export default function AdEdit() {
                             layers={activeResize ? activeResize.resized_layers : (ad.classified_layers || ad.parsed_layers)}
                             fonts={ad.fonts}
                             layerOverrides={activeResize ? activeResize.layer_overrides : layerOverrides}
-                            onLayerOverridesChange={activeResize
-                              ? (layerId, overrides) => handleResizeOverridesChange(layerId, overrides, activeResize.id)
-                              : handleLayerOverride
-                            }
-                            onEditLayer={(layer) => setStyleEditingLayer(layer)}
+                            showOutlines={false}
                           />
                         </div>
 
@@ -829,29 +860,80 @@ export default function AdEdit() {
         </>
       )}
 
-      {/* Style step inline text editor */}
-      {styleEditingLayer && (() => {
-        const layer = styleEditingLayer
-        const overrides = layerOverrides?.[layer.id] || {}
-        const fontName = (overrides.font_family || layer.font_family || '').toLowerCase()
-        const initial = {
-          content: overrides.content || layer.content || '',
-          font_family: overrides.font_family || layer.font_family || 'sans-serif',
-          font_size: overrides.font_size || layer.font_size || '24',
-          is_bold: overrides.is_bold ?? layer.is_bold ?? /bold|black|heavy/.test(fontName),
-          is_italic: overrides.is_italic ?? layer.is_italic ?? /italic|oblique/.test(fontName),
-          is_underline: overrides.is_underline ?? false,
-          fill: overrides.fill || layer.fill || layer.color || '#FFFFFF',
-          letter_spacing: overrides.letter_spacing || '0',
-          line_height: overrides.line_height || '1.3',
-          text_align: overrides.text_align || layer.text_align || layer.align || 'left',
-        }
-        return <StyleLayerEditor
-          key={layer.id}
-          initial={initial}
-          onChange={(updated) => handleLayerOverride(layer.id, updated)}
-          onClose={() => setStyleEditingLayer(null)}
-        />
+      {/* Style step editor modal — same InteractiveSvgEditor as Resize */}
+      {styleEditorOpen && (() => {
+        const readyResizes = resizes.filter((r) => r.state === 'resized' && r.resized_svg_url)
+        const activeResize = readyResizes.find((r) => r.id === stylePreviewResizeId)
+        const svgUrl = activeResize ? activeResize.resized_svg_url : ad.svg_url
+        const editorLayers = activeResize ? activeResize.resized_layers : (ad.classified_layers || ad.parsed_layers)
+        const editorOverrides = activeResize ? activeResize.layer_overrides : layerOverrides
+        const editorLabel = activeResize
+          ? `${activeResize.dimensions} — ${activeResize.label || ''}`
+          : `Original (${ad.width}x${ad.height})`
+
+        return svgUrl ? (
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={(e) => { if (e.target === e.currentTarget) setStyleEditorOpen(false) }}>
+            <div className="modal-dialog modal-xl modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header py-2">
+                  <h6 className="modal-title mb-0">
+                    {editorLabel}
+                  </h6>
+                  <button type="button" className="btn-close" onClick={() => setStyleEditorOpen(false)} />
+                </div>
+                <div className="d-flex align-items-center gap-2 flex-nowrap px-3 py-1 border-bottom bg-light" style={{ fontSize: '0.82rem' }}>
+                  <div ref={styleToolbarRef}></div>
+                  <button type="button" className="btn btn-secondary btn-sm ms-auto" onClick={() => setStyleEditorOpen(false)}>
+                    Done
+                  </button>
+                </div>
+                <div className="modal-body position-relative" style={{
+                  ...(form.background_type === 'solid_color'
+                    ? { backgroundColor: form.background_color }
+                    : form.background_type === 'image' && (() => {
+                        const bgAsset = assets.find((a) => a.id === form.background_asset_id)
+                        const bgUrl = bgAsset?.file_url || bgAsset?.url
+                        return bgUrl ? {
+                          backgroundImage: `url(${bgUrl})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                        } : {}
+                      })()
+                  ),
+                }}>
+                  <InteractiveSvgEditor
+                    key={`style-${activeResize?.id || 'original'}-${activeResize?.updated_at || ''}`}
+                    svgUrl={svgUrl}
+                    layers={editorLayers}
+                    classifiedLayers={editorLayers}
+                    onLayerOverridesChange={activeResize
+                      ? (layerId, overrides) => handleResizeOverridesChange(layerId, overrides, activeResize.id)
+                      : handleLayerOverride
+                    }
+                    initialOverrides={editorOverrides || {}}
+                    transparentBackground
+                    renderToolbar={(toolbar) => styleToolbarRef.current ? ReactDOM.createPortal(toolbar, styleToolbarRef.current) : null}
+                  />
+                  {/* Overlay */}
+                  {form.overlay_enabled && (
+                    <div style={{
+                      position: 'absolute', inset: 0, pointerEvents: 'none',
+                      background: form.overlay_type === 'gradient'
+                        ? `linear-gradient(to bottom, transparent, ${form.overlay_color}${Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0')})`
+                        : form.overlay_color + Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0'),
+                    }} />
+                  )}
+                  {/* Play button */}
+                  {form.play_button_enabled && (
+                    <div className="position-absolute top-50 start-50 translate-middle" style={{ pointerEvents: 'none' }}>
+                      <PlayButtonIcon style={form.play_button_style} color={form.play_button_color} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null
       })()}
 
       {/* Step 4: Version settings + preview */}
@@ -1025,61 +1107,139 @@ export default function AdEdit() {
               </div>
             </div>
 
-            {/* Right panel: preview */}
+            {/* Right panel: size selector + preview (same layout as Style) */}
             <div className="col-lg-7">
               <div className="sticky-top" style={{ top: '1rem' }}>
-                <label className="form-label fw-semibold small text-uppercase text-muted mb-2">Preview</label>
-                {hasSvg ? (
-                  <div className="position-relative rounded overflow-hidden border" style={{ ...( form.background_type === 'solid_color' ? { backgroundColor: form.background_color } : {} ), maxWidth: '100%' }}>
-                    <InteractiveSvgEditor
-                      svgUrl={ad.svg_url}
-                      layers={ad.parsed_layers}
-                      classifiedLayers={ad.classified_layers}
-                      onLayerOverridesChange={handleLayerOverride}
-                      initialOverrides={layerOverrides}
-                    />
-                    {form.overlay_enabled && (
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: form.overlay_type === 'gradient'
-                          ? `linear-gradient(to bottom, transparent, ${form.overlay_color}${Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0')})`
-                          : form.overlay_color + Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0'),
-                        pointerEvents: 'none',
-                      }} />
-                    )}
-                    {form.play_button_enabled && (
-                      <div className="position-absolute top-50 start-50 translate-middle" style={{ pointerEvents: 'none' }}>
-                        <PlayButtonIcon style={form.play_button_style} color={form.play_button_color} />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <AdPreview
-                    ad={ad}
-                    form={form}
-                    isPdf={isPdf}
-                    isSvg={isSvg}
-                  />
-                )}
+                {(() => {
+                  const readyResizes = resizes.filter((r) => r.state === 'resized' && r.resized_svg_url)
+                  const activeResize = readyResizes.find((r) => r.id === stylePreviewResizeId)
+                  const bgAsset = assets.find((a) => a.id === form.background_asset_id)
+                  const bgAssetUrl = bgAsset?.file_url || bgAsset?.url
+                  const previewW = activeResize ? activeResize.width : (ad.width || 1080)
+                  const previewH = activeResize ? activeResize.height : (ad.height || 1080)
 
-                {/* Parsed layers */}
-                {ad.parsed_layers?.length > 0 && (
-                  <div className="mt-3">
-                    <label className="form-label fw-semibold small text-uppercase text-muted">Detected Text Layers</label>
-                    <div className="border rounded p-2" style={{ maxHeight: 200, overflowY: 'auto' }}>
-                      {ad.parsed_layers.filter((l) => l.type === 'text').map((layer, i) => (
-                        <div key={i} className="d-flex align-items-start gap-2 py-1 border-bottom last-border-0">
-                          <i className="bi bi-text-left text-muted mt-1 small"></i>
-                          <div>
-                            <small className="text-muted d-block">{layer.id}</small>
-                            <span style={{ fontSize: '0.85rem' }}>{layer.content}</span>
-                          </div>
+                  // Find rendered version image for the selected audience + size
+                  let renderedImageUrl = null
+                  if (ad.state === 'merged' && versionResults?.audiences) {
+                    const matchAudiences = versionAudienceId === 'all'
+                      ? versionResults.audiences
+                      : versionResults.audiences.filter((a) => a.id === versionAudienceId)
+                    for (const aud of matchAudiences) {
+                      const match = aud.versions?.find((v) => {
+                        if (stylePreviewResizeId) return v.ad_resize_id === stylePreviewResizeId && v.state === 'active'
+                        return !v.ad_resize_id && v.state === 'active'
+                      })
+                      if (match?.rendered_image_url) { renderedImageUrl = match.rendered_image_url; break }
+                    }
+                  }
+
+                  return (
+                    <>
+                      {/* Size selector pills */}
+                      <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                        <span className="small text-muted fw-semibold text-uppercase me-1">Preview:</span>
+                        <button
+                          className={`btn btn-sm ${!stylePreviewResizeId ? 'btn-dark' : 'btn-outline-secondary'}`}
+                          onClick={() => setStylePreviewResizeId(null)}
+                        >
+                          Original ({ad.width}x{ad.height})
+                        </button>
+                        {readyResizes.map((r) => (
+                          <button
+                            key={r.id}
+                            className={`btn btn-sm ${stylePreviewResizeId === r.id ? 'btn-dark' : 'btn-outline-secondary'}`}
+                            onClick={() => setStylePreviewResizeId(r.id)}
+                          >
+                            {r.width}x{r.height}
+                          </button>
+                        ))}
+                      </div>
+                      {activeResize && (
+                        <small className="text-muted d-block mb-2">
+                          {activeResize.platform_labels?.map((l) => typeof l === 'string' ? l : `${l.platform} ${l.size_name}`).join(', ')}
+                        </small>
+                      )}
+
+                      {/* Audience selector — shown after merge */}
+                      {ad.state === 'merged' && versionResults?.audiences?.length > 0 && (
+                        <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                          <span className="small text-muted fw-semibold text-uppercase me-1">Audience:</span>
+                          {versionResults.audiences.map((aud) => (
+                            <button
+                              key={aud.id}
+                              className={`btn btn-sm ${versionAudienceId === aud.id ? 'btn-dark' : 'btn-outline-secondary'}`}
+                              onClick={() => setVersionAudienceId(aud.id)}
+                            >
+                              {aud.name}
+                            </button>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                      )}
+
+                      {/* Show rendered version image if available, otherwise composite preview */}
+                      {renderedImageUrl ? (
+                        <div className="rounded overflow-hidden border text-center" style={{ background: '#1a1a1a' }}>
+                          <img
+                            src={renderedImageUrl}
+                            alt="Versioned ad"
+                            className="img-fluid"
+                            style={{ maxHeight: 600 }}
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className="position-relative rounded overflow-hidden border"
+                          style={{ maxWidth: '100%', aspectRatio: `${previewW} / ${previewH}`, maxHeight: 600, background: '#1a1a1a' }}
+                        >
+                          {/* Background layer */}
+                          {form.background_type === 'image' && bgAssetUrl ? (
+                            <img
+                              src={bgAssetUrl}
+                              alt=""
+                              style={{
+                                position: 'absolute', inset: 0,
+                                width: '100%', height: '100%',
+                                objectFit: 'cover', objectPosition: 'center',
+                                zIndex: 0,
+                              }}
+                            />
+                          ) : form.background_type === 'solid_color' ? (
+                            <div style={{ position: 'absolute', inset: 0, backgroundColor: form.background_color, zIndex: 0 }} />
+                          ) : null}
+
+                          {/* Composite preview — no outlines, no editing */}
+                          <div style={{ position: 'relative', zIndex: 1 }}>
+                            <CompositePreview
+                              width={previewW}
+                              height={previewH}
+                              layers={activeResize ? activeResize.resized_layers : (ad.classified_layers || ad.parsed_layers)}
+                              fonts={ad.fonts}
+                              layerOverrides={activeResize ? activeResize.layer_overrides : layerOverrides}
+                              showOutlines={false}
+                            />
+                          </div>
+
+                          {/* Overlay layer */}
+                          {form.overlay_enabled && (
+                            <div style={{
+                              position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none',
+                              background: form.overlay_type === 'gradient'
+                                ? `linear-gradient(to bottom, transparent, ${form.overlay_color}${Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0')})`
+                                : form.overlay_color + Math.round(form.overlay_opacity * 2.55).toString(16).padStart(2, '0'),
+                            }} />
+                          )}
+
+                          {/* Play button layer */}
+                          {form.play_button_enabled && (
+                            <div className="position-absolute top-50 start-50 translate-middle" style={{ zIndex: 3, pointerEvents: 'none' }}>
+                              <PlayButtonIcon style={form.play_button_style} color={form.play_button_color} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </div>
           </div>
@@ -1273,17 +1433,23 @@ export default function AdEdit() {
   )
 }
 
-function StepIndicator({ number, label, active, completed }) {
+function StepIndicator({ number, label, active, completed, clickable, onClick }) {
   const bgClass = active ? 'bg-danger text-white' : completed ? 'bg-success text-white' : 'bg-light text-muted border'
+  const canClick = clickable && !active
   return (
-    <div className="d-flex align-items-center gap-2">
+    <div
+      className="d-flex align-items-center gap-2"
+      style={{ cursor: canClick ? 'pointer' : 'default' }}
+      onClick={canClick ? onClick : undefined}
+      role={canClick ? 'button' : undefined}
+    >
       <span
         className={`rounded-circle d-flex align-items-center justify-content-center ${bgClass}`}
         style={{ width: 28, height: 28, fontSize: '0.8rem', fontWeight: 600 }}
       >
         {completed ? <i className="bi bi-check"></i> : number}
       </span>
-      <span className={`small fw-semibold ${active ? '' : 'text-muted'}`}>{label}</span>
+      <span className={`small fw-semibold ${active ? '' : canClick ? 'text-body' : 'text-muted'}`}>{label}</span>
     </div>
   )
 }

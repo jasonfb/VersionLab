@@ -1,0 +1,16 @@
+<%= turbo_frame_tag "admin__ad_platform_size-new" do %>
+  <h3>
+    New Ad Platform Size
+  </h3>
+  <%= form_with model:  ad_platform_size,
+         url: admin_ad_platform_ad_platform_sizes_path(ad_platform), method: :post do  |f| %>
+  <%=  render partial: "admin/ad_platform_sizes/form", locals: {
+    ad_platform_size: ad_platform_size,
+    f: f,
+    ad_platform: ad_platform
+} %>
+
+
+<% end %>
+
+<% end %>

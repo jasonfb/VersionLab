@@ -1,0 +1,11 @@
+
+
+<%= turbo_stream.update "admin__ad_platforms-list" + "" do %>
+  <%= render partial: "list", locals: {ad_platforms: @ad_platforms ,
+
+} %>
+<% end %>
+
+<%= turbo_stream.update "flash_notices" do %>
+<%= render partial: "layouts/flash_notices", locals: {resource: @ad_platform} %>
+<% end %>

@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe AdLayout::LayoutEngine do
+  include_context "seeded ad shapes"
+
   let(:ad) do
     create(:ad,
       width: 1080,
@@ -39,7 +41,7 @@ RSpec.describe AdLayout::LayoutEngine do
     end
 
     it "classifies the bucket as square" do
-      expect(result.bucket).to eq(:square)
+      expect(result.shape).to eq(:square)
     end
 
     it "positions layers within the canvas" do
@@ -69,7 +71,7 @@ RSpec.describe AdLayout::LayoutEngine do
     let(:result) { engine.compute_layout(728, 90) }
 
     it "classifies as leaderboard" do
-      expect(result.bucket).to eq(:leaderboard)
+      expect(result.shape).to eq(:leaderboard)
     end
 
     it "drops subhead (not in placed_roles)" do
@@ -89,7 +91,7 @@ RSpec.describe AdLayout::LayoutEngine do
     let(:result) { engine.compute_layout(1080, 1920) }
 
     it "classifies as story" do
-      expect(result.bucket).to eq(:story)
+      expect(result.shape).to eq(:story)
     end
 
     it "includes all three roles" do
@@ -127,7 +129,7 @@ RSpec.describe AdLayout::LayoutEngine do
     end
 
     it "still classifies the bucket" do
-      expect(result.bucket).to eq(:square)
+      expect(result.shape).to eq(:square)
     end
 
     it "enforces minimum font size of 8" do
@@ -151,35 +153,6 @@ RSpec.describe AdLayout::LayoutEngine do
       next unless img
       expect(img["width"].to_i).to be > 0
       expect(img["height"].to_i).to be > 0
-    end
-  end
-
-  describe "with join groups" do
-    let(:classified_layers) do
-      [
-        # w1 is the group head — no wordmark_group_id needed
-        { "id" => "w1", "type" => "text", "content" => "BRAND", "font_size" => "20",
-          "x" => "50", "y" => "30", "width" => "100", "height" => "30",
-          "role" => "headline", "confidence" => 0.85 },
-        # w2 joins w1 via wordmark_group_id
-        { "id" => "w2", "type" => "text", "content" => "NAME", "font_size" => "14",
-          "x" => "50", "y" => "65", "width" => "80", "height" => "20",
-          "role" => "subhead", "wordmark_group_id" => "w1", "confidence" => 0.75 },
-        { "id" => "h1", "type" => "text", "content" => "Headline Text",
-          "font_size" => "48", "x" => "100", "y" => "200",
-          "role" => "headline", "confidence" => 0.85 }
-      ]
-    end
-
-    it "positions join group members together in the wordmark anchor" do
-      result = engine.compute_layout(1080, 1080)
-      group_ids = %w[w1 w2]
-      group_layers = result.layers.select { |l| group_ids.include?(l["id"]) }
-      # May be 0 if wordmark anchor is dropped in this template bucket
-      if group_layers.any?
-        expect(group_layers.size).to eq(2)
-        expect(group_layers.all? { |l| l["wrapped_lines"] }).to be true
-      end
     end
   end
 

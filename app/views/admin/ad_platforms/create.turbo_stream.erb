@@ -1,0 +1,24 @@
+<% if @ad_platform.errors.none? %>
+  <%= turbo_stream.replace "admin__ad_platforms-list" + "" do %>
+  <%= render partial: "list", locals: {ad_platforms: @ad_platforms,
+  
+} %>
+
+<% end %>
+  <% end %>
+<!-- parental updated -->
+
+<!-- errors -->
+  <%= turbo_stream.replace "admin__ad_platform-new" do %>
+  <% if @ad_platform.errors.none? %>
+  <%= render partial: "new_button", locals: {
+
+
+} %>
+  <% else %>
+  <%= render partial: "new_form", locals: {ad_platform: @ad_platform,  } %>
+  <% end %>
+  <% end %>
+  <%= turbo_stream.replace "flash_notices" do %>
+  <%= render partial: "layouts/flash_notices", locals: {resource: @ad_platform} %>
+<% end %>

@@ -1,0 +1,13 @@
+
+
+<div class="container">
+  <div class="row"> <div class="col-md-12">
+  <%= render partial: "admin/nav", locals: {nav: "ad_platform_sizes"} %></div> </div>
+  
+
+  <div class="row"> <div class="col-md-12">
+  <%= render partial: 'admin/ad_platform_sizes/list',
+    locals: {ad_platform_sizes: @ad_platform_sizes  , nested_for: "ad_platform-#{@ad_platform.id}", ad_platform: @ad_platform
+  } %>
+  </div> </div>
+</div>

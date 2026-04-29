@@ -1,0 +1,7 @@
+<%= tag.turbo_frame id: "admin__ad_platform_sizes-list" + ((('__' + nested_for) if defined?(nested_for)) || ""),
+                    src: admin_ad_platform_ad_platform_sizes_path(ad_platform) + "?__lazy",
+                    loading: "lazy" do %>
+
+  <div class="text-muted">Loading ...</div>
+
+<% end %>

@@ -1,0 +1,45 @@
+<div class="row">
+  <div class='col-md-2 cell--ad_platform_size--name' >  
+    <div class='<%= "alert alert-danger" if ad_platform_size.errors.details.keys.include?(:name) %>'  >
+        <%= f.text_field :name, value: ad_platform_size.name, autocomplete: 'off', size: 40, class: 'form-control', type: '' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Name</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--ad_platform_size--width' >  
+    <div class='<%= "alert alert-danger" if ad_platform_size.errors.details.keys.include?(:width) %>'  >
+        <%= f.text_field :width, value: ad_platform_size.width, autocomplete: 'off', size: 4, class: 'form-control', type: 'number' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Width</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--ad_platform_size--height' >  
+    <div class='<%= "alert alert-danger" if ad_platform_size.errors.details.keys.include?(:height) %>'  >
+        <%= f.text_field :height, value: ad_platform_size.height, autocomplete: 'off', size: 4, class: 'form-control', type: 'number' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Height</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--ad_platform_size--position' >  
+    <div class='<%= "alert alert-danger" if ad_platform_size.errors.details.keys.include?(:position) %>'  >
+        <%= f.text_field :position, value: ad_platform_size.position, autocomplete: 'off', size: 4, class: 'form-control', type: 'number' %>
+       
+      
+      <label class='text-muted small form-text' for=''>Position</label>
+    </div>
+   
+  </div>
+  <div class='col-md-2 cell--ad_platform_size--**shape' ><%= render partial: 'shape', locals: {ad_platform_size: ad_platform_size } %>
+  </div>
+
+  <div class="col-md-2">
+    <%= link_to "Cancel", admin_ad_platform_ad_platform_sizes_path(ad_platform) + (params[:page] ? "?page=" + params[:page] : ""),  {class: "btn btn-secondary"} %>
+    <%= f.submit "Save", class: "btn btn-primary pull-right" %>
+  </div>
+</div>

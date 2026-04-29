@@ -1,0 +1,15 @@
+<%= turbo_frame_tag "admin__ad_shape_layout_rule-new" do %>
+  <h3>
+    New Layout Rule
+  </h3>
+  <%= form_with model: ad_shape_layout_rule,
+         url: admin_ad_shape_ad_shape_layout_rules_path(ad_shape), method: :post do |f| %>
+  <%=  render partial: "admin/ad_shape_layout_rules/form", locals: {
+    ad_shape_layout_rule: ad_shape_layout_rule,
+    f: f,
+    ad_shape: ad_shape
+} %>
+
+<% end %>
+
+<% end %>

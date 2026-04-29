@@ -1,6 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe AdResizeService do
+  include_context "seeded ad platforms"
+
   let(:ad) do
     create(:ad,
       width: 1080,

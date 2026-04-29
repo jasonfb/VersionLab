@@ -1,0 +1,11 @@
+<%= turbo_stream.replace "admin__#{dom_id(@ad_shape_layout_rule)}" do %>
+  <%= render partial: 'line', locals: {ad_shape_layout_rule: @ad_shape_layout_rule,  ad_shape: @ad_shape }   %>
+<% end %>
+<!-- parental updated -->
+<%= turbo_stream.replace "__admin#{dom_id(@ad_shape)}" do %>
+    <%= render partial: "admin/ad_shapes/line", locals: {ad_shape: @ad_shape} %>
+  <% end %>
+<!-- flash notices -->
+<%= turbo_stream.update "flash_notices" do %>
+  <%= render partial: "layouts/flash_notices", locals: {resource: @ad_shape_layout_rule} %>
+<% end %>

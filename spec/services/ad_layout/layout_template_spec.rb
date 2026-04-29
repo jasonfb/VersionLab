@@ -1,18 +1,20 @@
 require "rails_helper"
 
 RSpec.describe AdLayout::LayoutTemplate do
-  describe ".for_bucket" do
-    AdLayout::AspectRatioBucket.all_buckets.each do |bucket|
-      it "returns a template for #{bucket}" do
-        template = described_class.for_bucket(bucket)
+  include_context "seeded ad shapes"
+
+  describe ".for_shape" do
+    AdLayout::AspectRatioBucket.all_shapes.each do |shape|
+      it "returns a template for #{shape}" do
+        template = described_class.for_shape(shape)
         expect(template).to be_a(Hash)
         expect(template).to have_key(:headline)
         expect(template).to have_key(:cta)
       end
     end
 
-    it "raises for unknown bucket" do
-      expect { described_class.for_bucket(:widescreen) }.to raise_error(ArgumentError, /Unknown bucket/)
+    it "raises for unknown shape" do
+      expect { described_class.for_shape(:widescreen) }.to raise_error(ArgumentError, /Unknown shape/)
     end
   end
 
@@ -60,7 +62,7 @@ RSpec.describe AdLayout::LayoutTemplate do
 
     it "returns subhead, body, decoration for leaderboard" do
       dropped = described_class.dropped_roles(:leaderboard)
-      expect(dropped).to contain_exactly("subhead", "body", "decoration", "wordmark")
+      expect(dropped).to contain_exactly("subhead", "body", "decoration")
     end
   end
 
@@ -87,26 +89,22 @@ RSpec.describe AdLayout::LayoutTemplate do
   end
 
   describe "template structure validation" do
-    AdLayout::LayoutTemplate::TEMPLATES.each do |bucket, template|
-      context "#{bucket} template" do
+    AdShape.ordered.each do |shape_record|
+      context "#{shape_record.name} template" do
         it "has valid anchor percentages for all placed roles" do
-          template.each do |role, entry|
-            next if entry[:drop]
-
-            anchor = entry[:anchor]
-            expect(anchor[:x]).to be_between(0.0, 1.0), "#{bucket}.#{role} anchor.x out of range"
-            expect(anchor[:y]).to be_between(0.0, 1.0), "#{bucket}.#{role} anchor.y out of range"
-            expect(anchor[:w]).to be_between(0.0, 1.0), "#{bucket}.#{role} anchor.w out of range"
-            expect(anchor[:h]).to be_between(0.0, 1.0), "#{bucket}.#{role} anchor.h out of range"
-            expect(anchor[:x] + anchor[:w]).to be <= 1.01, "#{bucket}.#{role} exceeds canvas width"
-            expect(anchor[:y] + anchor[:h]).to be <= 1.01, "#{bucket}.#{role} exceeds canvas height"
+          shape_record.ad_shape_layout_rules.placed.each do |rule|
+            expect(rule.anchor_x).to be_between(0.0, 1.0), "#{shape_record.name}.#{rule.role} anchor_x out of range"
+            expect(rule.anchor_y).to be_between(0.0, 1.0), "#{shape_record.name}.#{rule.role} anchor_y out of range"
+            expect(rule.anchor_w).to be_between(0.0, 1.0), "#{shape_record.name}.#{rule.role} anchor_w out of range"
+            expect(rule.anchor_h).to be_between(0.0, 1.0), "#{shape_record.name}.#{rule.role} anchor_h out of range"
+            expect(rule.anchor_x + rule.anchor_w).to be <= 1.01, "#{shape_record.name}.#{rule.role} exceeds canvas width"
+            expect(rule.anchor_y + rule.anchor_h).to be <= 1.01, "#{shape_record.name}.#{rule.role} exceeds canvas height"
           end
         end
 
         it "has a positive font_scale for all placed roles" do
-          template.each do |role, entry|
-            next if entry[:drop]
-            expect(entry[:font_scale]).to be > 0, "#{bucket}.#{role} font_scale must be positive"
+          shape_record.ad_shape_layout_rules.placed.each do |rule|
+            expect(rule.font_scale).to be > 0, "#{shape_record.name}.#{rule.role} font_scale must be positive"
           end
         end
       end

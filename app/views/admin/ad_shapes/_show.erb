@@ -1,0 +1,28 @@
+<div class='hg-col col-sm-2 ad_shape--name'> <%= ad_shape.name %>
+</div>
+<div class='hg-col col-sm-2 ad_shape--min_ratio'> <%= ad_shape.min_ratio %>
+</div>
+<div class='hg-col col-sm-2 ad_shape--max_ratio'> <%= ad_shape.max_ratio %>
+</div>
+<div class='hg-col col-sm-2 ad_shape--position'> <%= ad_shape.position %>
+</div>
+
+
+
+
+
+
+
+<div class=" scaffold-line-buttons col-md-2" >
+  
+
+  
+    <%= form_with url: admin_ad_shape_path(ad_shape), html: {data: {'turbo-confirm': "Are you sure you want to delete #{ ad_shape.name }?" }, style: "display: inline-block;"}, method: :delete do |f| %>
+      <%= f.submit "Delete".html_safe,  class: "delete-ad_shape-button btn btn-primary btn-sm", disabled: (ad_shape.respond_to?(:delete_able?) && ! ad_shape.delete_able? ) %>
+    <% end %>
+  
+
+  
+  <%= link_to "Edit ".html_safe, edit_admin_ad_shape_path(ad_shape) + (params[:page] ? "?page=#{params[:page]}" : ""), 'data-turbo' => 'false', disable_with: "Loading...", class: "edit-ad_shape-button btn btn-primary btn-sm" %>
+  
+</div>

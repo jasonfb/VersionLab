@@ -1,0 +1,60 @@
+
+  <div class="row"> <div class="col-md-12">
+    <%= render partial: "admin/nav", locals: {nav: "ad_shapes"} %></div> </div>
+
+  <div class="container">
+  <div class="row">
+    <div class="col-md-12">
+
+      
+      <%= link_to "&#11013;&#65039; Back to list".html_safe, admin_ad_shapes_path %>
+      
+
+<%= render partial: "edit", locals: {ad_shape: @ad_shape}  %>
+
+<div class="card mt-3 mb-3">
+  <div class="card-header fw-semibold small text-uppercase text-muted">Layout Summary</div>
+  <div class="card-body">
+    <p class="mb-0 small"><%= @ad_shape.layout_summary %></p>
+  </div>
+</div>
+
+    </div>
+  </div>
+</div>
+
+
+<div class="container" data-controller="bootstrap-tabbed-nav">
+    <ul class="nav nav-tabs" id="ad_shape_downnest_portals" role="tablist">
+      
+        
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="ad_shape_layout_rules-tab" data-bs-toggle="tab" data-bs-target="#ad_shape_layout_rules-portal" type="button" role="tab" aria-controls="home" aria-selected="true">
+            Ad Shape Layout Rules
+          </button>
+        </li>
+      
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+      
+        
+        <div class="tab-pane fade show active" id="ad_shape_layout_rules-portal" role="tabpanel" aria-labelledby="ad_shape_layout_rules-tab">
+
+          
+          
+          
+          
+          
+
+          <%= render partial: "admin/ad_shape_layout_rules/lazy_list", locals: {ad_shape: @ad_shape,  nested_for: "ad_shape-#{@ad_shape.id}"  } %>
+
+        </div>
+      
+    </div>
+
+</div>
+
+
+
+

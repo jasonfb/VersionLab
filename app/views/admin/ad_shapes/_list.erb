@@ -1,0 +1,51 @@
+<%= turbo_frame_tag "admin__ad_shapes-list"   do %>
+
+  <div class="container ">
+    
+      <h4>
+        AD SHAPES
+      </h4>
+    
+
+    
+    
+      <%= render partial: "admin/ad_shapes/new_button", locals: {
+     } %>
+        <br />
+    
+    
+
+    
+      
+        <div class="row hg-row ">
+          <div class='col-sm-2 hg-heading-row heading--ad_shape--name' >Name</div>
+<div class='col-sm-2 hg-heading-row heading--ad_shape--min_ratio' >Min ratio</div>
+<div class='col-sm-2 hg-heading-row heading--ad_shape--max_ratio' >Max ratio</div>
+<div class='col-sm-2 hg-heading-row heading--ad_shape--position' >Position</div>
+
+          
+
+          
+
+          <div class=' scaffold-col-heading scaffold-col-heading-buttons col-sm-2' >
+          </div>
+        </div>
+      
+      
+      <% if ad_shapes.empty? %>
+    <div>
+        None
+    </div>
+      <% end %>
+      <% ad_shapes.each do |ad_shape| %>
+        <%= render partial: 'admin/ad_shapes/line', locals: {ad_shape: ad_shape,
+       } %>
+      <% end %>
+      
+    <%== @pagy.series_nav(:bootstrap) if @pagy && @pagy.pages > 1 %>
+  
+
+
+  
+  </div>
+<% end %>

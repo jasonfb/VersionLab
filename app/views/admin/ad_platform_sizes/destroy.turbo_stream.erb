@@ -1,0 +1,14 @@
+<%= turbo_stream.replace "__admin#{dom_id(@ad_platform)}" do %>
+    <%= render partial: "admin/ad_platforms/line", locals: {ad_platform: @ad_platform} %>
+  <% end %>
+
+<%= turbo_stream.update "admin__ad_platform_sizes-list" + "__ad_platform-#{@ad_platform.id}" do %>
+  <%= render partial: "list", locals: {ad_platform_sizes: @ad_platform_sizes ,
+nested_for: "ad_platform-#{@ad_platform.id}",
+ad_platform: @ad_platform
+} %>
+<% end %>
+
+<%= turbo_stream.update "flash_notices" do %>
+<%= render partial: "layouts/flash_notices", locals: {resource: @ad_platform_size} %>
+<% end %>

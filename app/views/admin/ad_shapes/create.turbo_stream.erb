@@ -1,0 +1,24 @@
+<% if @ad_shape.errors.none? %>
+  <%= turbo_stream.replace "admin__ad_shapes-list" + "" do %>
+  <%= render partial: "list", locals: {ad_shapes: @ad_shapes,
+  
+} %>
+
+<% end %>
+  <% end %>
+<!-- parental updated -->
+
+<!-- errors -->
+  <%= turbo_stream.replace "admin__ad_shape-new" do %>
+  <% if @ad_shape.errors.none? %>
+  <%= render partial: "new_button", locals: {
+
+
+} %>
+  <% else %>
+  <%= render partial: "new_form", locals: {ad_shape: @ad_shape,  } %>
+  <% end %>
+  <% end %>
+  <%= turbo_stream.replace "flash_notices" do %>
+  <%= render partial: "layouts/flash_notices", locals: {resource: @ad_shape} %>
+<% end %>

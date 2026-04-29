@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Ad Layout Engine — end-to-end integration", type: :model do
+  include_context "seeded ad shapes"
+
   let(:ad) do
     ad = create(:ad,
       width: 1080,
@@ -58,7 +60,7 @@ RSpec.describe "Ad Layout Engine — end-to-end integration", type: :model do
         engine = AdLayout::LayoutEngine.new(ad)
         result = engine.compute_layout(1080, 1080)
 
-        expect(result.bucket).to eq(:square)
+        expect(result.shape).to eq(:square)
         expect(result.layers.length).to eq(3)
 
         headline = result.layers.find { |l| l["role"] == "headline" }
@@ -70,7 +72,7 @@ RSpec.describe "Ad Layout Engine — end-to-end integration", type: :model do
         engine = AdLayout::LayoutEngine.new(ad)
         result = engine.compute_layout(728, 90)
 
-        expect(result.bucket).to eq(:leaderboard)
+        expect(result.shape).to eq(:leaderboard)
 
         roles = result.layers.map { |l| l["role"] }
         expect(roles).to include("headline")
@@ -82,7 +84,7 @@ RSpec.describe "Ad Layout Engine — end-to-end integration", type: :model do
         engine = AdLayout::LayoutEngine.new(ad)
         result = engine.compute_layout(1080, 1920)
 
-        expect(result.bucket).to eq(:story)
+        expect(result.shape).to eq(:story)
         expect(result.layers.length).to eq(3) # all three roles placed in story
       end
 
@@ -114,7 +116,7 @@ RSpec.describe "Ad Layout Engine — end-to-end integration", type: :model do
         end
       end
 
-      it "generates valid SVG for all 6 bucket types" do
+      it "generates valid SVG for all 6 shape types" do
         targets = {
           square:      [1080, 1080],
           landscape:   [1920, 1080],
@@ -127,20 +129,20 @@ RSpec.describe "Ad Layout Engine — end-to-end integration", type: :model do
         engine = AdLayout::LayoutEngine.new(ad)
         composer = AdLayout::SvgComposer.new(ad)
 
-        targets.each do |bucket, (w, h)|
+        targets.each do |shape, (w, h)|
           result = engine.compute_layout(w, h)
-          expect(result.bucket).to eq(bucket), "Expected #{w}x#{h} to be #{bucket}, got #{result.bucket}"
+          expect(result.shape).to eq(shape), "Expected #{w}x#{h} to be #{shape}, got #{result.shape}"
 
           svg_string = composer.compose(result)
           doc = Nokogiri::XML(svg_string) { |config| config.strict }
           root = doc.at_css("svg")
 
-          expect(root["width"]).to eq(w.to_s), "SVG width mismatch for #{bucket}"
-          expect(root["height"]).to eq(h.to_s), "SVG height mismatch for #{bucket}"
+          expect(root["width"]).to eq(w.to_s), "SVG width mismatch for #{shape}"
+          expect(root["height"]).to eq(h.to_s), "SVG height mismatch for #{shape}"
 
           # At least headline and CTA should be present (except where dropped)
           texts = doc.css("text")
-          expect(texts.length).to be >= 1, "No text elements in #{bucket} SVG"
+          expect(texts.length).to be >= 1, "No text elements in #{shape} SVG"
         end
       end
     end

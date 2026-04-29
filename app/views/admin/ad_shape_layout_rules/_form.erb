@@ -1,0 +1,66 @@
+<div class="row">
+  <div class='col-md-1 cell--ad_shape_layout_rule--role'>
+    <div class='<%= "alert alert-danger" if ad_shape_layout_rule.errors.details.keys.include?(:role) %>'>
+        <%= f.select(:role, AdShapeLayoutRule::ROLES.map { |r| [r.titleize, r] }, { selected: ad_shape_layout_rule.role }, class: 'form-select form-select-sm') %>
+      <label class='text-muted small form-text' for=''>Role</label>
+    </div>
+  </div>
+  <div class='col-md-1 cell--ad_shape_layout_rule--drop'>
+    <div class='<%= "alert alert-danger" if ad_shape_layout_rule.errors.details.keys.include?(:drop) %>'>
+      <span class='form-check'>
+        <%= f.radio_button(:drop, '0', checked: ad_shape_layout_rule.drop? ? '' : 'checked', class: 'form-check-input') %>
+        <%= f.label(:drop, value: 'No', for: 'ad_shape_layout_rule_drop_0') %>
+       <br /> <%= f.radio_button(:drop, '1',  checked: ad_shape_layout_rule.drop? ? 'checked' : '' , class: 'form-check-input') %>
+        <%= f.label(:drop, value: 'Yes', for: 'ad_shape_layout_rule_drop_1') %>
+      </span>
+      <label class='text-muted small form-text form-check-label' for='ad_shape_layout_rule_drop'>Drop</label>
+    </div>
+  </div>
+  <div class='col-md-1'>
+    <div class='<%= "alert alert-danger" if ad_shape_layout_rule.errors.details.keys.include?(:anchor_x) %>'>
+        <%= f.number_field(:anchor_x, class: 'form-control form-control-sm', value: ad_shape_layout_rule.anchor_x, step: 0.01) %>
+      <label class='text-muted small form-text' for=''>X</label>
+    </div>
+  </div>
+  <div class='col-md-1'>
+    <div class='<%= "alert alert-danger" if ad_shape_layout_rule.errors.details.keys.include?(:anchor_y) %>'>
+        <%= f.number_field(:anchor_y, class: 'form-control form-control-sm', value: ad_shape_layout_rule.anchor_y, step: 0.01) %>
+      <label class='text-muted small form-text' for=''>Y</label>
+    </div>
+  </div>
+  <div class='col-md-1'>
+    <div class='<%= "alert alert-danger" if ad_shape_layout_rule.errors.details.keys.include?(:anchor_w) %>'>
+        <%= f.number_field(:anchor_w, class: 'form-control form-control-sm', value: ad_shape_layout_rule.anchor_w, step: 0.01) %>
+      <label class='text-muted small form-text' for=''>W</label>
+    </div>
+  </div>
+  <div class='col-md-1'>
+    <div class='<%= "alert alert-danger" if ad_shape_layout_rule.errors.details.keys.include?(:anchor_h) %>'>
+        <%= f.number_field(:anchor_h, class: 'form-control form-control-sm', value: ad_shape_layout_rule.anchor_h, step: 0.01) %>
+      <label class='text-muted small form-text' for=''>H</label>
+    </div>
+  </div>
+  <div class='col-md-1'>
+    <div class='<%= "alert alert-danger" if ad_shape_layout_rule.errors.details.keys.include?(:font_scale) %>'>
+        <%= f.number_field(:font_scale, class: 'form-control form-control-sm', value: ad_shape_layout_rule.font_scale, step: 0.05) %>
+      <label class='text-muted small form-text' for=''>Font Scale</label>
+    </div>
+  </div>
+  <div class='col-md-1'>
+    <div class='<%= "alert alert-danger" if ad_shape_layout_rule.errors.details.keys.include?(:align) %>'>
+        <%= f.select(:align, AdShapeLayoutRule::ALIGNMENTS.map { |a| [a.titleize, a] }, { include_blank: true, selected: ad_shape_layout_rule.align }, class: 'form-select form-select-sm') %>
+      <label class='text-muted small form-text' for=''>Align</label>
+    </div>
+  </div>
+  <div class='col-md-1'>
+    <div class='<%= "alert alert-danger" if ad_shape_layout_rule.errors.details.keys.include?(:position) %>'>
+        <%= f.number_field(:position, class: 'form-control form-control-sm', value: ad_shape_layout_rule.position) %>
+      <label class='text-muted small form-text' for=''>Pos</label>
+    </div>
+  </div>
+
+  <div class="col-md-2">
+    <%= link_to "Cancel", admin_ad_shape_ad_shape_layout_rules_path(ad_shape) + (params[:page] ? "?page=" + params[:page] : ""),  {class: "btn btn-secondary btn-sm"} %>
+    <%= f.submit "Save", class: "btn btn-primary btn-sm pull-right" %>
+  </div>
+</div>

@@ -1,0 +1,48 @@
+<%= turbo_frame_tag "admin__ad_platform_sizes-list" + ((('__' + nested_for) if defined?(nested_for)) || "")  do %>
+
+  <div class="container ">
+    
+
+    
+    
+      <%= render partial: "admin/ad_platform_sizes/new_button", locals: {
+    ad_platform: ad_platform } %>
+        <br />
+    
+    
+
+    
+      
+        <div class="row hg-row ">
+          <div class='col-sm-2 hg-heading-row heading--ad_platform_size--name' >Name</div>
+<div class='col-sm-2 hg-heading-row heading--ad_platform_size--width' >Width</div>
+<div class='col-sm-2 hg-heading-row heading--ad_platform_size--height' >Height</div>
+<div class='col-sm-2 hg-heading-row heading--ad_platform_size--position' >Position</div>
+<div class='col-sm-2 hg-heading-row heading--ad_platform_size--**shape' ></div>
+
+          
+
+          
+
+          <div class=' scaffold-col-heading scaffold-col-heading-buttons col-sm-' >
+          </div>
+        </div>
+      
+      
+      <% if ad_platform_sizes.empty? %>
+    <div>
+        None
+    </div>
+      <% end %>
+      <% ad_platform_sizes.each do |ad_platform_size| %>
+        <%= render partial: 'admin/ad_platform_sizes/line', locals: {ad_platform_size: ad_platform_size,
+      nested_for: nested_for, ad_platform: ad_platform } %>
+      <% end %>
+      
+    <%== @pagy.series_nav(:bootstrap) if @pagy && @pagy.pages > 1 %>
+  
+
+
+  
+  </div>
+<% end %>

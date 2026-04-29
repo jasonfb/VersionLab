@@ -1,0 +1,49 @@
+<%= turbo_frame_tag "admin__ad_platforms-list"   do %>
+
+  <div class="container ">
+    
+      <h4>
+        AD PLATFORMS
+      </h4>
+    
+
+    
+    
+      <%= render partial: "admin/ad_platforms/new_button", locals: {
+     } %>
+        <br />
+    
+    
+
+    
+      
+        <div class="row hg-row ">
+          <div class='col-sm-2 hg-heading-row heading--ad_platform--name' >Name</div>
+<div class='col-sm-2 hg-heading-row heading--ad_platform--position' >Position</div>
+
+          
+
+          
+
+          <div class=' scaffold-col-heading scaffold-col-heading-buttons col-sm-2' >
+          </div>
+        </div>
+      
+      
+      <% if ad_platforms.empty? %>
+    <div>
+        None
+    </div>
+      <% end %>
+      <% ad_platforms.each do |ad_platform| %>
+        <%= render partial: 'admin/ad_platforms/line', locals: {ad_platform: ad_platform,
+       } %>
+      <% end %>
+      
+    <%== @pagy.series_nav(:bootstrap) if @pagy && @pagy.pages > 1 %>
+  
+
+
+  
+  </div>
+<% end %>

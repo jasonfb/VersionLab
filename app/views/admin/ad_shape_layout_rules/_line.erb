@@ -1,0 +1,8 @@
+<%= turbo_frame_tag "admin__#{ dom_id(ad_shape_layout_rule) }" do  %>
+  <div class='row hg-row' data-id='<%= ad_shape_layout_rule.id %>' data-edit='false'>
+  <%= render partial: 'admin/ad_shape_layout_rules/show', locals: {
+    ad_shape_layout_rule: ad_shape_layout_rule,
+    ad_shape: ad_shape,
+    nested_for: "ad_shape-#{ad_shape.id}" } %>
+  </div>
+<% end %>

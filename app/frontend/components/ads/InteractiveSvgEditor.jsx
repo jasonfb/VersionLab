@@ -150,7 +150,8 @@ function fitTextToBox(content, boxWidth, boxHeight, maxFontSize, enableWordWrap)
 function applyFittedText(textEl, fontSize, lines, boxX, boxWidth, align) {
   textEl.setAttribute('font-size', fontSize.toFixed(1))
 
-  const anchor = ALIGN_TO_ANCHOR[align] || textEl.getAttribute('text-anchor') || 'start'
+  // Resolve alignment: trust the explicit align param, only fall back to element attribute as last resort
+  const anchor = (align && ALIGN_TO_ANCHOR[align]) ? ALIGN_TO_ANCHOR[align] : (textEl.getAttribute('text-anchor') || 'start')
   let textX = boxX
   if (anchor === 'middle') textX = boxX + boxWidth / 2
   else if (anchor === 'end') textX = boxX + boxWidth
@@ -183,6 +184,7 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
   const dragRef = useRef(null) // current drag state (non-reactive for perf)
   const layerOffsets = useRef({}) // { layerId: { x, y } }
   const layerBoxes = useRef({}) // { layerId: { width, height } } — custom box dimensions from resize
+  const layerRectPos = useRef({}) // { layerId: { x, y } } — absolute rect position (stable across bbox changes)
   const maxFontSizes = useRef({}) // { layerId: fontSize } — native/original font size ceiling
   const wordWrapFlags = useRef({}) // { layerId: boolean }
   const deletedIds = useRef(new Set()) // layers hidden by the user in this resize
@@ -277,9 +279,18 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       const pad = 6
       const offset = layerOffsets.current[layerId] || { x: 0, y: 0 }
       const customBox = layerBoxes.current[layerId]
-      // Position always derived from element bbox + offset; custom box only overrides width/height
-      const rx = bbox.x - pad + offset.x
-      const ry = bbox.y - pad + offset.y
+      const savedPos = layerRectPos.current[layerId]
+
+      // Use absolute rect position when available (stable across bbox changes);
+      // otherwise derive from bbox + offset
+      let rx, ry
+      if (savedPos && customBox) {
+        rx = savedPos.x
+        ry = savedPos.y
+      } else {
+        rx = bbox.x - pad + offset.x
+        ry = bbox.y - pad + offset.y
+      }
       const rw = customBox ? customBox.width : bbox.width + pad * 2
       const rh = customBox ? customBox.height : bbox.height + pad * 2
 
@@ -300,7 +311,8 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           ? Array.from(elTspans).map(t => t.textContent).join(' ')
           : el.textContent
         const { fontSize, lines } = fitTextToBox(content, innerW, innerH, maxFs, ww)
-        const align = ANCHOR_TO_ALIGN[el.getAttribute('text-anchor')] || 'left'
+        const elAnchor = el.getAttribute('text-anchor') || readSvgStyle(el, 'text-anchor', 'start')
+        const align = ANCHOR_TO_ALIGN[elAnchor] || 'left'
         applyFittedText(el, fontSize, lines, rx + pad, innerW, align)
         el.setAttribute('y', ry + pad + fontSize)
         el.removeAttribute('transform')
@@ -365,6 +377,10 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           const textContent = elTspans.length > 0
             ? Array.from(elTspans).map(t => t.textContent).join(' ')
             : el.textContent
+          // Capture the current rendered font size and alignment at drag start
+          const currentFontSize = parseFloat(el.getAttribute('font-size')) || 16
+          const elAnchor = el.getAttribute('text-anchor') || readSvgStyle(el, 'text-anchor', 'start')
+          const currentAlign = ANCHOR_TO_ALIGN[elAnchor] || 'left'
           dragRef.current = {
             mode: 'resize',
             corner: name,
@@ -374,11 +390,13 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
             layerId,
             elType: type,
             textContent,
+            textAlign: currentAlign,
             startSvgX: svgPt.x,
             startSvgY: svgPt.y,
             origBox: { x: rx, y: ry, w: rw, h: rh },
             origBbox: bbox,
-            maxFontSize: maxFontSizes.current[layerId] || parseFloat(el.getAttribute('font-size')) || 16,
+            startFontSize: currentFontSize,
+            maxFontSize: maxFontSizes.current[layerId] || currentFontSize,
             wordWrap: wordWrapFlags.current[layerId] || false,
           }
         })
@@ -398,6 +416,9 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         e.stopPropagation()
         const svgPt = screenToSvg(svg, e.clientX, e.clientY)
         const cur = layerOffsets.current[layerId] || { x: 0, y: 0 }
+        // Read fresh bbox in case a resize changed the element's position
+        let freshBbox
+        try { freshBbox = el.getBBox() } catch (_) { freshBbox = bbox }
         dragRef.current = {
           mode: 'move',
           svg,
@@ -408,7 +429,8 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           startSvgY: svgPt.y,
           startOffsetX: cur.x,
           startOffsetY: cur.y,
-          origBbox: bbox,
+          origBbox: freshBbox,
+          pad: 6,
         }
       })
 
@@ -482,6 +504,7 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
     setReady(false)
     layerOffsets.current = {}
     layerBoxes.current = {}
+    layerRectPos.current = {}
     maxFontSizes.current = {}
     wordWrapFlags.current = {}
     deletedIds.current = new Set()
@@ -493,6 +516,9 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         }
         if (ov.box_width !== undefined && ov.box_height !== undefined) {
           layerBoxes.current[id] = { width: ov.box_width, height: ov.box_height }
+        }
+        if (ov.rect_x !== undefined && ov.rect_y !== undefined) {
+          layerRectPos.current[id] = { x: ov.rect_x, y: ov.rect_y }
         }
         if (ov.max_font_size !== undefined) {
           maxFontSizes.current[id] = ov.max_font_size
@@ -517,6 +543,42 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           // Also handle PDF-converted SVGs with a background <use> element
           const bgUse = svg.querySelector(':scope > use')
           if (bgUse) bgUse.style.opacity = '0'
+
+          // Hide elements classified as background by role
+          const bgLayers = (classifiedLayers || []).filter((l) => l.role === 'background')
+          bgLayers.forEach((bgLayer) => {
+            // Try by ID first
+            let el = svg.getElementById(bgLayer.id)
+            // Fallback: match <image> elements by position/size when ID isn't on the DOM element
+            if (!el && bgLayer.type === 'image') {
+              const bx = parseFloat(bgLayer.x) || 0
+              const by = parseFloat(bgLayer.y) || 0
+              const bw = parseFloat(bgLayer.width) || 0
+              const bh = parseFloat(bgLayer.height) || 0
+              svg.querySelectorAll('image').forEach((imgEl) => {
+                const ix = parseFloat(imgEl.getAttribute('x')) || 0
+                const iy = parseFloat(imgEl.getAttribute('y')) || 0
+                const iw = parseFloat(imgEl.getAttribute('width')) || 0
+                const ih = parseFloat(imgEl.getAttribute('height')) || 0
+                if (Math.abs(ix - bx) < 2 && Math.abs(iy - by) < 2 && Math.abs(iw - bw) < 2 && Math.abs(ih - bh) < 2) {
+                  el = imgEl
+                }
+              })
+            }
+            if (el) el.style.opacity = '0'
+          })
+
+          // Fallback: hide full-canvas <image> elements not caught by classification
+          const vb = svg.getAttribute('viewBox')?.split(/\s+/).map(Number)
+          if (vb && vb.length === 4) {
+            svg.querySelectorAll('image').forEach((imgEl) => {
+              const imgW = parseFloat(imgEl.getAttribute('width')) || 0
+              const imgH = parseFloat(imgEl.getAttribute('height')) || 0
+              if (imgW >= vb[2] * 0.95 && imgH >= vb[3] * 0.95) {
+                imgEl.style.opacity = '0'
+              }
+            })
+          }
         }
         if (svg) {
           Object.entries(layerOffsets.current).forEach(([id, { x, y }]) => {
@@ -597,31 +659,58 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           const pad = 6
           const innerW = w - pad * 2
           const innerH = h - pad * 2
+          const startInnerW = d.origBox.w - pad * 2
+          const startInnerH = d.origBox.h - pad * 2
+
+          // Proportional scaling: scale font relative to how the box changed
+          // This avoids character-width estimation mismatches
+          const scaleW = startInnerW > 0 ? innerW / startInnerW : 1
+          const scaleH = startInnerH > 0 ? innerH / startInnerH : 1
+          let fontSize = d.startFontSize * Math.min(scaleW, scaleH)
+          fontSize = Math.min(fontSize, d.maxFontSize)
+          fontSize = Math.max(fontSize, 6)
+
           const content = d.textContent
-          const { fontSize, lines } = fitTextToBox(content, innerW, innerH, d.maxFontSize, d.wordWrap)
-          const align = ANCHOR_TO_ALIGN[d.textEl.getAttribute('text-anchor')] || 'left'
-          applyFittedText(d.textEl, fontSize, lines, x + pad, innerW, align)
-          // Update y to position text within the box
+          const ww = d.wordWrap
+          let lines
+          if (ww) {
+            const charWidth = fontSize * 0.55
+            const charsPerLine = Math.max(1, Math.floor(innerW / charWidth))
+            lines = wordWrapText(content, charsPerLine)
+            // If wrapped lines overflow height, shrink further
+            const totalHeight = fontSize + (lines.length - 1) * fontSize * 1.3
+            if (totalHeight > innerH && innerH > 0) {
+              fontSize = fontSize * (innerH / totalHeight)
+              fontSize = Math.max(fontSize, 6)
+              const cw2 = fontSize * 0.55
+              const cpl2 = Math.max(1, Math.floor(innerW / cw2))
+              lines = wordWrapText(content, cpl2)
+            }
+          } else {
+            lines = [content]
+          }
+
+          applyFittedText(d.textEl, fontSize, lines, x + pad, innerW, d.textAlign)
           d.textEl.setAttribute('y', y + pad + fontSize)
-          // Remove any transform since we're positioning absolutely
           d.textEl.removeAttribute('transform')
         }
       } else {
-        // Move mode (existing behavior)
+        // Move mode
+        const pad = d.pad || 6
         const dx = pt.x - d.startSvgX
         const dy = pt.y - d.startSvgY
         const nx = d.startOffsetX + dx
         const ny = d.startOffsetY + dy
         d.textEl.setAttribute('transform', `translate(${nx}, ${ny})`)
-        d.rect.setAttribute('x', d.origBbox.x - 4 + nx)
-        d.rect.setAttribute('y', d.origBbox.y - 4 + ny)
+        d.rect.setAttribute('x', d.origBbox.x - pad + nx)
+        d.rect.setAttribute('y', d.origBbox.y - pad + ny)
 
         // Move resize handles too
         const handles = d.svg.querySelectorAll(`#vl-interactive rect[data-handle][data-layer-id="${d.layerId}"]`)
         const rw = parseFloat(d.rect.getAttribute('width'))
         const rh = parseFloat(d.rect.getAttribute('height'))
-        const rx = d.origBbox.x - 4 + nx
-        const ry = d.origBbox.y - 4 + ny
+        const rx = d.origBbox.x - pad + nx
+        const ry = d.origBbox.y - pad + ny
         handles.forEach((handle) => {
           const hs = parseFloat(handle.getAttribute('width'))
           const name = handle.getAttribute('data-handle')
@@ -650,11 +739,15 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         const finalY = parseFloat(d.rect.getAttribute('y'))
 
         layerBoxes.current[d.layerId] = { width: finalW, height: finalH }
+        // Store absolute rect position — stable across bbox changes
+        layerRectPos.current[d.layerId] = { x: finalX, y: finalY }
 
-        // Update offset so that bbox + offset = finalX/finalY (for NW/SW/NE corners that shift position)
+        // Also keep offset in sync for backward compat / persistence
         const pad = 6
-        const newOffsetX = finalX - (d.origBbox.x - pad)
-        const newOffsetY = finalY - (d.origBbox.y - pad)
+        let currentBbox
+        try { currentBbox = d.textEl.getBBox() } catch (_) { currentBbox = d.origBbox }
+        const newOffsetX = finalX - (currentBbox.x - pad)
+        const newOffsetY = finalY - (currentBbox.y - pad)
         layerOffsets.current[d.layerId] = { x: newOffsetX, y: newOffsetY }
 
         const overrides = {
@@ -662,6 +755,8 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           y_offset: newOffsetY,
           box_width: finalW,
           box_height: finalH,
+          rect_x: finalX,
+          rect_y: finalY,
         }
 
         // For text elements, persist the computed font size
@@ -675,6 +770,8 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         onLayerOverridesChange?.(d.layerId, overrides)
         dragRef.current = null
         setHoveredId(null)
+        // Rebuild interactive layer so closures have fresh bbox/position values
+        buildInteractiveLayer()
       } else {
         // Move mode (existing behavior)
         let nx = d.startOffsetX, ny = d.startOffsetY
@@ -685,11 +782,24 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         }
         const moved = Math.abs(nx - d.startOffsetX) > 3 || Math.abs(ny - d.startOffsetY) > 3
         layerOffsets.current[d.layerId] = { x: nx, y: ny }
+        // Update absolute rect position if it was set
+        if (layerRectPos.current[d.layerId]) {
+          const pad = d.pad || 6
+          layerRectPos.current[d.layerId] = {
+            x: d.origBbox.x - pad + nx,
+            y: d.origBbox.y - pad + ny,
+          }
+        }
         d.textEl.setAttribute('transform', `translate(${nx}, ${ny})`)
         dragRef.current = null
         setHoveredId(null)
         if (moved) {
-          onLayerOverridesChange?.(d.layerId, { x_offset: nx, y_offset: ny })
+          const moveOverrides = { x_offset: nx, y_offset: ny }
+          if (layerRectPos.current[d.layerId]) {
+            moveOverrides.rect_x = layerRectPos.current[d.layerId].x
+            moveOverrides.rect_y = layerRectPos.current[d.layerId].y
+          }
+          onLayerOverridesChange?.(d.layerId, moveOverrides)
         } else {
           setSelectedId((prev) => (prev === d.layerId ? null : d.layerId))
         }
@@ -834,6 +944,14 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       } else {
         element.textContent = newStyles.content
       }
+
+      // Update max font size when user changes it in the editor
+      if (newStyles.font_size) {
+        maxFontSizes.current[id] = parseFloat(newStyles.font_size)
+      }
+
+      // The absolute rect position (layerRectPos) stays stable — buildInteractiveLayer
+      // will use it to position the rect regardless of how the bbox changed.
 
       buildInteractiveLayer()
     } else {

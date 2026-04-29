@@ -1,0 +1,24 @@
+<div class='hg-col col-sm-2 ad_platform--name'> <%= ad_platform.name %>
+</div>
+<div class='hg-col col-sm-2 ad_platform--position'> <%= ad_platform.position %>
+</div>
+
+
+
+
+
+
+
+<div class=" scaffold-line-buttons col-md-2" >
+  
+
+  
+    <%= form_with url: admin_ad_platform_path(ad_platform), html: {data: {'turbo-confirm': "Are you sure you want to delete #{ ad_platform.name }?" }, style: "display: inline-block;"}, method: :delete do |f| %>
+      <%= f.submit "Delete".html_safe,  class: "delete-ad_platform-button btn btn-primary btn-sm", disabled: (ad_platform.respond_to?(:delete_able?) && ! ad_platform.delete_able? ) %>
+    <% end %>
+  
+
+  
+  <%= link_to "Edit ".html_safe, edit_admin_ad_platform_path(ad_platform) + (params[:page] ? "?page=#{params[:page]}" : ""), 'data-turbo' => 'false', disable_with: "Loading...", class: "edit-ad_platform-button btn btn-primary btn-sm" %>
+  
+</div>

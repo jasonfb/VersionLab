@@ -2,7 +2,7 @@ require "set"
 
 module AdLayout
   class LayoutEngine
-    Result = Data.define(:layers, :bucket, :target_width, :target_height)
+    Result = Data.define(:layers, :shape, :target_width, :target_height)
 
     def initialize(ad)
       @ad = ad
@@ -13,14 +13,14 @@ module AdLayout
     #
     # layout_variant: "left", "center", or "right" — overrides the per-role text
     # alignment from the template so the designer can pick a starting layout.
-    def compute_layout(target_width, target_height, layout_variant: "center")
+    def compute_layout(target_width, target_height, layout_variant: "center", shape_override: nil)
       unless @ad.classifications_confirmed? && @ad.classified_layers.present?
-        return legacy_layout(target_width, target_height)
+        return legacy_layout(target_width, target_height, shape_override: shape_override)
       end
 
-      bucket = AspectRatioBucket.classify(target_width, target_height)
-      template = LayoutTemplate.for_bucket(bucket)
-      placed_roles = LayoutTemplate.placed_roles(bucket)
+      shape = shape_override || AspectRatioBucket.classify(target_width, target_height)
+      template = LayoutTemplate.for_shape(shape)
+      placed_roles = LayoutTemplate.placed_roles(shape)
 
       base_scale = compute_base_font_scale(target_width, target_height)
       font_lookup = build_font_lookup
@@ -31,36 +31,7 @@ module AdLayout
       # as a single text block per chain head.
       classified = AdContinuation.collapse(@ad.classified_layers)
 
-      # Join groups: lay out as a single unit (like an image) so members
-      # keep their relative spacing. A layer joins a group by having
-      # wordmark_group_id set to the head layer's id. Process before the
-      # per-layer iteration and skip all group members in the main loop.
-      wordmark_template = template[:wordmark]
-      wordmark_member_ids = Set.new
-      if wordmark_template && !wordmark_template[:drop]
-        # Collect layers that explicitly reference a group head
-        explicit_by_gid = classified
-          .select { |l| l["wordmark_group_id"].present? }
-          .group_by { |l| l["wordmark_group_id"] }
-
-        join_groups = explicit_by_gid.filter_map do |gid, explicit_members|
-          head = classified.find { |l| l["id"] == gid }
-          all = ([head] + explicit_members).compact.uniq { |l| l["id"] }
-          [gid, all] if all.size >= 2
-        end.to_h
-
-        join_groups.each do |_group_id, members|
-          anchor_px = LayoutTemplate.anchor_to_pixels(
-            wordmark_template[:anchor], target_width, target_height
-          )
-          positioned_members = position_wordmark_group(members, anchor_px)
-          positioned.concat(positioned_members)
-          members.each { |m| wordmark_member_ids << m["id"] }
-        end
-      end
-
       classified.each do |layer|
-        next if wordmark_member_ids.include?(layer["id"])
         role = layer["role"]
         next unless role
         next unless placed_roles.include?(role)
@@ -85,7 +56,7 @@ module AdLayout
 
       Result.new(
         layers: positioned,
-        bucket: bucket,
+        shape: shape,
         target_width: target_width,
         target_height: target_height
       )
@@ -93,13 +64,13 @@ module AdLayout
 
     private
 
-    # Roles whose alignment the layout variant can override. Wordmark and
-    # decoration keep their template-defined alignment regardless of variant.
+    # Roles whose alignment the layout variant can override. Decoration
+    # keeps its template-defined alignment regardless of variant.
     VARIANT_ALIGNABLE_ROLES = %w[headline subhead body cta logo].to_set.freeze
 
     # Override a role_template's align (and optionally anchor x-position) based
     # on the chosen layout variant. Returns the original template if no override
-    # applies (e.g. for wordmark, decoration, or "center" variant which matches
+    # applies (e.g. for decoration, or "center" variant which matches
     # most templates already).
     def apply_variant_alignment(role_template, role, layout_variant)
       return role_template unless VARIANT_ALIGNABLE_ROLES.include?(role)
@@ -203,70 +174,6 @@ module AdLayout
         a[:x] + a[:w] > b[:x] &&
         a[:y] < b[:y] + b[:h] &&
         a[:y] + a[:h] > b[:y]
-    end
-
-    # Position a wordmark group as a single unit. Members may have different
-    # font sizes/families — we treat the group's combined bounding box like
-    # an image: scale it to fit the wordmark anchor preserving aspect ratio,
-    # then place each member at its scaled relative position with a scaled
-    # font size. No text wrapping; wordmarks are short by design.
-    def position_wordmark_group(members, anchor_px)
-      return [] if members.empty?
-
-      # Per-member original bbox (estimated from font_size + content length)
-      bboxes = members.map do |layer|
-        font_size = layer["font_size"].to_f
-        font_size = 12.0 if font_size <= 0
-        content = layer["content"].to_s
-        # Approximate width using the same heuristic used elsewhere in this file
-        est_width = layer["width"].to_f
-        est_width = font_size * content.length * 0.55 if est_width <= 0
-        est_height = layer["height"].to_f
-        est_height = font_size * 1.3 if est_height <= 0
-        {
-          layer: layer,
-          font_size: font_size,
-          x: layer["x"].to_f,
-          y: layer["y"].to_f,
-          w: est_width,
-          h: est_height
-        }
-      end
-
-      group_min_x = bboxes.map { |b| b[:x] }.min
-      group_min_y = bboxes.map { |b| b[:y] }.min
-      group_max_x = bboxes.map { |b| b[:x] + b[:w] }.max
-      group_max_y = bboxes.map { |b| b[:y] + b[:h] }.max
-      group_w = group_max_x - group_min_x
-      group_h = group_max_y - group_min_y
-      return [] if group_w <= 0 || group_h <= 0
-
-      scale = [anchor_px[:w] / group_w, anchor_px[:h] / group_h].min
-      # Center the scaled group within the anchor region
-      scaled_w = group_w * scale
-      scaled_h = group_h * scale
-      offset_x = anchor_px[:x] + (anchor_px[:w] - scaled_w) / 2.0
-      offset_y = anchor_px[:y] + (anchor_px[:h] - scaled_h) / 2.0
-
-      bboxes.map do |b|
-        result = b[:layer].dup
-        new_x = offset_x + (b[:x] - group_min_x) * scale
-        new_y = offset_y + (b[:y] - group_min_y) * scale
-        new_font = (b[:font_size] * scale).round(1)
-        new_font = [new_font, 6.0].max # don't scale below readability floor
-
-        result["x"] = new_x.round.to_s
-        result["y"] = new_y.round.to_s
-        result["width"] = (b[:w] * scale).round.to_s
-        result["height"] = (b[:h] * scale).round.to_s
-        result["font_size"] = new_font.to_s
-        result["align"] = "left"
-        result["wrapped_lines"] = [b[:layer]["content"]]
-        # Strip any inherited cta_background since wordmarks aren't buttons
-        result.delete("cta_background_color")
-        result.delete("cta_background_rx_ratio")
-        result
-      end
     end
 
     def position_layer(layer, role_template, anchor_px, base_scale, font_lookup)
@@ -396,7 +303,7 @@ module AdLayout
       [scale_x, scale_y].min
     end
 
-    def legacy_layout(target_width, target_height)
+    def legacy_layout(target_width, target_height, shape_override: nil)
       scale_x = target_width.to_f / @ad.width
       scale_y = target_height.to_f / @ad.height
 
@@ -415,8 +322,8 @@ module AdLayout
         resized
       end
 
-      bucket = AspectRatioBucket.classify(target_width, target_height)
-      Result.new(layers: layers, bucket: bucket, target_width: target_width, target_height: target_height)
+      shape = shape_override || AspectRatioBucket.classify(target_width, target_height)
+      Result.new(layers: layers, shape: shape, target_width: target_width, target_height: target_height)
     end
   end
 end

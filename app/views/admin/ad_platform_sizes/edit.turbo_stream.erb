@@ -1,0 +1,3 @@
+<%= turbo_stream.replace "admin__#{dom_id(@ad_platform_size)}" do %>
+  <%= render 'edit', locals: { ad_platform_size: @ad_platform_size, ad_platform: @ad_platform  } %>
+<% end %>

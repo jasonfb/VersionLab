@@ -1,0 +1,18 @@
+<%= turbo_frame_tag "admin__#{dom_id(ad_platform)}" do  %>
+<div class="cell editable" style="position: relative;">
+  <% if ad_platform.errors.any? %>
+  <%= render(partial: "admin/errors", locals: {resource: ad_platform }) %>
+  <% end %>
+  <h2>Editing <%= ad_platform.name %></h2>
+  <%= form_with model: ad_platform,
+   url: admin_ad_platform_path(ad_platform), html: {'data-turbo': false} do |f| %>
+    <%=  render partial: "admin/ad_platforms/form", locals: {
+      ad_platform: ad_platform,
+      f: f,
+      
+  } %>
+  
+  <% end %>
+  
+</div>
+<% end %>

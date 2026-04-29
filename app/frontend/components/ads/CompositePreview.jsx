@@ -13,6 +13,8 @@ export default function CompositePreview({
   layerOverrides,
   onLayerOverridesChange,
   onEditLayer,
+  showOutlines = true,
+  onClick,
 }) {
   const svgRef = useRef(null)
   const [fontsLoaded, setFontsLoaded] = useState(false)
@@ -150,20 +152,21 @@ export default function CompositePreview({
 
         return (
           <g key={layer.id}>
-            {/* Hit area for drag + dblclick */}
+            {/* Hit area for drag + click */}
             <rect
               x={x + ox}
               y={y + oy}
               width={w}
               height={h}
               fill="transparent"
-              stroke="#dc3545"
-              strokeWidth={2}
-              strokeDasharray="8 4"
+              stroke={showOutlines ? "#dc3545" : "transparent"}
+              strokeWidth={showOutlines ? 2 : 0}
+              strokeDasharray={showOutlines ? "8 4" : undefined}
               rx={3}
-              style={{ cursor: 'move' }}
-              onMouseDown={(e) => onDragStart(e, layer.id)}
-              onDoubleClick={() => onEditLayer?.(layer)}
+              style={{ cursor: onClick ? 'pointer' : 'move' }}
+              onMouseDown={(e) => !onClick && onDragStart(e, layer.id)}
+              onClick={() => onClick?.()}
+              onDoubleClick={() => !onClick && onEditLayer?.(layer)}
             />
             {/* Rendered text */}
             <text

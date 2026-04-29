@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe AdLayout::SvgComposer do
+  include_context "seeded ad shapes"
+
   let(:ad) do
     create(:ad,
       width: 1080,

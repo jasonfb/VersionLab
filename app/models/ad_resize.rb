@@ -26,6 +26,7 @@
 #
 class AdResize < ApplicationRecord
   belongs_to :ad
+  belongs_to :ad_shape, optional: true
   has_many :ad_versions, dependent: :nullify
 
   has_one_attached :preview_image
@@ -45,5 +46,10 @@ class AdResize < ApplicationRecord
 
   def dimensions
     "#{width}x#{height}"
+  end
+
+  # Override chain: explicit ad_shape > computed from dimensions
+  def effective_shape
+    ad_shape&.name&.to_sym || AdLayout::AspectRatioBucket.classify(width, height)
   end
 end

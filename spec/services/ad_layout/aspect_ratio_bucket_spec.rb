@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe AdLayout::AspectRatioBucket do
+  include_context "seeded ad shapes"
+
   describe ".classify" do
     # Square
     { "1080x1080 (1:1)" => [1080, 1080, :square],
@@ -44,9 +46,9 @@ RSpec.describe AdLayout::AspectRatioBucket do
     end
   end
 
-  describe ".all_buckets" do
-    it "returns all 6 bucket names" do
-      expect(described_class.all_buckets).to eq(
+  describe ".all_shapes" do
+    it "returns all 6 shape names" do
+      expect(described_class.all_shapes).to eq(
         [:leaderboard, :landscape, :square, :portrait, :story, :skyscraper]
       )
     end

@@ -1,0 +1,16 @@
+<%= turbo_frame_tag "admin__ad_shape-new" do %>
+  <h3>
+    New Ad Shape
+  </h3>
+  <%= form_with model:  ad_shape,
+         url: admin_ad_shapes_path, method: :post do  |f| %>
+  <%=  render partial: "admin/ad_shapes/form", locals: {
+    ad_shape: ad_shape,
+    f: f,
+    
+} %>
+
+
+<% end %>
+
+<% end %>

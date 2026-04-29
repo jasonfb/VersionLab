@@ -1,0 +1,12 @@
+<%= turbo_frame_tag "admin__#{ dom_id(ad_platform_size) }" do  %>
+  <div class='row hg-row' data-id='<%= ad_platform_size.id %>' data-edit='false'>
+  <%= render partial: 'admin/ad_platform_sizes/show', locals: {
+    ad_platform_size: ad_platform_size,
+    ad_platform: ad_platform,
+    nested_for: "ad_platform-#{ad_platform.id}" } %>
+  </div>
+<% end %>
+
+
+
+

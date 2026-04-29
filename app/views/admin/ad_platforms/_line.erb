@@ -1,0 +1,10 @@
+<%= turbo_frame_tag "admin__#{ dom_id(ad_platform) }" do  %>
+  <div class='row hg-row' data-id='<%= ad_platform.id %>' data-edit='false'>
+  <%= render partial: 'admin/ad_platforms/show', locals: {
+    ad_platform: ad_platform } %>
+  </div>
+<% end %>
+
+
+
+

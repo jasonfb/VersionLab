@@ -28,6 +28,7 @@ Rails.application.routes.draw do
     resources :ai_usage_summaries, only: [ :index ]
     resources :ai_logs, only: [ :index ]
     get "lookups", to: "lookups#index"
+    resources :ad_shapes, only: [:index]
     resources :clients, only: [ :index, :create, :update ] do
       resources :campaigns, only: [ :index, :show, :create, :update, :destroy ] do
         member do
@@ -112,6 +113,12 @@ Rails.application.routes.draw do
         get :ai_models
       end
       resources :account_users
+    end
+    resources :ad_platforms do
+      resources :ad_platform_sizes
+    end
+    resources :ad_shapes do
+      resources :ad_shape_layout_rules
     end
     resources :subscription_tiers
     resources :subscriptions, only: [ :edit, :update ]
