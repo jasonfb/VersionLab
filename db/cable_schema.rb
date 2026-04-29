@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_27_232350) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_29_144737) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -24,7 +24,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_27_232350) do
   create_enum "ad_state", ["setup", "pending", "merged", "regenerating", "resizing"]
   create_enum "ad_version_state", ["generating", "active", "rejected"]
   create_enum "ad_versioning_mode", ["retain_existing", "version_ads"]
-  create_enum "ai_log_call_type", ["email", "campaign_summary", "email_summary", "ad"]
+  create_enum "ai_log_call_type", ["email", "campaign_summary", "email_summary", "ad", "audience_summary"]
   create_enum "asset_standardized_ratio", ["hero_3_1", "banner_2_1", "widescreen_16_9", "square_1_1", "portrait_4_5"]
   create_enum "autolink_link_mode", ["user_url", "ai_decide"]
   create_enum "autolink_mode", ["none", "link_relevant_text"]
@@ -294,32 +294,71 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_27_232350) do
   end
 
   create_table "assets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "assetable_id"
+    t.string "assetable_type"
     t.uuid "client_id", null: false
+    t.text "content_text"
     t.datetime "created_at", null: false
+    t.string "display_name"
     t.string "folder"
     t.integer "height"
     t.string "name"
     t.enum "standardized_ratio", enum_type: "asset_standardized_ratio"
     t.datetime "updated_at", null: false
     t.integer "width"
+    t.index ["assetable_type", "assetable_id"], name: "index_assets_on_assetable_type_and_assetable_id"
     t.index ["client_id"], name: "index_assets_on_client_id"
   end
 
   create_table "audiences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "action_prevention_factors", default: [], array: true
+    t.string "action_prevention_factors_other"
+    t.datetime "ai_summary_generated_at"
+    t.enum "ai_summary_state", default: "idle", null: false, enum_type: "campaign_ai_summary_state"
+    t.text "checkout_friction_points", default: [], array: true
+    t.string "checkout_friction_points_other"
     t.uuid "client_id", null: false
+    t.string "client_url"
+    t.text "communication_channels", default: [], array: true
+    t.string "communication_channels_other"
+    t.string "communication_frequency"
+    t.string "communication_frequency_other"
     t.datetime "created_at", null: false
     t.text "creative_and_imagery_rules"
     t.text "demographics_and_financial_capacity"
     t.text "details"
     t.text "executive_summary"
+    t.text "general_insights"
+    t.string "industry"
+    t.string "industry_other"
+    t.string "interaction_recency"
+    t.string "interaction_recency_other"
     t.text "lapse_diagnosis"
+    t.text "lifecycle_messages", default: [], array: true
+    t.string "lifecycle_messages_other"
     t.text "motivational_drivers_and_messaging_framework"
     t.string "name", null: false
+    t.string "order_value_band"
+    t.string "order_value_band_other"
+    t.text "outcomes_that_matter", default: [], array: true
+    t.string "outcomes_that_matter_other"
+    t.string "primary_action"
+    t.string "primary_action_other"
+    t.text "product_categories_themes"
+    t.string "product_visuals_impact"
     t.text "prohibited_patterns"
+    t.string "promotion_sensitivity"
+    t.string "promotion_sensitivity_other"
+    t.string "purchase_cadence"
+    t.string "purchase_cadence_other"
     t.text "relationship_state_and_pre_lapse_indicators"
+    t.string "relationship_status"
     t.text "risk_scoring_model"
     t.text "strategic_reactivation_and_upgrade_cadence"
     t.text "success_indicators_and_macro_trends"
+    t.text "supporting_sites", default: [], array: true
+    t.text "top_purchase_drivers", default: [], array: true
+    t.string "top_purchase_drivers_other"
     t.datetime "updated_at", null: false
   end
 

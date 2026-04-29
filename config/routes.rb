@@ -52,6 +52,12 @@ Rails.application.routes.draw do
       end
       resources :audiences, only: [ :index, :show, :create, :update, :destroy ] do
         post :seed, on: :collection
+        member do
+          post :summarize
+          get :documents
+          post :upload_document
+          delete "documents/:document_id", action: :destroy_document, as: :destroy_document
+        end
       end
       resources :ads, only: [ :index, :show, :create, :update, :destroy ] do
         member do

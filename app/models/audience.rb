@@ -22,6 +22,9 @@
 #
 class Audience < ApplicationRecord
   belongs_to :client
+  has_many :assets, as: :assetable, dependent: :destroy
 
   validates :name, presence: true
+
+  enum :ai_summary_state, { idle: "idle", generating: "generating", generated: "generated", failed: "failed" }
 end

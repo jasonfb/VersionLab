@@ -23,6 +23,7 @@
 #
 class Asset < ApplicationRecord
   belongs_to :client
+  belongs_to :assetable, polymorphic: true, optional: true
 
   has_one_attached :file
 

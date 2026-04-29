@@ -1,6 +1,6 @@
 class Api::AudiencesController < Api::BaseController
   before_action :set_client
-  before_action :set_audience, only: [ :show, :update, :destroy ]
+  before_action :set_audience, only: [ :show, :update, :destroy, :summarize, :documents, :upload_document, :destroy_document ]
 
   def index
     audiences = @client.audiences.order(updated_at: :desc)
@@ -40,6 +40,39 @@ class Api::AudiencesController < Api::BaseController
     head :no_content
   end
 
+  def summarize
+    @audience.update!(ai_summary_state: :generating)
+    AudienceSummaryJob.perform_later(@audience.id)
+    render json: audience_json(@audience)
+  end
+
+  def documents
+    docs = @audience.assets.order(created_at: :asc)
+    render json: docs.map { |d| document_json(d) }
+  end
+
+  def upload_document
+    file = params[:file]
+    asset = @client.assets.build(
+      name: file.original_filename,
+      display_name: file.original_filename,
+      assetable: @audience
+    )
+    asset.file.attach(file)
+
+    if asset.save
+      render json: document_json(asset), status: :created
+    else
+      render json: { errors: asset.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  def destroy_document
+    doc = @audience.assets.find(params[:document_id])
+    doc.destroy!
+    head :no_content
+  end
+
   private
 
   def set_client
@@ -62,7 +95,42 @@ class Api::AudiencesController < Api::BaseController
       :creative_and_imagery_rules,
       :risk_scoring_model,
       :prohibited_patterns,
-      :success_indicators_and_macro_trends
+      :success_indicators_and_macro_trends,
+      # Profile fields
+      :client_url,
+      :industry,
+      :industry_other,
+      :interaction_recency,
+      :interaction_recency_other,
+      :purchase_cadence,
+      :purchase_cadence_other,
+      :relationship_status,
+      :primary_action,
+      :primary_action_other,
+      :order_value_band,
+      :order_value_band_other,
+      :promotion_sensitivity,
+      :promotion_sensitivity_other,
+      :communication_frequency,
+      :communication_frequency_other,
+      :product_visuals_impact,
+      :general_insights,
+      :product_categories_themes,
+      # "Other" text for multiselects
+      :outcomes_that_matter_other,
+      :top_purchase_drivers_other,
+      :action_prevention_factors_other,
+      :checkout_friction_points_other,
+      :communication_channels_other,
+      :lifecycle_messages_other,
+      # Array fields
+      supporting_sites: [],
+      outcomes_that_matter: [],
+      top_purchase_drivers: [],
+      action_prevention_factors: [],
+      checkout_friction_points: [],
+      communication_channels: [],
+      lifecycle_messages: []
     )
   end
 
@@ -81,7 +149,54 @@ class Api::AudiencesController < Api::BaseController
       risk_scoring_model: a.risk_scoring_model,
       prohibited_patterns: a.prohibited_patterns,
       success_indicators_and_macro_trends: a.success_indicators_and_macro_trends,
+      # Profile fields
+      client_url: a.client_url,
+      industry: a.industry,
+      industry_other: a.industry_other,
+      interaction_recency: a.interaction_recency,
+      interaction_recency_other: a.interaction_recency_other,
+      purchase_cadence: a.purchase_cadence,
+      purchase_cadence_other: a.purchase_cadence_other,
+      relationship_status: a.relationship_status,
+      primary_action: a.primary_action,
+      primary_action_other: a.primary_action_other,
+      order_value_band: a.order_value_band,
+      order_value_band_other: a.order_value_band_other,
+      promotion_sensitivity: a.promotion_sensitivity,
+      promotion_sensitivity_other: a.promotion_sensitivity_other,
+      communication_frequency: a.communication_frequency,
+      communication_frequency_other: a.communication_frequency_other,
+      product_visuals_impact: a.product_visuals_impact,
+      general_insights: a.general_insights,
+      product_categories_themes: a.product_categories_themes,
+      supporting_sites: a.supporting_sites,
+      outcomes_that_matter: a.outcomes_that_matter,
+      top_purchase_drivers: a.top_purchase_drivers,
+      action_prevention_factors: a.action_prevention_factors,
+      checkout_friction_points: a.checkout_friction_points,
+      communication_channels: a.communication_channels,
+      lifecycle_messages: a.lifecycle_messages,
+      outcomes_that_matter_other: a.outcomes_that_matter_other,
+      top_purchase_drivers_other: a.top_purchase_drivers_other,
+      action_prevention_factors_other: a.action_prevention_factors_other,
+      checkout_friction_points_other: a.checkout_friction_points_other,
+      communication_channels_other: a.communication_channels_other,
+      lifecycle_messages_other: a.lifecycle_messages_other,
+      # AI summary state
+      ai_summary_state: a.ai_summary_state,
+      ai_summary_generated_at: a.ai_summary_generated_at,
       updated_at: a.updated_at
+    }
+  end
+
+  def document_json(d)
+    {
+      id: d.id,
+      display_name: d.display_name || d.name,
+      content_type: d.file.attached? ? d.file.blob.content_type : nil,
+      byte_size: d.file.attached? ? d.file.blob.byte_size : nil,
+      has_text: d.content_text.present?,
+      created_at: d.created_at
     }
   end
 end
