@@ -100,7 +100,7 @@ gem "pundit", "~> 2.5"
 
 gem "ruby-openai", "~> 7.4"
 
-gem "rubyzip", "~> 2.4"
+gem "rubyzip", "~> 3.2"
 gem "pdf-reader", "~> 2.0"
 
 gem "stripe", "~> 14.0"
