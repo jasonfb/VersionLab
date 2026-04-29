@@ -73,7 +73,8 @@ class AudienceSummaryService
   def parse_response(content)
     raise Error, "Blank AI response" if content.blank?
 
-    json = JSON.parse(content)
+    cleaned = content.sub(/\A\s*```(?:json)?\s*\n?/, "").sub(/\n?\s*```\s*\z/, "")
+    json = JSON.parse(cleaned)
     SUMMARY_FIELDS.each_with_object({}) do |key, hash|
       hash[key] = json[key] if json[key].present?
     end

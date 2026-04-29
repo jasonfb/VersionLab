@@ -155,7 +155,8 @@ class AdMergeService
   end
 
   def parse_response(json_string)
-    parsed = JSON.parse(json_string)
+    cleaned = json_string.sub(/\A\s*```(?:json)?\s*\n?/, "").sub(/\n?\s*```\s*\z/, "")
+    parsed = JSON.parse(cleaned)
     raise Error, "Expected a JSON object with layer IDs as keys" unless parsed.is_a?(Hash)
     parsed
   rescue JSON::ParserError => e

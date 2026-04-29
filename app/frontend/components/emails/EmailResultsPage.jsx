@@ -69,7 +69,7 @@ export default function EmailResultsPage() {
     if (!iframe || html === null) return
     const doc = iframe.contentDocument || iframe.contentWindow.document
     doc.open(); doc.write(html); doc.close()
-  }, [html])
+  }, [html, viewMode])
 
   const openRejectModal = (audience) => {
     setRejectModal(audience)

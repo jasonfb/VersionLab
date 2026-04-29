@@ -140,7 +140,8 @@ class AdAiClassifyService
 
   def parse_response(json_string)
     raise Error, "Empty response from AI" if json_string.blank?
-    parsed = JSON.parse(json_string)
+    cleaned = json_string.sub(/\A\s*```(?:json)?\s*\n?/, "").sub(/\n?\s*```\s*\z/, "")
+    parsed = JSON.parse(cleaned)
     layers = parsed.is_a?(Hash) ? parsed["layers"] : nil
     raise Error, "Expected a JSON object with a 'layers' array" unless layers.is_a?(Array)
     layers
