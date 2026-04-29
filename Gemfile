@@ -106,3 +106,5 @@ gem "pdf-reader", "~> 2.0"
 gem "stripe", "~> 14.0"
 
 gem "mailgun-ruby", "~> 1.3"
+
+gem "exception_notification", "~> 4.5"

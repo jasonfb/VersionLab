@@ -76,10 +76,12 @@ RSpec.describe AdJob do
     end
 
     context "when AdMergeService raises" do
-      it "handles AdMergeService::Error and resets state" do
+      it "handles AdMergeService::Error, resets state, and re-raises" do
         allow(AdMergeService).to receive(:new).and_raise(AdMergeService::Error, "AI error")
 
-        described_class.new.perform(ad.id)
+        expect {
+          described_class.new.perform(ad.id)
+        }.to raise_error(AdMergeService::Error, "AI error")
 
         expect(ad.reload.state).to eq("setup")
       end

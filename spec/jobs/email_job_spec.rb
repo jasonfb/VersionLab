@@ -63,10 +63,12 @@ RSpec.describe EmailJob do
     end
 
     context "when AiMergeService raises an error" do
-      it "handles AiMergeService::Error and resets state to setup" do
+      it "handles AiMergeService::Error, resets state, and re-raises" do
         allow(AiMergeService).to receive(:new).and_raise(AiMergeService::Error, "API failure")
 
-        described_class.new.perform(email.id)
+        expect {
+          described_class.new.perform(email.id)
+        }.to raise_error(AiMergeService::Error, "API failure")
 
         expect(email.reload.state).to eq("setup")
       end
@@ -74,7 +76,9 @@ RSpec.describe EmailJob do
       it "broadcasts error via ActionCable" do
         allow(AiMergeService).to receive(:new).and_raise(AiMergeService::Error, "API failure")
 
-        described_class.new.perform(email.id)
+        expect {
+          described_class.new.perform(email.id)
+        }.to raise_error(AiMergeService::Error)
 
         expect(ActionCable.server).to have_received(:broadcast).with(
           "email:#{email.id}",

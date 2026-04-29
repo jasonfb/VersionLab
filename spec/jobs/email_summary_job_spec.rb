@@ -24,12 +24,14 @@ RSpec.describe EmailSummaryJob do
     end
 
     context "when EmailSummaryService raises" do
-      it "sets state to failed on service error" do
+      it "sets state to failed on service error and re-raises" do
         allow(EmailSummaryService).to receive(:new).and_raise(
           EmailSummaryService::Error, "No AI"
         )
 
-        described_class.new.perform(email.id)
+        expect {
+          described_class.new.perform(email.id)
+        }.to raise_error(EmailSummaryService::Error, "No AI")
 
         expect(email.reload.ai_summary_state).to eq("failed")
       end

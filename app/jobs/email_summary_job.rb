@@ -17,6 +17,7 @@ class EmailSummaryJob < ApplicationJob
   rescue EmailSummaryService::Error => e
     Rails.logger.error("EmailSummaryJob failed for email #{email_id}: #{e.message}")
     email&.update!(ai_summary_state: :failed)
+    raise
   rescue StandardError => e
     Rails.logger.error("EmailSummaryJob unexpected error for email #{email_id}: #{e.message}")
     email&.update!(ai_summary_state: :failed)

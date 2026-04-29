@@ -25,6 +25,7 @@ class AdJob < ApplicationJob
   rescue AdMergeService::Error => e
     Rails.logger.error("AdJob failed for ad #{ad_id}: #{e.message}")
     handle_failure(ad, audience_id, error: e.message)
+    raise
   rescue StandardError => e
     Rails.logger.error("AdJob unexpected error for ad #{ad_id}: #{e.message}")
     handle_failure(ad, audience_id, error: e.message)
@@ -43,6 +44,7 @@ class AdJob < ApplicationJob
         AdRenderService.new(version).call
       rescue AdRenderService::Error => e
         Rails.logger.error("AdRenderService failed for version #{version.id}: #{e.message}")
+        ExceptionNotifier.notify_exception(e, data: { job: "AdJob", ad_id: ad.id, version_id: version.id })
       end
     end
   end

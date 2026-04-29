@@ -17,6 +17,7 @@ class CampaignSummaryJob < ApplicationJob
   rescue CampaignSummaryService::Error => e
     Rails.logger.error("CampaignSummaryJob failed for campaign #{campaign_id}: #{e.message}")
     campaign&.update!(ai_summary_state: :failed)
+    raise
   rescue StandardError => e
     Rails.logger.error("CampaignSummaryJob unexpected error for campaign #{campaign_id}: #{e.message}")
     campaign&.update!(ai_summary_state: :failed)

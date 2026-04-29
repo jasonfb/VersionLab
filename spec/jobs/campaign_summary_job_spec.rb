@@ -34,12 +34,14 @@ RSpec.describe CampaignSummaryJob do
     end
 
     context "when CampaignSummaryService raises" do
-      it "sets state to failed on service error" do
+      it "sets state to failed on service error and re-raises" do
         allow(CampaignSummaryService).to receive(:new).and_raise(
           CampaignSummaryService::Error, "No AI service"
         )
 
-        described_class.new.perform(campaign.id)
+        expect {
+          described_class.new.perform(campaign.id)
+        }.to raise_error(CampaignSummaryService::Error, "No AI service")
 
         expect(campaign.reload.ai_summary_state).to eq("failed")
       end

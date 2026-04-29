@@ -13,6 +13,7 @@ class EmailJob < ApplicationJob
   rescue AiMergeService::Error => e
     Rails.logger.error("EmailJob failed for email #{email_id}: #{e.message}")
     handle_failure(email, audience_id, error: e.message)
+    raise
   rescue StandardError => e
     Rails.logger.error("EmailJob unexpected error for email #{email_id}: #{e.message}")
     handle_failure(email, audience_id, error: e.message)
