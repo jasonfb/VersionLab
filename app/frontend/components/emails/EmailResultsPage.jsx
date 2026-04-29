@@ -10,6 +10,7 @@ export default function EmailResultsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedAudienceId, setSelectedAudienceId] = useState(null)
+  const [viewMode, setViewMode] = useState('preview') // 'preview' or 'table'
 
   // Preview state
   const [html, setHtml] = useState(null)
@@ -107,6 +108,11 @@ export default function EmailResultsPage() {
   }
 
   const { email_template_name, audiences, variables, state } = data
+  const selectedAudience = audiences.find((a) => a.id === selectedAudienceId)
+  const activeVersion = selectedAudience
+    ? [...(selectedAudience.versions ?? [])].reverse().find((v) => v.state === 'active')
+    : null
+  const generatingVersion = selectedAudience?.versions.find((v) => v.state === 'generating')
 
   return (
     <div className="p-4 d-flex flex-column" style={{ height: 'calc(100vh - 60px)' }}>
@@ -137,32 +143,58 @@ export default function EmailResultsPage() {
           >
             <i className="bi bi-download me-1"></i>Export ZIP
           </a>
+          <button
+            className={`btn btn-sm ${viewMode === 'table' ? 'btn-secondary' : 'btn-outline-secondary'}`}
+            onClick={() => setViewMode(viewMode === 'preview' ? 'table' : 'preview')}
+            title={viewMode === 'preview' ? 'Switch to table view' : 'Switch to preview'}
+          >
+            <i className={`bi ${viewMode === 'preview' ? 'bi-table' : 'bi-eye'} me-1`}></i>
+            {viewMode === 'preview' ? 'Table View' : 'Preview'}
+          </button>
         </div>
       </div>
 
-      {/* Main split layout */}
-      <div className="d-flex gap-3 flex-grow-1" style={{ minHeight: 0 }}>
-        {/* Left: Variables table */}
-        <div className="flex-grow-1" style={{ minWidth: 0, overflow: 'hidden' }}>
-          <VariablesTable
+      {/* Audience tabs */}
+      <div className="d-flex align-items-center gap-2 mb-3 flex-shrink-0 flex-wrap">
+        {audiences.map((a) => {
+          const isSelected = selectedAudienceId === a.id
+          const isGenerating = a.versions.some((v) => v.state === 'generating')
+          return (
+            <button
+              key={a.id}
+              className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => setSelectedAudienceId(a.id)}
+            >
+              {isGenerating && (
+                <span className="spinner-border spinner-border-sm me-1" style={{ width: '0.6rem', height: '0.6rem' }} />
+              )}
+              {a.name}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Content area */}
+      <div className="flex-grow-1" style={{ minHeight: 0 }}>
+        {viewMode === 'preview' ? (
+          <PreviewView
+            audience={selectedAudience}
+            activeVersion={activeVersion}
+            generatingVersion={generatingVersion}
+            html={html}
+            loadingPreview={loadingPreview}
+            iframeRef={iframeRef}
+            onReject={openRejectModal}
+          />
+        ) : (
+          <TableView
             audiences={audiences}
             variables={variables}
             selectedAudienceId={selectedAudienceId}
             onSelectAudience={setSelectedAudienceId}
             onReject={openRejectModal}
           />
-        </div>
-
-        {/* Right: Preview panel */}
-        <div className="flex-shrink-0 d-flex flex-column" style={{ width: 420, minWidth: 420 }}>
-          <PreviewPanel
-            audiences={audiences}
-            selectedAudienceId={selectedAudienceId}
-            html={html}
-            loadingPreview={loadingPreview}
-            iframeRef={iframeRef}
-          />
-        </div>
+        )}
       </div>
 
       {/* Rejection modal */}
@@ -206,10 +238,66 @@ export default function EmailResultsPage() {
   )
 }
 
-// ─── Variables Table ────────────────────────────────────────────────────────
+// ─── Preview View (default) ─────────────────────────────────────────────────
 
-function VariablesTable({ audiences, variables, selectedAudienceId, onSelectAudience, onReject }) {
-  // selectedVersionId per audience — default to latest active version
+function PreviewView({ audience, activeVersion, generatingVersion, html, loadingPreview, iframeRef, onReject }) {
+  return (
+    <div className="d-flex flex-column h-100">
+      {/* Audience toolbar with reject button */}
+      {audience && (
+        <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
+          <div className="d-flex align-items-center gap-2">
+            <span className="fw-semibold">{audience.name}</span>
+            {activeVersion && (
+              <span className="badge bg-light text-muted border">v{activeVersion.version_number}</span>
+            )}
+            {generatingVersion && (
+              <span className="badge bg-warning text-dark">
+                <span className="spinner-border spinner-border-sm me-1" style={{ width: '0.6rem', height: '0.6rem' }} />
+                v{generatingVersion.version_number} generating
+              </span>
+            )}
+            {loadingPreview && (
+              <div className="spinner-border spinner-border-sm text-secondary" role="status" />
+            )}
+          </div>
+          {activeVersion && !generatingVersion && (
+            <button
+              className="btn btn-outline-danger btn-sm"
+              onClick={() => onReject(audience)}
+            >
+              <i className="bi bi-arrow-repeat me-1"></i>Reject &amp; Regenerate
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Full-width preview */}
+      <div className="border rounded flex-grow-1 bg-white" style={{ minHeight: 0 }}>
+        {generatingVersion ? (
+          <div className="d-flex align-items-center justify-content-center h-100 text-muted flex-column gap-2">
+            <div className="spinner-border" role="status" />
+            <p className="mb-0 small">Generating v{generatingVersion.version_number}…</p>
+          </div>
+        ) : html === null ? (
+          <div className="d-flex align-items-center justify-content-center h-100 text-muted">
+            <small>No active version to preview</small>
+          </div>
+        ) : (
+          <iframe
+            ref={iframeRef}
+            style={{ width: '100%', height: '100%', border: 'none' }}
+            title="Email Preview"
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Table View ─────────────────────────────────────────────────────────────
+
+function TableView({ audiences, variables, selectedAudienceId, onSelectAudience, onReject }) {
   const defaultSelected = Object.fromEntries(
     audiences.map((a) => {
       const active = [...a.versions].reverse().find((v) => v.state === 'active')
@@ -243,8 +331,8 @@ function VariablesTable({ audiences, variables, selectedAudienceId, onSelectAudi
             </th>
             {audiences.map((a) => {
               const isSelected = selectedAudienceId === a.id
-              const activeVersion = [...a.versions].reverse().find((v) => v.state === 'active')
-              const generatingVersion = a.versions.find((v) => v.state === 'generating')
+              const activeVer = [...a.versions].reverse().find((v) => v.state === 'active')
+              const generatingVer = a.versions.find((v) => v.state === 'generating')
               return (
                 <th
                   key={a.id}
@@ -260,14 +348,14 @@ function VariablesTable({ audiences, variables, selectedAudienceId, onSelectAudi
                   <div className="d-flex align-items-start justify-content-between">
                     <div>
                       <div className="fw-semibold">{a.name}</div>
-                      {generatingVersion && (
+                      {generatingVer && (
                         <small className="text-warning">
                           <span className="spinner-border spinner-border-sm me-1" style={{ width: '0.6rem', height: '0.6rem' }} />
-                          v{generatingVersion.version_number} generating
+                          v{generatingVer.version_number} generating
                         </small>
                       )}
                     </div>
-                    {activeVersion && !generatingVersion && (
+                    {activeVer && !generatingVer && (
                       <button
                         className="btn btn-outline-danger btn-sm py-0 px-1"
                         style={{ fontSize: '0.7rem', lineHeight: 1.4 }}
@@ -343,46 +431,5 @@ function VersionSelector({ versions, selectedId, onChange }) {
         </option>
       ))}
     </select>
-  )
-}
-
-// ─── Preview Panel ──────────────────────────────────────────────────────────
-
-function PreviewPanel({ audiences, selectedAudienceId, html, loadingPreview, iframeRef }) {
-  const audience = audiences.find((a) => a.id === selectedAudienceId)
-  const generating = audience?.versions.find((v) => v.state === 'generating')
-
-  return (
-    <div className="border rounded d-flex flex-column h-100 bg-white">
-      <div className="px-3 py-2 border-bottom bg-light d-flex align-items-center justify-content-between flex-shrink-0">
-        <div>
-          <small className="text-muted text-uppercase fw-semibold" style={{ letterSpacing: '0.05em', fontSize: '0.7rem' }}>Preview</small>
-          {audience && (
-            <div className="fw-semibold small">{audience.name}</div>
-          )}
-        </div>
-        {loadingPreview && (
-          <div className="spinner-border spinner-border-sm text-secondary" role="status" />
-        )}
-      </div>
-      <div className="flex-grow-1 position-relative" style={{ minHeight: 0 }}>
-        {generating ? (
-          <div className="d-flex align-items-center justify-content-center h-100 text-muted flex-column gap-2">
-            <div className="spinner-border" role="status" />
-            <p className="mb-0 small">Generating v{generating.version_number}…</p>
-          </div>
-        ) : html === null ? (
-          <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-            <small>No active version to preview</small>
-          </div>
-        ) : (
-          <iframe
-            ref={iframeRef}
-            style={{ width: '100%', height: '100%', border: 'none' }}
-            title="Email Preview"
-          />
-        )}
-      </div>
-    </div>
   )
 }
