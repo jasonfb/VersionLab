@@ -85,7 +85,8 @@ gem "rubycritic", "~> 5.0", group: :dev
 gem "hot-glue", "~> 0.7.6.1"
 # gem "hot-glue", path: "/Users/jason/Work/Hot_Glue/hot-glue-private"
 
-gem "helios-tracker", "0.0.1"
+gem "helios-tracker", "0.0.2"
+gem "universal-track-manager", "~> 0.9"
 
 gem "cssbundling-rails", "~> 1.4"
 

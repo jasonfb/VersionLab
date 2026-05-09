@@ -2,15 +2,15 @@ class CreateUniversalTrackManagerTables < ActiveRecord::Migration[8.1]
   def self.up
     ActiveRecord::Base.transaction do
 
-      create_table :browsers do |t|
+      create_table :utm_browsers do |t|
         # this table gets automatically populated by inbound traffic
         t.string :name, limit: 255
         t.timestamps
       end
 
-      add_index :browsers, :name
+      add_index :utm_browsers, :name
 
-      create_table :campaigns do |t|
+      create_table :utm_campaigns do |t|
         # this table gets automatically populated by inbound traffic
           t.string :utm_source, limit:256
           t.string :utm_medium, limit:256
@@ -23,9 +23,9 @@ class CreateUniversalTrackManagerTables < ActiveRecord::Migration[8.1]
         t.timestamps
       end
 
-      add_index :campaigns, :sha1
+      add_index :utm_campaigns, :sha1
 
-      create_table :visits do |t|
+      create_table :utm_visits do |t|
         t.datetime :first_pageload
         t.datetime :last_pageload
         t.integer :original_visit_id
@@ -43,9 +43,9 @@ class CreateUniversalTrackManagerTables < ActiveRecord::Migration[8.1]
 
   def self.down
     ActiveRecord::Base.transaction do
-      drop_table :browsers
-      drop_table :visits
-      drop_table :campaigns
+      drop_table :utm_browsers
+      drop_table :utm_visits
+      drop_table :utm_campaigns
     end
   end
 end

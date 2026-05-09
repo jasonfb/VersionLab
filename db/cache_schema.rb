@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_29_144737) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_09_002627) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -360,6 +360,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_29_144737) do
     t.text "top_purchase_drivers", default: [], array: true
     t.string "top_purchase_drivers_other"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "blocked_emails", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.string "source", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_blocked_emails_on_created_at"
+    t.index ["email"], name: "index_blocked_emails_on_email"
   end
 
   create_table "brand_profile_geographies", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -891,6 +900,42 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_29_144737) do
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
+  end
+
+  create_table "utm_browsers", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", limit: 255
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_utm_browsers_on_name"
+  end
+
+  create_table "utm_campaigns", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "gclid_present"
+    t.string "sha1", limit: 40
+    t.datetime "updated_at", null: false
+    t.string "utm_campaign", limit: 256
+    t.string "utm_content", limit: 256
+    t.string "utm_medium", limit: 256
+    t.string "utm_source", limit: 256
+    t.string "utm_term", limit: 256
+    t.index ["sha1"], name: "index_utm_campaigns_on_sha1"
+  end
+
+  create_table "utm_visits", force: :cascade do |t|
+    t.integer "browser_id"
+    t.integer "campaign_id"
+    t.integer "count", default: 1
+    t.datetime "created_at", null: false
+    t.datetime "first_pageload"
+    t.string "hmid"
+    t.string "ip_v4_address", limit: 15
+    t.datetime "last_pageload"
+    t.integer "original_visit_id"
+    t.datetime "updated_at", null: false
+    t.integer "viewport_height"
+    t.integer "viewport_width"
+    t.index ["hmid"], name: "index_utm_visits_on_hmid"
   end
 
   add_foreign_key "accounts", "ai_models"
