@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  mount HeliosTracker::Engine, at: '/'
   devise_for :users, skip: [ :registrations ]
   # Admin namespace
   namespace :admin do

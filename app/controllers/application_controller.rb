@@ -1,4 +1,6 @@
 class ApplicationController < ActionController::Base
+  include HeliosTrackerConcern
+  include UniversalTrackManagerConcern
   include Pundit::Authorization
 
   include Pagy::Method
