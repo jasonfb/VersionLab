@@ -43,6 +43,10 @@ describe 'Campaign workflow', type: :feature, js: true do
         react_fill_in_textarea(textareas[0], with: 'A comprehensive spring campaign targeting lapsed donors.')
         click_button 'Save'
 
+        # Wait for async save to complete
+        expect(page).not_to have_button('Saving…', wait: 5)
+        sleep 0.5
+
         campaign.reload
         expect(campaign.description).to eq('A comprehensive spring campaign targeting lapsed donors.')
       end

@@ -62,7 +62,8 @@ RSpec.describe AiLog, type: :model do
     it "defines call_type enum" do
       expect(described_class.call_types).to eq(
         "email" => "email", "campaign_summary" => "campaign_summary",
-        "email_summary" => "email_summary", "ad" => "ad"
+        "email_summary" => "email_summary", "ad" => "ad",
+        "audience_summary" => "audience_summary"
       )
     end
   end

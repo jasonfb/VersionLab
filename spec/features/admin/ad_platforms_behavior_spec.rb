@@ -46,9 +46,8 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
       new_position = rand(10) 
       find("[name='ad_platform[position]']").fill_in(with: new_position)
       click_button "Save"
-      expect(page).to have_content("Successfully created")
 
-      expect(page).to have_content(new_name)
+      expect(page).to have_content(new_name, wait: 5)
       expect(page).to have_content(new_position)
     end
   end

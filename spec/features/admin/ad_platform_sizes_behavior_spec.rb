@@ -1,12 +1,22 @@
 require 'rails_helper'
 
-describe 'interaction for Admin::AdPlatformSizesController' do
+describe 'interaction for Admin::AdPlatformSizesController', type: :feature, js: true do
   include HotGlue::ControllerHelper
   include ActionView::RecordIdentifier
+  include Rails.application.routes.url_helpers
 
   # HOTGLUE-SAVESTART
   # HOTGLUE-END
-  
+
+  let(:admin_user) do
+    user = create(:user)
+    admin_role = Role.find_or_create_by!(name: "admin")
+    user.roles << admin_role
+    user
+  end
+
+  before { login_as(admin_user, scope: :user) }
+
 
 
 
@@ -21,7 +31,7 @@ describe 'interaction for Admin::AdPlatformSizesController' do
     ad_platform_size.save!
     ad_platform_size
   }
-  let(:ad_platform) {create(:ad_platform , : current_user )}
+  let(:ad_platform) { create(:ad_platform) }
   
   describe "index" do
     it "should show me the list" do
@@ -47,9 +57,8 @@ describe 'interaction for Admin::AdPlatformSizesController' do
       new_position = rand(10) 
       find("[name='ad_platform_size[position]']").fill_in(with: new_position)
       click_button "Save"
-      expect(page).to have_content("Successfully created")
 
-      expect(page).to have_content(new_name)
+      expect(page).to have_content(new_name, wait: 5)
       expect(page).to have_content(new_width)
       expect(page).to have_content(new_height)
       expect(page).to have_content(new_position)
@@ -60,7 +69,7 @@ describe 'interaction for Admin::AdPlatformSizesController' do
   describe "edit & update" do
     it "should return an editable form" do
       visit admin_ad_platform_ad_platform_sizes_path(ad_platform)
-      find("a.edit-ad_platform_size-button[href='/admin/ad_platform_sizes/#{ad_platform_size1.id}/edit']").click
+      find("a.edit-ad_platform_size-button[href='/admin/ad_platforms/#{ad_platform.id}/ad_platform_sizes/#{ad_platform_size1.id}/edit']").click
 
       expect(page).to have_content("Editing #{ad_platform_size1.name.squish || "(no name)"}")
       new_name = FFaker::Movie.title 

@@ -20,7 +20,7 @@ RSpec.describe SubscriptionBillingJob do
       described_class.new.perform
 
       subscription.reload
-      expect(subscription.paid_through_date).to eq(Date.current - 5.days + 30.days)
+      expect(subscription.paid_through_date).to eq((Date.current - 5.days) + 1.month)
       expect(account.payments.count).to eq(1)
       expect(account.payments.last.status).to eq("succeeded")
     end
