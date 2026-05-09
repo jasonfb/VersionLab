@@ -22,7 +22,7 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
   let!(:ad_platform1) {
     ad_platform = create(:ad_platform , 
                           name: FFaker::Movie.title, 
-                          position: rand(100) )
+                          position: rand(1..100) )
 
     ad_platform.save!
     ad_platform

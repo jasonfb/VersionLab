@@ -26,7 +26,7 @@ describe 'interaction for Admin::AdShapesController', type: :feature, js: true d
                           name: FFaker::Movie.title, 
                           min_ratio: rand(1..10000), 
                           max_ratio: rand(1..10000), 
-                          position: rand(100) )
+                          position: rand(1..100) )
 
     ad_shape.save!
     ad_shape
