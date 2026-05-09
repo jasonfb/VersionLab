@@ -43,7 +43,7 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
       expect(page).to have_selector(:xpath, './/h3[contains(., "New Ad Platform")]')
       new_name = FFaker::Movie.title 
       find("[name='ad_platform[name]']").fill_in(with: new_name)
-      new_position = rand(10) 
+      new_position = rand(1..10) 
       find("[name='ad_platform[position]']").fill_in(with: new_position)
       click_button "Save"
 
@@ -61,7 +61,7 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
       expect(page).to have_content("Editing #{ad_platform1.name.squish || "(no name)"}")
       new_name = FFaker::Movie.title 
       find("[name='ad_platform[name]']").fill_in(with: new_name)
-      new_position = rand(10) 
+      new_position = rand(1..10) 
       find("[name='ad_platform[position]']").fill_in(with: new_position)
       click_button "Save"
       within("turbo-frame#admin__#{dom_id(ad_platform1)} ") do
