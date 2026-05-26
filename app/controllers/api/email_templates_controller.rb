@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::EmailTemplatesController < Api::BaseController
   before_action :set_client
   before_action :set_email_template, only: [:show, :update, :destroy, :reset]

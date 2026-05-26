@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class MigrateAssetsToProjects < ActiveRecord::Migration[8.1]
   def up
     # Step 1: add nullable project_id to assets

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SubscriptionUpgradeService
   class Error < StandardError; end
 

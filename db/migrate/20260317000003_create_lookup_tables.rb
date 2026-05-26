@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateLookupTables < ActiveRecord::Migration[8.1]
   def change
     create_table :organization_types, id: :uuid, default: -> { "gen_random_uuid()" } do |t|

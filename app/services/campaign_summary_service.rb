@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CampaignSummaryService
   class Error < StandardError; end
 

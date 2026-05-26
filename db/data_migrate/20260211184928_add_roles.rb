@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddRoles < ActiveRecord::Migration[8.1]
   def change
     Role.create(name: "admin", label: "Admin")

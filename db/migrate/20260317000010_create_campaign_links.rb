@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateCampaignLinks < ActiveRecord::Migration[8.1]
   def change
     create_table :campaign_links, id: :uuid, default: -> { "gen_random_uuid()" } do |t|

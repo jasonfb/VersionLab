@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateTemplateVariables < ActiveRecord::Migration[8.1]
   def change
     create_table :template_variables, id: :uuid do |t|

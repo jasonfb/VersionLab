@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::EmailDocumentsController < Api::BaseController
   before_action :set_email
 

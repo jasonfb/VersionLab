@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class EmailChannel < ApplicationCable::Channel
   def subscribed
     email = find_email

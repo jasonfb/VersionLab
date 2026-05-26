@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAdVersions < ActiveRecord::Migration[8.1]
   def change
     create_table :ad_versions, id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

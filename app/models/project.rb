@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Project < ApplicationRecord
   belongs_to :account
   has_many :email_templates, dependent: :destroy

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AdClassifyService
   CTA_PATTERNS = /\b(shop\s+now|buy\s+now|learn\s+more|click\s+here|sign\s+up|get\s+started|subscribe|order\s+now|book\s+now|try\s+free|start\s+free|download|join\s+now|apply\s+now|contact\s+us|see\s+more|view\s+more|explore|discover|get\s+offer|claim|redeem|save\s+now|add\s+to\s+cart)\b/i
 

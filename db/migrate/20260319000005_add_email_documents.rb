@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddEmailDocuments < ActiveRecord::Migration[8.1]
   def up
     # Add email_summary call type to ai_log_call_type enum

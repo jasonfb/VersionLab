@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateSubscriptions < ActiveRecord::Migration[8.1]
   def change
     create_enum :subscription_billing_interval, ["monthly", "annual"]

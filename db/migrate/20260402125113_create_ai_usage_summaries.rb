@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAiUsageSummaries < ActiveRecord::Migration[8.1]
   def change
     create_table :ai_usage_summaries, id: :uuid do |t|

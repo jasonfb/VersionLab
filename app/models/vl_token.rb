@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # VersionLab Tokens — internal abstraction over real AI spend.
 #
 # Conversion: 1000 VL tokens = $1.00 of our actual AI cost.

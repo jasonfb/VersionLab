@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAiServices < ActiveRecord::Migration[8.1]
   def change
     create_table :ai_services, id: :uuid do |t|

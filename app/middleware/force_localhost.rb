@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ForceLocalhost
   def initialize(app)
     @app = app

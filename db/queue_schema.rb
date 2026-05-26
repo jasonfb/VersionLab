@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_09_002627) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_26_171751) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -62,6 +62,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_09_002627) do
     t.string "stripe_customer_id"
     t.datetime "updated_at", null: false
     t.index ["stripe_customer_id"], name: "index_accounts_on_stripe_customer_id", unique: true
+  end
+
+  create_table "action_text_rich_texts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "body"
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.uuid "record_id", null: false
+    t.string "record_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["record_type", "record_id", "name"], name: "index_action_text_rich_texts_uniqueness", unique: true
   end
 
   create_table "active_storage_attachments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -585,6 +595,55 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_09_002627) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "helios_press_block_images", force: :cascade do |t|
+    t.bigint "block_id", null: false
+    t.text "caption"
+    t.datetime "created_at", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["block_id", "position"], name: "index_helios_press_block_images_on_block_id_and_position"
+    t.index ["block_id"], name: "index_helios_press_block_images_on_block_id"
+  end
+
+  create_table "helios_press_blocks", force: :cascade do |t|
+    t.string "block_type", null: false
+    t.integer "columns", default: 3
+    t.datetime "created_at", null: false
+    t.integer "position", null: false
+    t.bigint "post_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["post_id", "position"], name: "index_helios_press_blocks_on_post_id_and_position"
+    t.index ["post_id"], name: "index_helios_press_blocks_on_post_id"
+  end
+
+  create_table "helios_press_posts", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "external_id"
+    t.string "keywords"
+    t.string "name", null: false
+    t.boolean "published", default: false, null: false
+    t.string "slug", null: false
+    t.datetime "updated_at", null: false
+    t.index ["external_id"], name: "index_helios_press_posts_on_external_id", unique: true
+    t.index ["published"], name: "index_helios_press_posts_on_published"
+    t.index ["slug"], name: "index_helios_press_posts_on_slug", unique: true
+  end
+
+  create_table "helios_videos_videos", force: :cascade do |t|
+    t.integer "block_id"
+    t.datetime "created_at", null: false
+    t.string "key"
+    t.string "name"
+    t.jsonb "playback_urls"
+    t.string "provider"
+    t.boolean "requires_signed_urls", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["block_id"], name: "index_helios_videos_videos_on_block_id"
+    t.index ["key"], name: "index_helios_videos_videos_on_key", unique: true
+    t.index ["provider"], name: "index_helios_videos_videos_on_provider"
+  end
+
   create_table "industries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -974,6 +1033,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_09_002627) do
   add_foreign_key "email_documents", "emails"
   add_foreign_key "emails", "campaigns"
   add_foreign_key "emails", "clients"
+  add_foreign_key "helios_press_block_images", "helios_press_blocks", column: "block_id"
+  add_foreign_key "helios_press_blocks", "helios_press_posts", column: "post_id"
   add_foreign_key "invoice_line_items", "invoices"
   add_foreign_key "invoices", "accounts"
   add_foreign_key "invoices", "subscriptions"

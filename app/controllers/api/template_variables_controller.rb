@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::TemplateVariablesController < Api::BaseController
   before_action :set_section
   before_action :set_variable, only: [:update, :destroy]

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class EmailSummaryJob < ApplicationJob
   queue_as :default
 

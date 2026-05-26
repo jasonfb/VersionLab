@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::AudiencesController < Api::BaseController
   before_action :set_client
   before_action :set_audience, only: [ :show, :update, :destroy, :summarize, :documents, :upload_document, :destroy_document ]

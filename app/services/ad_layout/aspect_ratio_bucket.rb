@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AdLayout
   class AspectRatioBucket
     # Classify target dimensions into a shape name (e.g. :square, :leaderboard).

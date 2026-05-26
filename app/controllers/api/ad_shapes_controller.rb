@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::AdShapesController < Api::BaseController
   def index
     shapes = AdShape.ordered.includes(:ad_shape_layout_rules)

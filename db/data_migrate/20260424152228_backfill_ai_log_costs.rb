@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class BackfillAiLogCosts < ActiveRecord::Migration[8.1]
   def up
     # Step 1: backfill ai_logs in a single SQL UPDATE using a join to ai_models

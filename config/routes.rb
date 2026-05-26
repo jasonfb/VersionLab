@@ -1,5 +1,12 @@
+# frozen_string_literal: true
+
 Rails.application.routes.draw do
+  get "sitemap.xml", to: "sitemap#show"
   mount HeliosTracker::Engine, at: '/'
+  mount Helios::Press::Admin::Engine, at: "/admin/press"
+  mount Helios::Press::Public::Engine, at: "/blog"
+  mount Helios::Press::Api::Engine, at: "/api/press"
+  mount Helios::Videos::Engine, at: "/videos"
   devise_for :users, skip: [ :registrations ]
   # Admin namespace
   namespace :admin do

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddSlotRoleAndWordCountToTemplateVariables < ActiveRecord::Migration[8.1]
   def up
     create_enum :template_variable_slot_role, %w[teaser_text eyebrow headline subheadline body cta_text image]

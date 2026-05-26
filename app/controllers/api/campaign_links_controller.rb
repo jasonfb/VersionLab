@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::CampaignLinksController < Api::BaseController
   before_action :set_campaign
 

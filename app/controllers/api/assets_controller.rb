@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::AssetsController < Api::BaseController
   def index
     assets = @current_client.assets.where(assetable_id: nil).order(created_at: :desc).map do |asset|

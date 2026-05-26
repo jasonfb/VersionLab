@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::AiLogsController < Api::BaseController
   def index
     logs = @current_account.ai_logs

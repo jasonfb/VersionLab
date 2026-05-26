@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::AccountUsersController < Api::BaseController
   before_action :require_owner_or_admin
   before_action :set_account_user, only: [:update, :destroy]

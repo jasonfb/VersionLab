@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 UniversalTrackManager.configure do |config|
   config.track_ips = true
   config.track_utms = true

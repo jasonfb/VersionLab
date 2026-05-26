@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateUniversalTrackManagerTables < ActiveRecord::Migration[8.1]
   def self.up
     ActiveRecord::Base.transaction do

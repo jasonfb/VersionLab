@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CampaignSummaryJob < ApplicationJob
   queue_as :default
 

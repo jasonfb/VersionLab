@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class FixUniversalTrackManagerTableNames < ActiveRecord::Migration[8.1]
   def up
     # Production had a partial install of universal-track-manager 0.8 which created

@@ -24,10 +24,12 @@
   },
   "devDependencies": {},
   "dependencies": {
+    "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo-rails": "^8.0.23",
     "@popperjs/core": "^2.11.8",
     "@rails/actioncable": "^8.1.200",
-    "@rails/activestorage": "^8.1.200",
+    "@rails/actiontext": "^8.1.300",
+    "@rails/activestorage": "^8.1.300",
     "@stripe/react-stripe-js": "^6.0.0",
     "@stripe/stripe-js": "^9.0.0",
     "autoprefixer": "^10.4.24",
@@ -41,6 +43,8 @@
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.0",
     "sass": "^1.97.3",
+    "sortablejs": "^1.15.7",
+    "trix": "^2.1.19",
     "vite": "^5",
     "vite-plugin-ruby": "5.1.1"
   },

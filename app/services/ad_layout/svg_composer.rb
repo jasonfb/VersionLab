@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AdLayout
   class SvgComposer
     def initialize(ad)

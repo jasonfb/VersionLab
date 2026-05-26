@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::BrandProfilesController < Api::BaseController
   before_action :set_client
 

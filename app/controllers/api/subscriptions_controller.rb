@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::SubscriptionsController < Api::BaseController
   before_action :require_billing_access!, only: [:create_payment_intent, :confirm]
 

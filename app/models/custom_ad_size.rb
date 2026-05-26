@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CustomAdSize < ApplicationRecord
   belongs_to :client
   belongs_to :ad_shape, optional: true

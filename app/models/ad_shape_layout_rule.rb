@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AdShapeLayoutRule < ApplicationRecord
   ROLES = %w[headline subhead body cta logo decoration].freeze
   ALIGNMENTS = %w[left center right].freeze

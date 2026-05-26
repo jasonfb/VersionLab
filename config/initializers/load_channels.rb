@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Action Cable looks up channels via a registry populated when channel classes
 # are loaded. In development with Zeitwerk lazy loading, channel files aren't
 # loaded until something references them — but Action Cable's registry lookup

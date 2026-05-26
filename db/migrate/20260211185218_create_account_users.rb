@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAccountUsers < ActiveRecord::Migration[8.1]
   def change
     create_table :account_users, id: :uuid do |t|

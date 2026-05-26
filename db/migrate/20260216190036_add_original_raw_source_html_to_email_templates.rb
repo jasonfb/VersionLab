@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddOriginalRawSourceHtmlToEmailTemplates < ActiveRecord::Migration[8.1]
   def change
     add_column :email_templates, :original_raw_source_html, :text

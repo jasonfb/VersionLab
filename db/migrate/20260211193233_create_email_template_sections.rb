@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateEmailTemplateSections < ActiveRecord::Migration[8.1]
   def change
     create_table :email_template_sections, id: :uuid, default: -> { "gen_random_uuid()" } do |t|

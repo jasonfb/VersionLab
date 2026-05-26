@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateTemplateImports < ActiveRecord::Migration[8.1]
   def up
     create_enum :template_import_type, %w[bundled external]

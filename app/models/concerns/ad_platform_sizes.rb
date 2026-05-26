@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AdPlatformSizes
   # Returns all platforms with their sizes, structured like the old PLATFORMS hash.
   # Used by the API to serve platform data to the frontend.

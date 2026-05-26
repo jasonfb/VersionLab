@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class FixUserRolesForeignKeyTypes < ActiveRecord::Migration[8.1]
   def up
     # user_roles was created with integer FKs but users/roles use UUID PKs

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::AdsController < Api::BaseController
   before_action :set_client
   before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version, :classifications, :confirm_classifications, :ai_classify, :upload_logo, :remove_logo ]

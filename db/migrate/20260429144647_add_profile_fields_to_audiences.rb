@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddProfileFieldsToAudiences < ActiveRecord::Migration[8.1]
   def change
     change_table :audiences, bulk: true do |t|

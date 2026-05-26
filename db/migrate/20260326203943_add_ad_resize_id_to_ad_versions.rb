@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddAdResizeIdToAdVersions < ActiveRecord::Migration[8.1]
   def change
     add_column :ad_versions, :ad_resize_id, :uuid

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AiProviders
   module Factory
     TEXT_PROVIDERS = {

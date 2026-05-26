@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddAdShapeIdToAdResizesAndCustomAdSizes < ActiveRecord::Migration[8.1]
   def change
     add_column :ad_resizes, :ad_shape_id, :uuid

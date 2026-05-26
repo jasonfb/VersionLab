@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class TemplateImportChannel < ApplicationCable::Channel
   def subscribed
     import = find_import

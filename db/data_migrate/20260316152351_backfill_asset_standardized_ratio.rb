@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class BackfillAssetStandardizedRatio < ActiveRecord::Migration[8.1]
   def up
     Asset.where(standardized_ratio: nil).where.not(width: nil, height: nil).find_each do |asset|

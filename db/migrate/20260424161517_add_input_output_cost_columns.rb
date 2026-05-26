@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddInputOutputCostColumns < ActiveRecord::Migration[8.1]
   def change
     add_column :ai_logs, :_input_cost_cents, :decimal, precision: 12, scale: 6

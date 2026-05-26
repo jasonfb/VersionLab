@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SeedAiModelPricing < ActiveRecord::Migration[8.1]
   # Pricing stored as integer cents per 1,000,000 tokens.
   # E.g. $2.00/M tokens → 200 cents/M

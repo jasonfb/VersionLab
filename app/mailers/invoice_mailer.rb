@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class InvoiceMailer < ApplicationMailer
   def issued(invoice)
     @invoice = invoice

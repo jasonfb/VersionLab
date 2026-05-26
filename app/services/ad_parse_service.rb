@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AdParseService
   # Known platform aspect ratios: [width_ratio, height_ratio, platforms]
   PLATFORM_RATIOS = [

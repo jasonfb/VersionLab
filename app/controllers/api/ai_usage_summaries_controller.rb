@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::AiUsageSummariesController < Api::BaseController
   def index
     summaries = @current_account.ai_usage_summaries

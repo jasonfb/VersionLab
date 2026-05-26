@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class BackfillAdClassifications < ActiveRecord::Migration[8.1]
   def up
     Ad.where(classifications_confirmed: false).find_each do |ad|

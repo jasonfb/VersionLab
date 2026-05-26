@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class UnhideDefaultClientsForAgencyAccounts < ActiveRecord::Migration[8.1]
   def up
     Account.where(is_agency: true).find_each do |account|

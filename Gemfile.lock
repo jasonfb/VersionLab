@@ -78,6 +78,9 @@ GEM
       securerandom (>= 0.3)
       tzinfo (~> 2.0, >= 2.0.5)
       uri (>= 0.13.1)
+    acts_as_list (1.2.6)
+      activerecord (>= 6.1)
+      activesupport (>= 6.1)
     addressable (2.8.8)
       public_suffix (>= 2.0.2, < 8.0)
     afm (1.0.0)
@@ -242,10 +245,22 @@ GEM
       activesupport (>= 6.1)
     hashdiff (1.2.1)
     hashery (2.1.2)
+    helios-press (0.2)
+      acts_as_list (>= 1.0)
+      helios-sitemap
+      helios-videos
+      rails (>= 8.0)
+    helios-sitemap (0.2)
+      aws-sdk-s3 (>= 1.0)
+      rails (>= 8.0)
+      sitemap_generator (~> 6.3)
     helios-tracker (0.0.2)
       ffaker (~> 2.16)
       rails (> 5.1)
       universal-track-manager (~> 0.9)
+    helios-videos (0.2.2)
+      jwt (>= 2.0)
+      rails (>= 8.0)
     hot-glue (0.7.6.2)
       ffaker (~> 2.16)
       rails (> 5.1)
@@ -270,6 +285,8 @@ GEM
       activesupport (>= 7.0.0)
     jmespath (1.6.2)
     json (2.19.5)
+    jwt (3.2.0)
+      base64
     kamal (2.10.1)
       activesupport (>= 7.0)
       base64 (~> 0.2)
@@ -549,6 +566,8 @@ GEM
     simplecov-rcov (0.3.7)
       simplecov (>= 0.4.1)
     simplecov_json_formatter (0.1.4)
+    sitemap_generator (6.3.0)
+      builder (~> 3.0)
     solid_cable (3.0.12)
       actioncable (>= 7.2)
       activejob (>= 7.2)
@@ -662,7 +681,10 @@ DEPENDENCIES
   exception_notification (~> 4.5)
   factory_bot_rails (~> 6.5)
   ffaker (~> 2.25)
+  helios-press
+  helios-sitemap
   helios-tracker (= 0.0.2)
+  helios-videos
   hot-glue (~> 0.7.6.1)
   image_processing (~> 1.2)
   jbuilder

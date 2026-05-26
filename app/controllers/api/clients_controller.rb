@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::ClientsController < Api::BaseController
   def index
     clients = accessible_clients.order(:name)

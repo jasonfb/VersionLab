@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AdPlatformSize < ApplicationRecord
   belongs_to :ad_platform
 

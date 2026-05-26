@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 HeliosTracker.configure do |config|
   # -----------------------------------------------------------------------
   # User Configuration

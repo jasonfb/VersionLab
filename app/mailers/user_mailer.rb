@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class UserMailer < ApplicationMailer
   def account_invitation(user, account, invited_by)
     @user = user

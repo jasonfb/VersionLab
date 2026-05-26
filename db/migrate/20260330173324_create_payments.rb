@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreatePayments < ActiveRecord::Migration[8.1]
   def change
     create_enum :payment_status, ["succeeded", "failed", "pending", "refunded"]

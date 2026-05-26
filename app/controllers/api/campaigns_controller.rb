@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::CampaignsController < Api::BaseController
   before_action :set_client
 

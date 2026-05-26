@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAdFonts < ActiveRecord::Migration[8.1]
   def change
     create_table :ad_fonts, id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

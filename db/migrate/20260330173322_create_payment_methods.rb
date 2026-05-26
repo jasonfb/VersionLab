@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreatePaymentMethods < ActiveRecord::Migration[8.1]
   def change
     create_table :payment_methods, id: :uuid do |t|

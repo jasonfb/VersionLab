@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::EmailAutolinkSettingsController < Api::BaseController
   before_action :set_client
   before_action :set_email

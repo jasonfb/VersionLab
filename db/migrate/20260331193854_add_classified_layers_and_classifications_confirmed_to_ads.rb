@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddClassifiedLayersAndClassificationsConfirmedToAds < ActiveRecord::Migration[8.1]
   def change
     add_column :ads, :classified_layers, :jsonb, default: [], null: false

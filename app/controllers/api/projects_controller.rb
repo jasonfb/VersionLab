@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::ProjectsController < Api::BaseController
   def index
     projects = @current_account.projects.visible.order(:name)

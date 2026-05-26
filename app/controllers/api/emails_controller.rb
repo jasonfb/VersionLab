@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::EmailsController < Api::BaseController
   before_action :set_client
   before_action :set_email, only: [:show, :update, :destroy, :run, :results, :preview, :reject, :export, :summarize]

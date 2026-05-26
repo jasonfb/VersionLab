@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAdShapes < ActiveRecord::Migration[8.1]
   def change
     create_table :ad_shapes, id: :uuid do |t|

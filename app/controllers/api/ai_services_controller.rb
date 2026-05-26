@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::AiServicesController < Api::BaseController
   def index
     services = if params[:all]
@@ -12,7 +14,7 @@ class Api::AiServicesController < Api::BaseController
         id: s.id,
         name: s.name,
         slug: s.slug,
-        models: s.ai_models.order(:name).map { |m|
+        models: s.ai_models.sort_by(&:name).map { |m|
           {
             id: m.id,
             name: m.name,

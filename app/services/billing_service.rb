@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Single entry point for all subscription billing actions.
 #
 # Run #process(subscription) once per subscription per day. It handles, in order:

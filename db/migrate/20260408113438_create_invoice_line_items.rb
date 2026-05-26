@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateInvoiceLineItems < ActiveRecord::Migration[8.1]
   def change
     create_table :invoice_line_items, id: :uuid do |t|

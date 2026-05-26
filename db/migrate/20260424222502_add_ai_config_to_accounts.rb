@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddAiConfigToAccounts < ActiveRecord::Migration[8.1]
   def change
     add_column :accounts, :customer_chooses_ai, :boolean, default: true, null: false

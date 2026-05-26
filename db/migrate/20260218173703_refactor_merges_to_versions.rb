@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class RefactorMergesToVersions < ActiveRecord::Migration[8.1]
   def up
     # Blow away all existing merge data

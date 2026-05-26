@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class RenameMergeToEmail < ActiveRecord::Migration[8.1]
   def up
     # Rename tables

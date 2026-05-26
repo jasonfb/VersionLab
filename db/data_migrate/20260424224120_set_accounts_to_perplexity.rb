@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SetAccountsToPerplexity < ActiveRecord::Migration[8.1]
   def up
     service = AiService.find_by!(slug: "perplexity")

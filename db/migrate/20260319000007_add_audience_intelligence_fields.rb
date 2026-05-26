@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddAudienceIntelligenceFields < ActiveRecord::Migration[8.1]
   def change
     add_column :audiences, :executive_summary, :text

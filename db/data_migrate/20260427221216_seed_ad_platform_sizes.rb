@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SeedAdPlatformSizes < ActiveRecord::Migration[8.1]
   PLATFORMS = {
     "Facebook (Meta)" => [

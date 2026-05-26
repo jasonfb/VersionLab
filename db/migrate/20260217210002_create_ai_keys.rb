@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAiKeys < ActiveRecord::Migration[8.1]
   def change
     create_table :ai_keys, id: :uuid do |t|

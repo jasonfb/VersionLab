@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddEmailSectionAutolinkSettings < ActiveRecord::Migration[8.1]
   def up
     execute "CREATE TYPE autolink_mode AS ENUM ('none', 'link_relevant_text')"

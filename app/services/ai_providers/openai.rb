@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AiProviders
   class Openai < Base
     def complete(model:, messages:, temperature: 0.7, json_mode: false)

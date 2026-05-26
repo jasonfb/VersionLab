@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::PaymentsController < Api::BaseController
   before_action :require_billing_access!
 

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddProjectIdToEmailTemplates < ActiveRecord::Migration[8.1]
   def up
     add_column :email_templates, :project_id, :uuid

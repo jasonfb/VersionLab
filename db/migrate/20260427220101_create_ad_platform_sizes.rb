@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAdPlatformSizes < ActiveRecord::Migration[8.1]
   def change
     create_table :ad_platform_sizes, id: :uuid do |t|

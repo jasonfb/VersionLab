@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AdShape < ApplicationRecord
   has_many :ad_shape_layout_rules, dependent: :destroy
   has_many :ad_resizes

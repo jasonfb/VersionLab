@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AdResizeService
   class Error < StandardError; end
 

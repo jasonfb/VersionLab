@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class EmailSummaryService
   class Error < StandardError; end
 

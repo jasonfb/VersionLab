@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddImageLocationToTemplateVariables < ActiveRecord::Migration[8.1]
   def up
     execute "CREATE TYPE template_variable_image_location AS ENUM ('hero', 'banner', 'sidebar', 'inline', 'footer')"

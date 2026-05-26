@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::AccountsController < Api::BaseController
   def index
     account_users = current_user.account_users.includes(:account)

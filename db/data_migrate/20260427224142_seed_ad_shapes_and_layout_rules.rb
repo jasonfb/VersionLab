@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SeedAdShapesAndLayoutRules < ActiveRecord::Migration[8.1]
   SHAPES = [
     { name: "leaderboard", min_ratio: 3.5,  max_ratio: Float::INFINITY },

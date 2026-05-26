@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateMerges < ActiveRecord::Migration[8.1]
   def change
     create_table :merges, id: :uuid do |t|

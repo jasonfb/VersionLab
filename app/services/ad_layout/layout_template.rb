@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AdLayout
   class LayoutTemplate
     # Element priority order (highest first). Elements are placed in this order;

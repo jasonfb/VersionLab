@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Daily sweep that delegates each subscription to BillingService.
 #
 # Picks up two states:

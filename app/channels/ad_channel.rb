@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AdChannel < ApplicationCable::Channel
   def subscribed
     ad = find_ad

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SeedSubscriptionTiers < ActiveRecord::Migration[8.1]
   def up
     SubscriptionTier.find_or_create_by!(slug: "standard") do |tier|

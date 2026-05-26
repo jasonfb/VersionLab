@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddTokenCycleAndFinalBilledToSubscriptions < ActiveRecord::Migration[8.1]
   def up
     add_column :subscriptions, :token_cycle_started_on, :date

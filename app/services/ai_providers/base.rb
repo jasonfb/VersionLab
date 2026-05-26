@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AiProviders
   class Base
     class Error < StandardError; end

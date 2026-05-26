@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AdPlatform < ApplicationRecord
   has_many :ad_platform_sizes, dependent: :destroy
 

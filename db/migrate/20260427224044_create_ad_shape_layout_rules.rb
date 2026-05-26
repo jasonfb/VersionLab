@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAdShapeLayoutRules < ActiveRecord::Migration[8.1]
   def change
     create_table :ad_shape_layout_rules, id: :uuid do |t|

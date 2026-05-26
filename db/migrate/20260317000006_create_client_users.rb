@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateClientUsers < ActiveRecord::Migration[8.1]
   def change
     create_table :client_users, id: :uuid, default: -> { "gen_random_uuid()" } do |t|

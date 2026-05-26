@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::EmailTemplateSectionsController < Api::BaseController
   before_action :set_email_template
 

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class RemoveAccountIdFromAiKeys < ActiveRecord::Migration[8.1]
   def up
     remove_index :ai_keys, name: :index_ai_keys_on_account_id_and_ai_service_id

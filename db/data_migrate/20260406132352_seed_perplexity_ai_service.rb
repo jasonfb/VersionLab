@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SeedPerplexityAiService < ActiveRecord::Migration[8.1]
   def up
     service = AiService.find_or_create_by!(slug: "perplexity") do |s|

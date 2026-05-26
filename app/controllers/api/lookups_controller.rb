@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Api::LookupsController < Api::BaseController
   def index
     render json: {

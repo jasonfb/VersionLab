@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateSubscriptionTiers < ActiveRecord::Migration[8.1]
   def change
     create_table :subscription_tiers, id: :uuid do |t|

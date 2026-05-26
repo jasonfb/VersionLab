@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AdRenderService
   class Error < StandardError; end
 

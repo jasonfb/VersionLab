@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateBlockedEmails < ActiveRecord::Migration[8.1]
   def change
     create_table :blocked_emails, id: :uuid do |t|

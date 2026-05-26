@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateAiLogs < ActiveRecord::Migration[8.1]
   def up
     execute "CREATE TYPE ai_log_call_type AS ENUM ('merge', 'campaign_summary')"
