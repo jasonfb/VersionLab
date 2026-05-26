@@ -2,7 +2,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     Ascii85 (2.0.1)
-    action_text-trix (2.1.18)
+    action_text-trix (2.1.19)
       railties
     actioncable (8.1.3)
       actionpack (= 8.1.3)
@@ -89,8 +89,8 @@ GEM
       activesupport (>= 6.0.0)
     ast (2.4.3)
     aws-eventstream (1.4.0)
-    aws-partitions (1.1213.0)
-    aws-sdk-core (3.242.0)
+    aws-partitions (1.1253.0)
+    aws-sdk-core (3.249.0)
       aws-eventstream (~> 1, >= 1.3.0)
       aws-partitions (~> 1, >= 1.992.0)
       aws-sigv4 (~> 1.9)
@@ -98,11 +98,11 @@ GEM
       bigdecimal
       jmespath (~> 1, >= 1.6.1)
       logger
-    aws-sdk-kms (1.121.0)
-      aws-sdk-core (~> 3, >= 3.241.4)
+    aws-sdk-kms (1.128.0)
+      aws-sdk-core (~> 3, >= 3.248.0)
       aws-sigv4 (~> 1.5)
-    aws-sdk-s3 (1.213.0)
-      aws-sdk-core (~> 3, >= 3.241.4)
+    aws-sdk-s3 (1.224.0)
+      aws-sdk-core (~> 3, >= 3.248.0)
       aws-sdk-kms (~> 1)
       aws-sigv4 (~> 1.5)
     aws-sigv4 (1.12.1)
@@ -245,10 +245,11 @@ GEM
       activesupport (>= 6.1)
     hashdiff (1.2.1)
     hashery (2.1.2)
-    helios-press (0.2)
+    helios-press (0.3)
       acts_as_list (>= 1.0)
       helios-sitemap
       helios-videos
+      nokogiri (>= 1.13)
       rails (>= 8.0)
     helios-sitemap (0.2)
       aws-sdk-s3 (>= 1.0)
@@ -319,7 +320,7 @@ GEM
       faraday-multipart (< 2)
       mini_mime
       zeitwerk
-    marcel (1.1.0)
+    marcel (1.2.1)
     matrix (0.4.3)
     mini_magick (5.3.1)
       logger
@@ -651,7 +652,7 @@ GEM
     xpath (3.2.0)
       nokogiri (~> 1.8)
     yaml (0.4.0)
-    zeitwerk (2.7.5)
+    zeitwerk (2.8.2)
 
 PLATFORMS
   aarch64-linux
@@ -681,7 +682,7 @@ DEPENDENCIES
   exception_notification (~> 4.5)
   factory_bot_rails (~> 6.5)
   ffaker (~> 2.25)
-  helios-press
+  helios-press (= 0.3)
   helios-sitemap
   helios-tracker (= 0.0.2)
   helios-videos

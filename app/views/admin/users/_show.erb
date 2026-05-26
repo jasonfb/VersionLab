@@ -2,6 +2,11 @@
 </div>
 <div class='hg-col col-sm-2 user--name'> <%= user.name %>
 </div>
+<div class='hg-col col-sm-2 user--roles'>
+  <% user.roles.each do |role| %>
+    <span class="badge bg-secondary"><%= role.label %></span>
+  <% end %>
+</div>
 
 
 

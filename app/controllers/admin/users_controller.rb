@@ -115,15 +115,26 @@ class Admin::UsersController < Admin::BaseController
 
 
   def user_params
-    fields = :email, :name
+    fields = [:email, :name]
+    fields << { role_ids: [] } if current_user.superadmin?
     params.require(:user).permit(fields)
   end
 
-  
   def update_user_params
-    fields = :email, :name
-    
-    params.require(:user).permit(fields)
+    fields = [:email, :name]
+    fields << { role_ids: [] } if current_user.superadmin?
+    permitted = params.require(:user).permit(fields)
+
+    # Prevent superadmins from removing their own superadmin role
+    if current_user.superadmin? && @user == current_user
+      superadmin_role = Role.find_by(name: "superadmin")
+      if superadmin_role && permitted[:role_ids].present? && !permitted[:role_ids].include?(superadmin_role.id)
+        permitted[:role_ids] << superadmin_role.id
+        flash[:alert] = "You cannot remove your own superadmin role."
+      end
+    end
+
+    permitted
   end
   
 

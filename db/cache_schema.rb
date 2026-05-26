@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_26_171751) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_26_174957) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -600,8 +600,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_26_171751) do
     t.text "caption"
     t.datetime "created_at", null: false
     t.integer "position", null: false
+    t.string "reference_key"
     t.datetime "updated_at", null: false
     t.index ["block_id", "position"], name: "index_helios_press_block_images_on_block_id_and_position"
+    t.index ["block_id", "reference_key"], name: "index_helios_press_block_images_on_block_id_and_reference_key", unique: true
     t.index ["block_id"], name: "index_helios_press_block_images_on_block_id"
   end
 

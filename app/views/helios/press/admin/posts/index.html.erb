@@ -1,0 +1,44 @@
+<%= render partial: "admin/nav", locals: { nav: "press" } %>
+
+<div class="container py-5">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Posts</h1>
+    <%= link_to "New Post", helios_press_admin.new_post_path, class: "btn btn-primary" %>
+  </div>
+
+  <% if @posts.any? %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Slug</th>
+          <th>Status</th>
+          <th>Last Updated</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @posts.each do |post| %>
+          <tr>
+            <td><%= link_to post.name, helios_press_admin.edit_post_path(post) %></td>
+            <td><small class="text-muted">/<%= post.slug %></small></td>
+            <td>
+              <% if post.published? %>
+                <span class="badge bg-success">Published</span>
+              <% else %>
+                <span class="badge bg-secondary">Draft</span>
+              <% end %>
+            </td>
+            <td><%= post.updated_at.strftime("%m/%d/%y") %></td>
+            <td>
+              <%= link_to "Edit", helios_press_admin.edit_post_path(post), class: "btn btn-sm btn-outline-primary" %>
+              <%= link_to "Delete", helios_press_admin.post_path(post), data: { turbo_method: :delete, turbo_confirm: "Are you sure?" }, class: "btn btn-sm btn-outline-danger" %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="text-muted">No posts yet. Create your first post!</p>
+  <% end %>
+</div>
