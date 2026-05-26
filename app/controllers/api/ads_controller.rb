@@ -5,7 +5,7 @@ class Api::AdsController < Api::BaseController
   before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version, :classifications, :confirm_classifications, :ai_classify, :upload_logo, :remove_logo ]
 
   def index
-    ads = @client.ads.includes(:audiences, :campaign, :ai_service, :ai_model)
+    ads = @client.ads.includes(:audiences, :campaign)
                      .order(updated_at: :desc)
     render json: ads.map { |a| ad_json(a) }
   end
