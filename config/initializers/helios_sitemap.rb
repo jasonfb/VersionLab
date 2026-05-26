@@ -2,7 +2,7 @@
 
 Helios::Sitemap.configure do |config|
   # The canonical host for your sitemap URLs
-  config.default_host = "https://example.com"
+  config.default_host = "https://versionlab.io"
 
   # S3 settings (defaults read from ENV vars)
   # config.aws_region = ENV["AWS_REGION"]
