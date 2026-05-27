@@ -21,9 +21,18 @@ class TemplateImportJob < ApplicationJob
     import.update!(state: :completed)
     broadcast(import)
   rescue => e
-    import&.update!(state: :failed, error_message: e.message)
-    broadcast(import) if import
-    raise
+    if import
+      import.update!(state: :failed, error_message: e.message)
+      broadcast(import)
+    end
+
+    ExceptionNotifier.notify_exception(
+      e,
+      data: { job: self.class.name, job_id: job_id, template_import_id: import&.id }
+    )
+    # Do NOT re-raise — the import is terminal. Re-raising would trigger
+    # Solid Queue retries that overwrite the "failed" state, leaving the
+    # UI stuck on "Queued…" forever.
   end
 
   private

@@ -49,7 +49,7 @@ Rails.application.routes.draw do
       resource :brand_profile, only: [ :show ] do
         post :upsert, on: :collection
       end
-      resources :template_imports, only: [ :create ]
+      resources :template_imports, only: [ :create, :show ]
       resources :email_templates, only: [ :index, :show, :create, :update, :destroy ] do
         member do
           post :reset

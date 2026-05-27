@@ -48,8 +48,8 @@ RSpec.describe TemplateImportJob do
     end
 
     context "when import fails" do
-      it "sets state to failed with error message" do
-        expect { described_class.new.perform(import.id) }.to raise_error(StandardError)
+      it "sets state to failed with error message without re-raising" do
+        expect { described_class.new.perform(import.id) }.not_to raise_error
 
         import.reload
         expect(import.state).to eq("failed")

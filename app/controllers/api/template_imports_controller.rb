@@ -3,6 +3,17 @@
 class Api::TemplateImportsController < Api::BaseController
   before_action :set_client
 
+  def show
+    import = TemplateImport.find(params[:id])
+    render json: {
+      id: import.id,
+      email_template_id: import.email_template_id,
+      state: import.state,
+      warnings: import.warnings_list,
+      error_message: import.error_message
+    }
+  end
+
   def create
     return render_error("Name is required") if params[:name].blank?
     return render_error("Import type must be bundled or external") unless %w[bundled external].include?(params[:import_type])

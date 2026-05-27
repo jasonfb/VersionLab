@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { apiUpload } from '~/lib/api'
+import { apiFetch, apiUpload } from '~/lib/api'
 import { subscribeTemplateImportChannel } from '~/lib/cable'
 
 const IMPORT_TYPES = {
@@ -89,20 +89,48 @@ export default function TemplateNew() {
       setEmailTemplateId(result.email_template_id)
       setImportState(result.state)
 
-      // Subscribe to real-time updates
+      let settled = false
+      const settle = () => { settled = true }
+
+      // Poll the API as a fallback in case WebSocket doesn't deliver
+      const pollUrl = `/api/clients/${clientId}/template_imports/${result.id}`
+      const pollInterval = setInterval(async () => {
+        if (settled) { clearInterval(pollInterval); return }
+        try {
+          const data = await apiFetch(pollUrl)
+          if (data.state === 'completed' || data.state === 'failed') {
+            settle()
+            clearInterval(pollInterval)
+            setImportState(data.state)
+            if (data.warnings?.length) setWarnings(data.warnings)
+            if (data.error_message) setImportError(data.error_message)
+            if (data.state === 'completed') {
+              setTimeout(() => navigate(`/clients/${clientId}/templates/${data.email_template_id}`), 800)
+            }
+          } else {
+            setImportState(data.state)
+          }
+        } catch { /* ignore poll errors */ }
+      }, 3000)
+
+      // Subscribe to real-time updates (primary channel)
       const unsubscribe = subscribeTemplateImportChannel(result.id, {
         received(data) {
+          if (settled) return
           setImportState(data.state)
           if (data.warnings?.length) setWarnings(data.warnings)
           if (data.error_message) setImportError(data.error_message)
 
           if (data.state === 'completed') {
+            settle()
+            clearInterval(pollInterval)
             unsubscribe()
-            // Brief pause so the user sees the completed state
             setTimeout(() => {
               navigate(`/clients/${clientId}/templates/${data.email_template_id}`)
             }, 800)
           } else if (data.state === 'failed') {
+            settle()
+            clearInterval(pollInterval)
             unsubscribe()
           }
         },
