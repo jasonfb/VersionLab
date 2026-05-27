@@ -63,6 +63,14 @@ class Subscription < ApplicationRecord
     subscription_tier.slug == "free_trial"
   end
 
+  def demo?
+    subscription_tier.slug == "demo"
+  end
+
+  def trial_or_demo?
+    free_trial? || demo?
+  end
+
   def overdue?
     active? && !free_trial? && paid_through_date < Date.current
   end

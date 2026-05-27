@@ -44,6 +44,15 @@ class Api::BaseController < ApplicationController
     @current_account_user ||= @current_account.account_users.find_by(user: current_user)
   end
 
+  def require_active_subscription!
+    if @current_account.account_locked_out?
+      render json: {
+        error: "Your account has been locked. Please upgrade to a paid plan to continue.",
+        locked_out: true
+      }, status: :forbidden
+    end
+  end
+
   def require_billing_access!
     au = current_account_user
     unless au&.is_owner? || au&.is_admin? || au&.is_billing_admin?

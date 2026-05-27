@@ -1,0 +1,27 @@
+Welcome to VersionLab, <%= @user.name&.split(" ")&.first || "there" %>!
+
+Your free trial for <%= @account.name %> is now active.
+You have 7 days and 250 VL credits to explore everything VersionLab has to offer.
+
+GETTING STARTED
+
+1. Set your password — Visit the link below to set your password and log in.
+   <%= @setup_url %>
+   This link expires in <%= Devise.reset_password_within / 1.hour %> hours.
+
+2. Create a template — Import an HTML email template or paste one in.
+   VersionLab will parse it and identify the sections you can version.
+
+3. Set up your audiences — Define the customer segments you want to target.
+   The more detail you provide, the better the AI-generated versions will be.
+
+4. Run your first merge — Select a template and audiences, then hit "Run."
+   VersionLab's AI will generate tailored copy variants for each audience.
+
+5. Review and export — Compare versions side-by-side, reject and regenerate
+   any you don't like, then export the final HTML.
+
+If you have any questions, just reply to this email — we're happy to help.
+
+Best,
+The VersionLab Team

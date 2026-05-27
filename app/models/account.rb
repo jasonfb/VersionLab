@@ -48,9 +48,23 @@ class Account < ApplicationRecord
     active_subscription&.subscription_tier&.slug == "free_trial"
   end
 
+  def on_demo?
+    active_subscription&.subscription_tier&.slug == "demo"
+  end
+
   def trial_expired?
     sub = active_subscription
     return false unless sub
-    sub.free_trial? && sub.paid_through_date < Date.current
+    sub.trial_or_demo? && sub.paid_through_date < Date.current
+  end
+
+  # Returns true when a demo or free-trial account has exhausted its 250
+  # VL-token allotment OR its time window has expired.
+  def account_locked_out?
+    sub = active_subscription
+    return false unless sub
+    return false unless sub.trial_or_demo?
+
+    trial_expired? || sub.current_cycle_vl_tokens_used >= sub.effective_monthly_token_allotment
   end
 end

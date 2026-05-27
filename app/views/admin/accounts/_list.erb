@@ -11,6 +11,7 @@
     
       <%= render partial: "admin/accounts/new_button", locals: {
      } %>
+      <%= link_to "Quick Onboard", quick_onboard_admin_accounts_path, class: "btn btn-success btn-sm ms-2" %>
         <br />
     
     
@@ -19,15 +20,16 @@
       
         <div class="row hg-row ">
           <div class='col-sm-2 hg-heading-row heading--account--name' >Name</div>
-<div class='col-sm-2 hg-heading-row heading--account--is_agency' >Is agency</div>
+<div class='col-sm-1 hg-heading-row heading--account--is_agency' >Is agency</div>
+<div class='col-sm-2 hg-heading-row heading--account--status' >Status</div>
 <div class='col-sm-2 hg-heading-row heading--account--customer_chooses_ai' >Customer chooses AI</div>
 <div class='col-sm-2 hg-heading-row heading--account--ai_config' >AI Config</div>
 
-          
 
-          
 
-          <div class=' scaffold-col-heading scaffold-col-heading-buttons col-sm-2' >
+
+
+          <div class=' scaffold-col-heading scaffold-col-heading-buttons col-sm-3' >
           </div>
         </div>
       

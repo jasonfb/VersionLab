@@ -5,7 +5,7 @@ class Api::SubscriptionsController < Api::BaseController
 
   def show
     subscription = @current_account.active_subscription
-    tiers = SubscriptionTier.where.not(slug: "free_trial").order(:position)
+    tiers = SubscriptionTier.where.not(slug: %w[free_trial demo]).order(:position)
 
     render json: {
       subscription: subscription_json(subscription),
@@ -60,6 +60,8 @@ class Api::SubscriptionsController < Api::BaseController
       start_date: subscription.start_date,
       paid_through_date: subscription.paid_through_date,
       is_free_trial: subscription.free_trial?,
+      is_demo: subscription.demo?,
+      is_locked_out: @current_account.account_locked_out?,
       trial_expired: @current_account.trial_expired?,
       is_overdue: subscription.overdue?,
       credit_applied_cents: subscription.credit_applied_cents,

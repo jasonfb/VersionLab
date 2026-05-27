@@ -25,7 +25,7 @@ class BillingService
   end
 
   def process
-    return if @subscription.free_trial?
+    return if @subscription.trial_or_demo?
 
     if @subscription.pending_final_bill?
       bill_final_overage_and_close

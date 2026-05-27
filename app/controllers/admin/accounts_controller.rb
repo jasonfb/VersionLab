@@ -20,7 +20,7 @@ class Admin::AccountsController < Admin::BaseController
   
   
   def load_all_accounts
-    @accounts = Account.includes(:ai_service, :ai_model).reverse_sort
+    @accounts = Account.includes(:ai_service, :ai_model, subscriptions: :subscription_tier).reverse_sort
     @pagy, @accounts = pagy(@accounts)
   end
 
@@ -107,6 +107,80 @@ class Admin::AccountsController < Admin::BaseController
     service = @ai_services.find_by(id: params[:ai_service_id])
     models = service ? service.ai_models.where(for_text: true).order(:name) : []
     render json: models.map { |m| { id: m.id, name: m.name } }
+  end
+
+  def quick_onboard
+    @onboard = OpenStruct.new
+  end
+
+  def create_quick_onboard
+    first_name = params[:first_name].to_s.strip
+    last_name = params[:last_name].to_s.strip
+    email = params[:email].to_s.strip.downcase
+    company_name = params[:company_name].to_s.strip
+
+    if [first_name, last_name, email, company_name].any?(&:blank?)
+      flash[:alert] = "All fields are required."
+      redirect_to quick_onboard_admin_accounts_path
+      return
+    end
+
+    ActiveRecord::Base.transaction do
+      user = User.find_or_initialize_by(email: email)
+      if user.new_record?
+        user.name = "#{first_name} #{last_name}"
+        user.password = SecureRandom.hex(16)
+        user.save!
+      else
+        user.update!(name: "#{first_name} #{last_name}") if user.name.blank?
+      end
+
+      account = Account.create!(name: company_name)
+      AccountUser.create!(user: user, account: account, is_owner: true)
+      account.clients.create!(name: company_name, hidden: true)
+
+      demo_tier = SubscriptionTier.find_by!(slug: "demo")
+      account.subscriptions.create!(
+        subscription_tier: demo_tier,
+        billing_interval: "monthly",
+        start_date: Date.current,
+        token_cycle_started_on: Date.current,
+        paid_through_date: Date.current + 1.day
+      )
+    end
+
+    flash[:notice] = "Demo account created for #{first_name} #{last_name} (#{email}) at #{company_name}."
+    redirect_to admin_accounts_path
+  end
+
+  def convert_to_free_trial
+    load_account
+    sub = @account.active_subscription
+
+    unless sub&.demo?
+      flash[:alert] = "Account is not in demo mode."
+      redirect_to admin_accounts_path
+      return
+    end
+
+    ActiveRecord::Base.transaction do
+      sub.update!(canceled_date: Date.current, final_billed_at: Time.current)
+
+      free_trial_tier = SubscriptionTier.find_by!(slug: "free_trial")
+      @account.subscriptions.create!(
+        subscription_tier: free_trial_tier,
+        billing_interval: "monthly",
+        start_date: Date.current,
+        token_cycle_started_on: Date.current,
+        paid_through_date: Date.current + 7.days
+      )
+    end
+
+    owner = @account.account_users.find_by(is_owner: true)&.user
+    FreeTrialMailer.welcome(owner, @account).deliver_later if owner
+
+    flash[:notice] = "#{@account.name} converted to Free Trial. Welcome email sent."
+    redirect_to admin_accounts_path
   end
 
   def destroy

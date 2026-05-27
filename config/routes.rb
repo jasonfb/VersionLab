@@ -125,6 +125,11 @@ Rails.application.routes.draw do
     resources :accounts do
       collection do
         get :ai_models
+        get :quick_onboard
+        post :create_quick_onboard
+      end
+      member do
+        post :convert_to_free_trial
       end
       resources :account_users
     end

@@ -39,7 +39,9 @@ class Api::AccountUsersController < Api::BaseController
     end
 
     au = @current_account.account_users.create!(user: user)
-    UserMailer.account_invitation(user, @current_account, current_user).deliver_later
+    unless @current_account.on_demo?
+      UserMailer.account_invitation(user, @current_account, current_user).deliver_later
+    end
     render json: account_user_json(au, []).merge(new_user: new_user), status: :created
   end
 
