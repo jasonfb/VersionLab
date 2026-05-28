@@ -37,7 +37,7 @@ class Account < ApplicationRecord
   end
 
   def active_subscription
-    subscriptions.active.includes(:subscription_tier).first
+    subscriptions.active.first
   end
 
   def default_payment_method

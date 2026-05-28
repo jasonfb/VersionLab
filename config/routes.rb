@@ -85,6 +85,7 @@ Rails.application.routes.draw do
           member do
             post :rebuild
             post :switch_variant
+            post :regenerate
           end
         end
       end

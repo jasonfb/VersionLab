@@ -86,8 +86,9 @@ gem "hot-glue", "~> 0.7.6.1"
 # gem "hot-glue", path: "/Users/jason/Work/Hot_Glue/hot-glue-private"
 
 gem "helios-tracker", "0.0.2"
-gem "helios-press", "0.3"
-gem "helios-videos"
+gem "helios-press", "0.4"
+gem "helios-videos", "0.3"
+gem "mux_ruby"
 gem "helios-sitemap"
 gem "universal-track-manager", "~> 0.9"
 

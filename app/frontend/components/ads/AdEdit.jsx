@@ -256,6 +256,29 @@ export default function AdEdit() {
     setStep(3)
   }
 
+  // Regenerate server-side SVG + preview for a single resize applying overrides.
+  // Called when leaving an editor, not on every save.
+  const regenerateResizePreview = async (resizeId) => {
+    if (!resizeId) return
+    try {
+      const updated = await apiFetch(
+        `/api/clients/${clientId}/ads/${adId}/ad_resizes/${resizeId}/regenerate`,
+        { method: 'POST' }
+      )
+      setResizes((prev) => prev.map((p) => p.id === updated.id ? updated : p))
+    } catch (e) {
+      console.error('Failed to regenerate preview:', e)
+    }
+  }
+
+  // Regenerate all resizes that have overrides (used when closing style editor).
+  const regenerateAllDirtyPreviews = async () => {
+    const dirtyResizes = resizes.filter((r) =>
+      r.state === 'resized' && r.layer_overrides && Object.keys(r.layer_overrides).length > 0
+    )
+    await Promise.allSettled(dirtyResizes.map((r) => regenerateResizePreview(r.id)))
+  }
+
   const handleSkipResizing = () => {
     setStep(3)
   }
@@ -872,18 +895,18 @@ export default function AdEdit() {
           : `Original (${ad.width}x${ad.height})`
 
         return svgUrl ? (
-          <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={(e) => { if (e.target === e.currentTarget) setStyleEditorOpen(false) }}>
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={(e) => { if (e.target === e.currentTarget) { setStyleEditorOpen(false); regenerateAllDirtyPreviews() } }}>
             <div className="modal-dialog modal-xl modal-dialog-centered">
               <div className="modal-content">
                 <div className="modal-header py-2">
                   <h6 className="modal-title mb-0">
                     {editorLabel}
                   </h6>
-                  <button type="button" className="btn-close" onClick={() => setStyleEditorOpen(false)} />
+                  <button type="button" className="btn-close" onClick={() => { setStyleEditorOpen(false); regenerateAllDirtyPreviews() }} />
                 </div>
                 <div className="d-flex align-items-center gap-2 flex-nowrap px-3 py-1 border-bottom bg-light" style={{ fontSize: '0.82rem' }}>
                   <div ref={styleToolbarRef}></div>
-                  <button type="button" className="btn btn-secondary btn-sm ms-auto" onClick={() => setStyleEditorOpen(false)}>
+                  <button type="button" className="btn btn-secondary btn-sm ms-auto" onClick={() => { setStyleEditorOpen(false); regenerateAllDirtyPreviews() }}>
                     Done
                   </button>
                 </div>
@@ -1248,7 +1271,7 @@ export default function AdEdit() {
 
       {/* Resize editor modal */}
       {editingResize && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={(e) => { if (e.target === e.currentTarget) setEditingResize(null) }}>
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={(e) => { if (e.target === e.currentTarget) { regenerateResizePreview(editingResize.id); setEditingResize(null) } }}>
           <div className="modal-dialog modal-xl modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header py-2">
@@ -1256,7 +1279,7 @@ export default function AdEdit() {
                   {editingResize.dimensions}
                   <small className="text-muted ms-1">{editingResize.label}</small>
                 </h6>
-                <button type="button" className="btn-close" onClick={() => setEditingResize(null)} />
+                <button type="button" className="btn-close" onClick={() => { regenerateResizePreview(editingResize.id); setEditingResize(null) }} />
               </div>
               <div className="d-flex align-items-center gap-2 flex-nowrap px-3 py-1 border-bottom bg-light" style={{ fontSize: '0.82rem' }}>
                 <button
@@ -1291,7 +1314,7 @@ export default function AdEdit() {
                   </div>
                 </div>
                 <div ref={toolbarPortalRef}></div>
-                <button type="button" className="btn btn-secondary btn-sm ms-auto" onClick={() => setEditingResize(null)}>
+                <button type="button" className="btn btn-secondary btn-sm ms-auto" onClick={() => { regenerateResizePreview(editingResize.id); setEditingResize(null) }}>
                   Done
                 </button>
               </div>

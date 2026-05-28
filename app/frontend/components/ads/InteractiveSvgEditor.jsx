@@ -197,6 +197,7 @@ function applyFittedText(textEl, fontSize, lines, boxX, boxWidth, align) {
 export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers, onLayerOverridesChange, initialOverrides, transparentBackground, renderToolbar }) {
   const containerRef = useRef(null)
   const dragRef = useRef(null) // current drag state (non-reactive for perf)
+  const companionRects = useRef({}) // { layerId: <rect> } — CTA button backgrounds linked to text
   const layerOffsets = useRef({}) // { layerId: { x, y } }
   const layerBoxes = useRef({}) // { layerId: { width, height } } — custom box dimensions from resize
   const layerRectPos = useRef({}) // { layerId: { x, y } } — absolute rect position (stable across bbox changes)
@@ -235,9 +236,47 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
     const interactiveEls = []
 
     // Native SVG text elements
+    companionRects.current = {}
     Array.from(svg.querySelectorAll('text')).forEach((textEl, i) => {
       if (!textEl.getAttribute('id')) textEl.setAttribute('id', `vl-text-${i}`)
-      interactiveEls.push({ el: textEl, layerId: textEl.getAttribute('id'), type: 'text' })
+      const layerId = textEl.getAttribute('id')
+      interactiveEls.push({ el: textEl, layerId, type: 'text' })
+
+      // Detect CTA button background: a <rect> whose bounds contain the text.
+      // In SvgComposer output the rect is the previous sibling; in original SVGs
+      // it could be anywhere. Find the smallest containing rect.
+      try {
+        const tbox = textEl.getBBox()
+        if (tbox.width > 0 && tbox.height > 0) {
+          const vb = svg.getAttribute('viewBox')?.split(/\s+/).map(Number)
+          const canvasArea = (vb && vb.length === 4) ? vb[2] * vb[3] : Infinity
+          let bestRect = null
+          let bestArea = Infinity
+          svg.querySelectorAll('rect').forEach((r) => {
+            // Skip rects inside the interactive overlay
+            if (r.closest('#vl-interactive')) return
+            const rx = parseFloat(r.getAttribute('x')) || 0
+            const ry = parseFloat(r.getAttribute('y')) || 0
+            const rw = parseFloat(r.getAttribute('width')) || 0
+            const rh = parseFloat(r.getAttribute('height')) || 0
+            if (rw <= 0 || rh <= 0) return
+            const area = rw * rh
+            // Skip full-canvas rects (backgrounds)
+            if (area >= canvasArea * 0.5) return
+            // Check if the rect contains the text bbox (with small tolerance)
+            if (tbox.x >= rx - 5 && tbox.y >= ry - 5 &&
+                tbox.x + tbox.width <= rx + rw + 5 &&
+                tbox.y + tbox.height <= ry + rh + 5 &&
+                area < bestArea) {
+              bestRect = r
+              bestArea = area
+            }
+          })
+          if (bestRect) {
+            companionRects.current[layerId] = bestRect
+          }
+        }
+      } catch (_) { /* getBBox may fail if not rendered */ }
     })
 
     // Native SVG image elements (logos, icons, etc.)
@@ -291,6 +330,19 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       }
       if (!bbox || (bbox.width === 0 && bbox.height === 0)) return
 
+      // For text with a CTA button background, use the button rect bounds
+      // so the interactive overlay covers the whole button, not just the text
+      const companion = companionRects.current[layerId]
+      if (companion && type === 'text') {
+        const cx = parseFloat(companion.getAttribute('x')) || 0
+        const cy = parseFloat(companion.getAttribute('y')) || 0
+        const cw = parseFloat(companion.getAttribute('width')) || 0
+        const ch = parseFloat(companion.getAttribute('height')) || 0
+        if (cw > 0 && ch > 0) {
+          bbox = { x: cx, y: cy, width: cw, height: ch }
+        }
+      }
+
       const pad = 6
       const offset = layerOffsets.current[layerId] || { x: 0, y: 0 }
       const customBox = layerBoxes.current[layerId]
@@ -313,6 +365,15 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
       if (type === 'text' && !maxFontSizes.current[layerId]) {
         const nativeSize = parseFloat(el.getAttribute('font-size')) || 16
         maxFontSizes.current[layerId] = nativeSize
+      }
+
+      // If custom box exists, apply persisted dimensions to image elements
+      if (customBox && savedPos && type === 'image') {
+        el.setAttribute('x', savedPos.x)
+        el.setAttribute('y', savedPos.y)
+        el.setAttribute('width', customBox.width)
+        el.setAttribute('height', customBox.height)
+        el.removeAttribute('transform')
       }
 
       // If custom box exists, refit text to match the persisted box dimensions
@@ -420,6 +481,7 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
             startFontSize: currentFontSize,
             maxFontSize: maxFontSizes.current[layerId] || currentFontSize,
             wordWrap: wordWrapFlags.current[layerId] || false,
+            companionRect: companionRects.current[layerId] || null,
           }
         })
 
@@ -444,6 +506,8 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         // Read current rect position from DOM
         const startRectX = parseFloat(rect.getAttribute('x'))
         const startRectY = parseFloat(rect.getAttribute('y'))
+        // Capture companion CTA button background if present
+        const companion = companionRects.current[layerId]
         dragRef.current = {
           mode: 'move',
           svg,
@@ -456,6 +520,9 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           startTransY: actualTrans.y,
           startRectX,
           startRectY,
+          companionRect: companion || null,
+          companionStartX: companion ? parseFloat(companion.getAttribute('x')) : 0,
+          companionStartY: companion ? parseFloat(companion.getAttribute('y')) : 0,
         }
       })
 
@@ -611,6 +678,38 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
             if (el && (x || y)) el.setAttribute('transform', `translate(${x}, ${y})`)
           })
 
+          // Apply persisted style overrides (fill, font_family, content, etc.)
+          if (initialOverrides) {
+            Object.entries(initialOverrides).forEach(([id, ov]) => {
+              const el = svg.getElementById(id)
+              if (!el || el.tagName !== 'text') return
+              if (ov.fill) {
+                el.setAttribute('fill', ov.fill)
+                el.querySelectorAll('tspan').forEach((t) => {
+                  if (t.getAttribute('fill') && t.getAttribute('fill') !== 'none') {
+                    t.setAttribute('fill', ov.fill)
+                  }
+                })
+              }
+              if (ov.font_family) el.setAttribute('font-family', ov.font_family)
+              if (ov.font_size) el.setAttribute('font-size', ov.font_size)
+              if (ov.is_bold !== undefined) el.setAttribute('font-weight', ov.is_bold ? 'bold' : 'normal')
+              if (ov.is_italic !== undefined) el.setAttribute('font-style', ov.is_italic ? 'italic' : 'normal')
+              if (ov.letter_spacing) el.setAttribute('letter-spacing', ov.letter_spacing)
+              if (ov.content && !ov.box_width) {
+                // Update text content only for non-resized elements (resized ones
+                // get refitted in buildInteractiveLayer)
+                const tspans = el.querySelectorAll('tspan')
+                if (tspans.length > 0) {
+                  tspans[0].textContent = ov.content
+                  Array.from(tspans).slice(1).forEach((t) => t.remove())
+                } else {
+                  el.textContent = ov.content
+                }
+              }
+            })
+          }
+
           // Note: deleted elements are hidden inside buildInteractiveLayer,
           // which runs after this effect via setReady(true).
 
@@ -685,6 +784,22 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           handle.setAttribute('y', cy - hs / 2)
         })
 
+        // Update image element dimensions during resize
+        if (d.elType === 'image') {
+          d.textEl.setAttribute('x', x)
+          d.textEl.setAttribute('y', y)
+          d.textEl.setAttribute('width', w)
+          d.textEl.setAttribute('height', h)
+        }
+
+        // Resize CTA button background with the text box
+        if (d.companionRect) {
+          d.companionRect.setAttribute('x', x)
+          d.companionRect.setAttribute('y', y)
+          d.companionRect.setAttribute('width', w)
+          d.companionRect.setAttribute('height', h)
+        }
+
         // Smart text fitting during resize (text elements only)
         if (d.elType === 'text') {
           const pad = 6
@@ -737,6 +852,12 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
         const ry = d.startRectY + dy
         d.rect.setAttribute('x', rx)
         d.rect.setAttribute('y', ry)
+
+        // Move CTA button background with the text
+        if (d.companionRect) {
+          d.companionRect.setAttribute('x', d.companionStartX + dx)
+          d.companionRect.setAttribute('y', d.companionStartY + dy)
+        }
 
         // Move resize handles too
         const handles = d.svg.querySelectorAll(`#vl-interactive rect[data-handle][data-layer-id="${d.layerId}"]`)

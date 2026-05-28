@@ -7,9 +7,12 @@ module AdLayout
     end
 
     # Build a new SVG from scratch at target dimensions using computed layout.
-    def compose(layout_result)
+    # Optional +layer_overrides+ hash (keyed by layer ID) applies user edits:
+    #   x_offset/y_offset, rect_x/rect_y, box_width/box_height, font_size, deleted
+    def compose(layout_result, layer_overrides: {})
       width = layout_result.target_width
       height = layout_result.target_height
+      overrides = layer_overrides || {}
 
       builder = Nokogiri::XML::Builder.new(encoding: "UTF-8") do |xml|
         xml.svg(
@@ -26,11 +29,16 @@ module AdLayout
 
           # Text and other elements
           layout_result.layers.each do |layer|
-            if layer["type"] == "image"
-              render_image_layer(xml, layer)
-            elsif layer["type"] == "text" && layer["content"].present?
-              render_cta_background(xml, layer) if layer["cta_background_color"].present?
-              render_text_layer(xml, layer)
+            ov = overrides[layer["id"]]&.stringify_keys || {}
+            next if ov["deleted"]
+
+            merged = apply_layer_overrides(layer, ov)
+
+            if merged["type"] == "image"
+              render_image_layer(xml, merged)
+            elsif merged["type"] == "text" && merged["content"].present?
+              render_cta_background(xml, merged) if merged["cta_background_color"].present?
+              render_text_layer(xml, merged)
             end
           end
         end
@@ -130,7 +138,12 @@ module AdLayout
       font_family = layer["font_family"].presence || "sans-serif"
       align = layer["align"] || "left"
       region_width = layer["width"].to_f
-      lines = layer["wrapped_lines"] || [layer["content"]]
+      # If content was overridden, re-wrap; otherwise use pre-wrapped lines
+      lines = if layer["content_overridden"]
+        wrap_text(layer["content"], region_width, font_size)
+      else
+        layer["wrapped_lines"] || [layer["content"]]
+      end
 
       # Compute text-anchor and x position based on alignment
       text_anchor, text_x = compute_alignment(align, x, region_width)
@@ -147,7 +160,7 @@ module AdLayout
       # block inside the button rect rather than top-aligning it.
       if layer["cta_background_color"].present?
         region_h = layer["height"].to_f
-        line_count = (layer["wrapped_lines"] || [layer["content"]]).size
+        line_count = lines.size
         block_h = font_size + (line_count - 1) * line_height
         start_y = y + ((region_h - block_h) / 2.0) + font_size
       end
@@ -171,6 +184,62 @@ module AdLayout
           end
         end
       end
+    end
+
+    # Merge user overrides into a layer hash. Handles both position offsets
+    # (x_offset/y_offset) and absolute repositioning (rect_x/rect_y + box_width/box_height).
+    def apply_layer_overrides(layer, ov)
+      return layer if ov.blank?
+
+      merged = layer.dup
+
+      if ov["rect_x"].present? && ov["rect_y"].present? && ov["box_width"].present? && ov["box_height"].present?
+        # Absolute reposition from resize — use rect position directly
+        merged["x"] = ov["rect_x"].to_f.round.to_s
+        merged["y"] = ov["rect_y"].to_f.round.to_s
+        merged["width"] = ov["box_width"].to_f.round.to_s
+        merged["height"] = ov["box_height"].to_f.round.to_s
+      else
+        # Relative offset from drag
+        merged["x"] = (layer["x"].to_f + (ov["x_offset"] || 0).to_f).round.to_s
+        merged["y"] = (layer["y"].to_f + (ov["y_offset"] || 0).to_f).round.to_s
+      end
+
+      merged["font_size"] = ov["font_size"].to_f if ov["font_size"].present?
+      merged["fill"] = ov["fill"] if ov["fill"].present?
+      merged["color"] = ov["fill"] if ov["fill"].present?
+      merged["font_family"] = ov["font_family"] if ov["font_family"].present?
+      merged["font_weight"] = ov["is_bold"] ? "bold" : "normal" if ov.key?("is_bold")
+      if ov["content"].present?
+        merged["content"] = ov["content"]
+        merged["content_overridden"] = true
+      end
+      merged["align"] = ov["text_align"] if ov["text_align"].present?
+
+      merged
+    end
+
+    # Simple word wrap using estimated character width (matches frontend logic)
+    def wrap_text(content, region_width, font_size)
+      return [content] if content.blank? || region_width <= 0 || font_size <= 0
+      char_width = font_size * 0.52
+      chars_per_line = [1, (region_width / char_width).floor].max
+      words = content.split(/\s+/)
+      lines = []
+      current = []
+      current_len = 0
+      words.each do |word|
+        if current.empty? || current_len + 1 + word.length <= chars_per_line
+          current << word
+          current_len += (current.length == 1 ? 0 : 1) + word.length
+        else
+          lines << current.join(" ")
+          current = [word]
+          current_len = word.length
+        end
+      end
+      lines << current.join(" ") if current.any?
+      lines
     end
 
     def compute_alignment(align, region_x, region_width)

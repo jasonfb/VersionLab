@@ -7,7 +7,7 @@ module AdPlatformSizes
     AdPlatform.ordered.includes(:ad_platform_sizes).map do |platform|
       [
         platform.name,
-        platform.ad_platform_sizes.ordered.map { |s| { name: s.name, width: s.width, height: s.height } }
+        platform.ad_platform_sizes.sort_by(&:position).map { |s| { name: s.name, width: s.width, height: s.height } }
       ]
     end.to_h
   end

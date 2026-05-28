@@ -13,6 +13,14 @@ class Api::AdResizesController < Api::BaseController
     render json: resize_json(@resize)
   end
 
+  # Regenerate SVG + preview image applying current layer_overrides.
+  # Called explicitly (e.g. when leaving the editor), not on every save.
+  def regenerate
+    AdResizeService.regenerate_preview(@resize)
+    @resize.reload
+    render json: resize_json(@resize)
+  end
+
   # Destroy & rebuild a single resize so it picks up the latest layer
   # classifications without regenerating every other size.
   def rebuild

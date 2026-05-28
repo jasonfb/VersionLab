@@ -26,6 +26,7 @@
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo-rails": "^8.0.23",
+    "@mux/mux-player": "^3.13.0",
     "@popperjs/core": "^2.11.8",
     "@rails/actioncable": "^8.1.200",
     "@rails/actiontext": "^8.1.300",

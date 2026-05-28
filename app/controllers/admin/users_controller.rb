@@ -19,7 +19,7 @@ class Admin::UsersController < Admin::BaseController
   
   
   def load_all_users
-    @users = User.reverse_sort
+    @users = User.includes(:roles).reverse_sort
     @pagy, @users = pagy(@users)
   end
 

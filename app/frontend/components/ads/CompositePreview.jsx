@@ -119,17 +119,28 @@ export default function CompositePreview({
       {textLayers.map((layer) => {
         const props = getLayerProps(layer)
         const overrides = layerOverrides?.[layer.id] || {}
-        const ox = parseFloat(overrides.x_offset) || 0
-        const oy = parseFloat(overrides.y_offset) || 0
-        const x = parseFloat(layer.x) || 0
-        const y = parseFloat(layer.y) || 0
-        const w = parseFloat(layer.width) || (width * 0.8)
-        const h = parseFloat(layer.height) || 100
+        if (overrides.deleted) return null
+        let x, y, w, h
+        if (overrides.rect_x !== undefined && overrides.rect_y !== undefined &&
+            overrides.box_width !== undefined && overrides.box_height !== undefined) {
+          // Absolute positioning from resize editor
+          x = parseFloat(overrides.rect_x)
+          y = parseFloat(overrides.rect_y)
+          w = parseFloat(overrides.box_width)
+          h = parseFloat(overrides.box_height)
+        } else {
+          const ox = parseFloat(overrides.x_offset) || 0
+          const oy = parseFloat(overrides.y_offset) || 0
+          x = (parseFloat(layer.x) || 0) + ox
+          y = (parseFloat(layer.y) || 0) + oy
+          w = parseFloat(layer.width) || (width * 0.8)
+          h = parseFloat(layer.height) || 100
+        }
 
         const anchor = props.text_align === 'center' ? 'middle' : props.text_align === 'right' ? 'end' : 'start'
-        let textX = x + ox
-        if (anchor === 'middle') textX = x + w / 2 + ox
-        else if (anchor === 'end') textX = x + w + ox
+        let textX = x
+        if (anchor === 'middle') textX = x + w / 2
+        else if (anchor === 'end') textX = x + w
 
         // Word wrap
         const charW = props.font_size * 0.55
@@ -154,8 +165,8 @@ export default function CompositePreview({
           <g key={layer.id}>
             {/* Hit area for drag + click */}
             <rect
-              x={x + ox}
-              y={y + oy}
+              x={x}
+              y={y}
               width={w}
               height={h}
               fill="transparent"
@@ -171,7 +182,7 @@ export default function CompositePreview({
             {/* Rendered text */}
             <text
               x={textX}
-              y={y + props.font_size + oy}
+              y={y + props.font_size}
               fill={props.fill}
               fontSize={props.font_size}
               fontFamily={`'${props.font_family}', sans-serif`}

@@ -15,6 +15,10 @@ Rails.application.configure do
     # but Bullet flags it in test with single-record fixtures.
     Bullet.add_safelist type: :unused_eager_loading, class_name: "AccountUser", association: :account
     Bullet.add_safelist type: :unused_eager_loading, class_name: "ActiveStorage::Attachment", association: :record
+    Bullet.add_safelist type: :unused_eager_loading, class_name: "Account", association: :ai_service
+    Bullet.add_safelist type: :unused_eager_loading, class_name: "Account", association: :ai_model
+    Bullet.add_safelist type: :unused_eager_loading, class_name: "Account", association: :subscriptions
+    # User => :roles is a real N+1 in admin/users; fixed with .includes(:roles)
   end
 
   # Settings specified here will take precedence over those in config/application.rb.

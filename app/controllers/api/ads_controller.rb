@@ -12,6 +12,7 @@ class Api::AdsController < Api::BaseController
   end
 
   def show
+    @ad = @client.ads.includes(ad_fonts: :font_file_attachment).find(params[:id])
     render json: ad_json(@ad)
   end
 

@@ -69,8 +69,8 @@ class AdResizeService
     resize
   end
 
-  def generate_resized_svg(resize, layout_result)
-    svg_string = build_resized_svg(resize, layout_result)
+  def generate_resized_svg(resize, layout_result, layer_overrides: {})
+    svg_string = build_resized_svg(resize, layout_result, layer_overrides: layer_overrides)
 
     resize.resized_svg.attach(
       io: StringIO.new(svg_string),
@@ -135,10 +135,10 @@ class AdResizeService
     File.binread(Rails.root.join("public", href.sub(%r{^/}, "")))
   end
 
-  def build_resized_svg(resize, layout_result)
+  def build_resized_svg(resize, layout_result, layer_overrides: {})
     # Use SvgComposer for classified ads; legacy rescale for old ads
     if @ad.classifications_confirmed?
-      AdLayout::SvgComposer.new(@ad).compose(layout_result)
+      AdLayout::SvgComposer.new(@ad).compose(layout_result, layer_overrides: layer_overrides)
     elsif @ad.converted_svg&.attached?
       rescale_svg(@ad.converted_svg.blob.download, resize.width, resize.height)
     elsif @ad.file&.attached? && @ad.file_content_type&.include?("svg")
@@ -146,6 +146,21 @@ class AdResizeService
     else
       fallback_svg(resize.width, resize.height)
     end
+  end
+
+  # Regenerate the SVG and preview image for an existing resize, applying
+  # the current layer_overrides. Called after the user edits a resize.
+  def self.regenerate_preview(resize)
+    ad = resize.ad
+    service = new(ad, platforms: {})
+    layout_result = AdLayout::LayoutEngine::Result.new(
+      target_width: resize.width,
+      target_height: resize.height,
+      layers: resize.resized_layers,
+      shape: nil
+    )
+    service.send(:generate_resized_svg, resize, layout_result, layer_overrides: resize.layer_overrides || {})
+    service.send(:generate_preview, resize)
   end
 
   def rescale_svg(svg_data, target_width, target_height)

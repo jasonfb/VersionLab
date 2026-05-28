@@ -5,7 +5,7 @@ class Api::PaymentsController < Api::BaseController
 
   def index
     payments = @current_account.payments
-      .includes(:subscription, :payment_method)
+      .includes(:payment_method)
       .recent
       .limit(50)
 
