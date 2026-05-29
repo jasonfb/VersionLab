@@ -4,7 +4,6 @@ Rails.application.routes.draw do
   get "sitemap.xml", to: "sitemap#show"
   mount HeliosTracker::Engine, at: '/'
   mount Helios::Press::Admin::Engine, at: "/admin/press"
-  mount Helios::Press::Public::Engine, at: "/blog"
   mount Helios::Press::Api::Engine, at: "/api/press"
   mount Helios::Videos::Engine, at: "/videos"
   devise_for :users, skip: [ :registrations ]
@@ -147,7 +146,10 @@ Rails.application.routes.draw do
   # Health check
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # React SPA catch-all (MUST be last)
+  # React SPA catch-all (before Press engine which has a /:slug catch-all)
   get "app",       to: "client_app#index"
   get "app/*path", to: "client_app#index"
+
+  # Blog engine at root (slugs match as /:slug after all specific routes above)
+  mount Helios::Press::Public::Engine, at: "/"
 end

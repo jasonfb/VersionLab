@@ -39,9 +39,16 @@
     <% end %>
   </head>
 
-  <body>
+  <body style="display: flex; flex-direction: column; min-height: 100vh; margin: 0;">
     <%= render "marketing/nav" %>
-    <%= yield %>
+    <main style="flex: 1;">
+      <%= yield %>
+    </main>
+    <% if content_for?(:footer) %>
+      <%= yield :footer %>
+    <% else %>
+      <%= render "marketing/footer_short" %>
+    <% end %>
     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
     <script>AOS.init({ duration: 600, once: true, offset: 60 });</script>
   </body>

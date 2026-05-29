@@ -2,5 +2,5 @@
 
 Helios::Press.configure do |config|
   config.admin_parent_controller = "Admin::BaseController"
-  config.public_parent_controller = "ApplicationController"
+  config.public_parent_controller = "PressBaseController"
 end
