@@ -14,13 +14,15 @@ Helios::Sitemap.configure do |config|
   # Define your sitemap entries.
   # The block receives a SitemapGenerator::Sitemap instance.
   config.sitemap_entries = ->(sitemap) {
+    # Marketing pages
     sitemap.add "/", changefreq: "daily", priority: 0.9
-    # sitemap.add "/about", changefreq: "weekly"
+    sitemap.add "/pricing", changefreq: "weekly", priority: 0.8
+    sitemap.add "/contact", changefreq: "monthly", priority: 0.6
 
-    # Dynamic entries from your database:
-    # Page.published.find_each do |page|
-    #   sitemap.add "/#{page.slug}", lastmod: page.updated_at, changefreq: "weekly"
-    # end
+    # Blog posts (helios-press)
+    Helios::Press::Post.published.find_each do |post|
+      sitemap.add "/#{post.slug}", lastmod: post.updated_at, changefreq: "weekly", priority: 0.7
+    end
   }
 
   # IndexNow integration (optional)

@@ -16,3 +16,6 @@ production:
   subscription_billing:
     class: SubscriptionBillingJob
     schedule: at 6am every day
+  sitemap_refresh:
+    class: SitemapRefreshJob
+    schedule: at 3am every day
