@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_28_195444) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_02_200545) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -54,6 +54,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_28_195444) do
 
   create_table "accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "ai_model_id"
+    t.jsonb "ai_model_preferences", default: {}
     t.uuid "ai_service_id"
     t.datetime "created_at", null: false
     t.boolean "customer_chooses_ai", default: false, null: false

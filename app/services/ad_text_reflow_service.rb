@@ -60,12 +60,7 @@ class AdTextReflowService
   end
 
   def resolve_ai_model
-    if @ad.ai_model && AiKey.exists?(ai_service_id: @ad.ai_model.ai_service_id)
-      return @ad.ai_model
-    end
-    service_ids_with_keys = AiKey.pluck(:ai_service_id)
-    return nil if service_ids_with_keys.empty?
-    AiModel.where(ai_service_id: service_ids_with_keys).order(:created_at).first
+    @ad.client.account.ai_model_for(:ad_layout, ad: @ad)
   end
 
   def build_messages(tw, th, zones, layers)

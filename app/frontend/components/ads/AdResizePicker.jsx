@@ -155,9 +155,14 @@ export default function AdResizePicker({
         </div>
 
         <div className="mb-3">
-          <label className="form-label fw-semibold small text-uppercase text-muted">
-            Custom Sizes
-          </label>
+          <div className="d-flex align-items-center justify-content-between mb-2">
+            <label className="form-label fw-semibold small text-uppercase text-muted mb-0">
+              Custom Sizes
+            </label>
+            <button className="btn btn-sm btn-outline-secondary" onClick={addCustomSize}>
+              <i className="bi bi-plus me-1"></i>Add Custom Size
+            </button>
+          </div>
           {customSizes.map((cs, i) => (
             <div key={i} className="d-flex align-items-center gap-2 mb-2">
               <input
@@ -196,9 +201,6 @@ export default function AdResizePicker({
               </button>
             </div>
           ))}
-          <button className="btn btn-sm btn-outline-secondary" onClick={addCustomSize}>
-            <i className="bi bi-plus me-1"></i>Add Custom Size
-          </button>
         </div>
 
         {(Object.keys(selectedPlatforms).length > 0 || validCustomSizes.length > 0) && (
@@ -225,15 +227,6 @@ export default function AdResizePicker({
             )}
           </button>
 
-          {allResized && (
-            <button className="btn btn-success btn-sm" onClick={onContinue}>
-              <i className="bi bi-arrow-right me-1"></i>Continue to Backgrounds
-            </button>
-          )}
-
-          <button className="btn btn-link btn-sm text-muted p-0 text-start" onClick={onSkip}>
-            Skip Resizing
-          </button>
         </div>
       </div>
 

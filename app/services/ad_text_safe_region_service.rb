@@ -38,14 +38,7 @@ class AdTextSafeRegionService
   private
 
   def resolve_ai_model
-    if @ad.ai_model && AiKey.exists?(ai_service_id: @ad.ai_model.ai_service_id)
-      return @ad.ai_model
-    end
-
-    service_ids_with_keys = AiKey.pluck(:ai_service_id)
-    return nil if service_ids_with_keys.empty?
-
-    AiModel.where(ai_service_id: service_ids_with_keys).order(:created_at).first
+    @ad.client.account.ai_model_for(:ad_vision, ad: @ad)
   end
 
   # Center-crop the background image (base64 data URI) to target dimensions.
@@ -83,7 +76,16 @@ class AdTextSafeRegionService
       [ target_w, resized.width ].min,
       [ target_h, resized.height ].min)
 
-    png_data = cropped.pngsave_buffer(compression: 6)
+    # Upscale to at least 900px wide for better AI vision accuracy
+    min_dimension = 900
+    upscale = if cropped.width < min_dimension
+      min_dimension.to_f / cropped.width
+    else
+      1.0
+    end
+    final = upscale > 1.0 ? cropped.resize(upscale) : cropped
+
+    png_data = final.pngsave_buffer(compression: 6)
     Base64.strict_encode64(png_data)
   rescue => e
     Rails.logger.warn("AdTextSafeRegionService: crop failed: #{e.message}")
@@ -105,34 +107,39 @@ class AdTextSafeRegionService
 
   def build_system_prompt(target_w, target_h)
     <<~PROMPT
-      You are an expert at analyzing advertising images for text placement.
+      You are an expert at precisely locating faces and subjects in images.
 
-      You will receive a #{target_w}×#{target_h} pixel background image for a display ad. Your job is to identify EXCLUSION ZONES — rectangular areas where text must NOT be placed. Everything outside these zones is considered safe for text.
+      You will receive an image that has been scaled up for clarity. The ACTUAL canvas size is #{target_w}×#{target_h} pixels. All coordinates in your response must be in the original #{target_w}×#{target_h} coordinate space.
 
-      Mark these areas as exclusion zones:
-      - Human faces (tight bounding box around each face)
-      - Human bodies and hands (when prominent/in-focus)
-      - Key product imagery or focal subjects
-      - Logos, brand marks, or existing text
-      - Fine-grained patterns like flowers, jewelry, or ornate detail that would clash with overlaid text
+      Your job: identify EXCLUSION ZONES — tight rectangular bounding boxes around faces and key subjects where advertising text must NOT be placed.
 
-      Do NOT exclude:
-      - Blurry or out-of-focus areas (these are GOOD for text)
-      - Sky, walls, floors, fabric, or other uniform/soft surfaces
-      - Color bars, banners, or solid overlays
-      - Dark, shadowed, or dimly lit areas
-      - Gentle gradients or bokeh backgrounds
+      WHAT TO MARK:
+      - Every human face: draw a box from the top of the forehead to the bottom of the chin, left edge of face to right edge. Include the full face but NOT extra background.
+      - Logos or brand marks with existing text
+      - Key product imagery that is the focal subject
 
-      The principle: if a region is visually "quiet" enough that a semi-bold white or dark text at 14–30px would be readable over it, it is NOT an exclusion zone.
+      WHAT NOT TO MARK:
+      - Bodies, arms, hands, clothing (only faces matter for text avoidance)
+      - Blurry/out-of-focus areas, sky, walls, gradients, bokeh
+      - Solid color bars or banners (these are GOOD for text)
+
+      PRECISION IS CRITICAL. For each face:
+      1. Identify the exact center of the face in the image
+      2. Estimate the face width and height carefully
+      3. Place the bounding box so the face is centered within it
+      4. The box should be tight — just enough to cover forehead to chin, ear to ear
+
+      Common mistakes to avoid:
+      - Don't shift boxes left/right of the actual face position
+      - Don't confuse one person's face with another's
+      - If a face is at the right edge of the image, the box should be at the right edge too
+      - Remember: (0,0) is the TOP-LEFT corner. X increases rightward, Y increases downward.
 
       Rules:
       - Return 1–10 exclusion zones
-      - Each zone must be at least 20px wide and 20px tall
-      - Zones may overlap if subjects overlap
-      - Coordinates are in pixels from top-left (0,0)
+      - Coordinates are in pixels from top-left (0,0) in the #{target_w}×#{target_h} space
       - x + width must not exceed #{target_w}, y + height must not exceed #{target_h}
-      - Keep bounding boxes tight around the actual subject — don't over-exclude
-      - Include a short label for each zone (e.g., "woman's face", "child's face", "brand logo")
+      - Include a short label (e.g., "left child's face", "center woman's face")
 
       Respond with valid JSON only:
       {

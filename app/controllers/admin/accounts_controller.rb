@@ -77,12 +77,19 @@ class Admin::AccountsController < Admin::BaseController
     
 
     modified_params = modify_date_inputs_on_params(update_account_params.dup, nil, {})
-  
-    
-      
-      
-   
-    
+
+    # Merge per-category AI model preferences
+    prefs = @account.ai_model_preferences || {}
+    Account::AI_MODEL_CATEGORIES.each do |cat|
+      value = params.dig(:account, :"ai_model_preferences_#{cat}")
+      if value.present?
+        prefs[cat] = { "ai_model_id" => value }
+      else
+        prefs.delete(cat)
+      end
+    end
+    modified_params[:ai_model_preferences] = prefs
+
     @account.assign_attributes(modified_params)
       
       
@@ -204,7 +211,7 @@ class Admin::AccountsController < Admin::BaseController
 
 
   def update_account_params
-    fields = :name, :is_agency, :stripe_customer_id, :customer_chooses_ai, :ai_service_id, :ai_model_id
+    fields = :name, :is_agency, :stripe_customer_id, :customer_chooses_ai, :ai_service_id, :ai_model_id, :ai_model_preferences
 
     params.require(:account).permit(fields)
   end

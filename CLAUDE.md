@@ -16,6 +16,8 @@ bin/vite dev               # Vite dev server only (port 3036)
 
 Note: Do not start the dev server. Let the operator start & stop it directly; prompt them to do so when testing is needed.
 
+Do not make any commits. Let the operator make all the commits and pause at stopping points for testing and committing.
+
 ### CSS
 
 ```bash

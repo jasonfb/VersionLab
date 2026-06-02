@@ -72,6 +72,34 @@
   </div>
 </div>
 
+<div class="row mt-3" id="ai-preferences-section" style="<%= 'display:none;' if account.customer_chooses_ai? %>">
+  <div class="col-12">
+    <h6 class="text-muted small text-uppercase fw-semibold mb-2">AI Model Preferences by Category</h6>
+    <p class="text-muted small mb-3">Override the default AI model for specific tasks. Leave blank to use the account default above.</p>
+  </div>
+  <% Account::AI_MODEL_CATEGORIES.each do |category| %>
+    <% label = category.titleize.gsub('Ai', 'AI') %>
+    <% current_model_id = account.ai_model_preferences&.dig(category, 'ai_model_id') %>
+    <div class="col-md-2 mb-2">
+      <select name="account[ai_model_preferences_<%= category %>]"
+              class="form-select form-select-sm"
+              id="ai_pref_<%= category %>">
+        <option value="">— Default —</option>
+        <% @ai_services.each do |service| %>
+          <optgroup label="<%= service.name %>">
+            <% service.ai_models.order(:name).each do |model| %>
+              <option value="<%= model.id %>" <%= 'selected' if current_model_id == model.id.to_s %>>
+                <%= model.name %>
+              </option>
+            <% end %>
+          </optgroup>
+        <% end %>
+      </select>
+      <label class="text-muted small form-text"><%= label %></label>
+    </div>
+  <% end %>
+</div>
+
 <script>
   (function() {
     var serviceSelect = document.getElementById('account_ai_service_id');
@@ -80,12 +108,15 @@
     var modelField = document.getElementById('ai-model-field');
     var toggleRadios = document.querySelectorAll('[data-ai-toggle]');
 
+    var prefsSection = document.getElementById('ai-preferences-section');
+
     // Toggle visibility of service/model fields based on customer_chooses_ai
     toggleRadios.forEach(function(radio) {
       radio.addEventListener('change', function() {
         var customerChooses = document.getElementById('account_customer_chooses_ai_1').checked;
         serviceField.style.display = customerChooses ? 'none' : '';
         modelField.style.display = customerChooses ? 'none' : '';
+        if (prefsSection) prefsSection.style.display = customerChooses ? 'none' : '';
         if (customerChooses) {
           serviceSelect.value = '';
           modelSelect.innerHTML = '<option value="">-- Select model --</option>';

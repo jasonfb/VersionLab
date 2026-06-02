@@ -1,17 +1,9 @@
-import React, { useState, useMemo } from 'react'
-import { apiFetch } from '~/lib/api'
+import React, { useMemo } from 'react'
 
-export default function AdBackgroundPicker({
+function AdBackgroundPicker({
   ad,
-  clientId,
   resizes,
-  smartPlacement,
-  onSmartPlacementChange,
-  onContinue,
-  onBack,
 }) {
-  const [detecting, setDetecting] = useState(false)
-  const [detectError, setDetectError] = useState(null)
   const bgLayer = useMemo(() => {
     return (ad.classified_layers || []).find((l) => l.type === 'background')
   }, [ad.classified_layers])
@@ -36,9 +28,6 @@ export default function AdBackgroundPicker({
     return (
       <div className="text-center py-5 text-muted">
         <p>No background image detected and no resizes selected.</p>
-        <button className="btn btn-primary" onClick={onContinue}>
-          Continue to Layout
-        </button>
       </div>
     )
   }
@@ -92,106 +81,12 @@ export default function AdBackgroundPicker({
         </div>
       )}
 
-      {/* Smart text placement checkbox */}
-      <div className="border rounded p-3 mb-4 bg-light">
-        <div className="form-check">
-          <input
-            className="form-check-input"
-            type="checkbox"
-            id="smart-placement"
-            checked={smartPlacement}
-            onChange={(e) => onSmartPlacementChange(e.target.checked)}
-          />
-          <label className="form-check-label fw-semibold" htmlFor="smart-placement">
-            Smart text placement
-          </label>
-        </div>
-        <p className="small text-muted mb-0 mt-1 ms-4">
-          Uses AI to detect faces and busy areas in each background, then places text only
-          in clean regions. Avoids overlaying text on people or important visual elements.
-        </p>
-      </div>
 
-      {/* Detection error */}
-      {detectError && (
-        <div className="alert alert-warning mb-3">
-          <i className="bi bi-exclamation-triangle me-2"></i>
-          {detectError}
-          <button className="btn btn-sm btn-outline-warning ms-2" onClick={() => { setDetectError(null); onContinue({}) }}>
-            Continue without smart placement
-          </button>
-        </div>
-      )}
-
-      {/* Continue button */}
-      <div className="d-flex gap-2">
-        <button
-          className="btn btn-primary"
-          disabled={detecting}
-          onClick={handleContinue}
-        >
-          {detecting ? (
-            <><span className="spinner-border spinner-border-sm me-2" />Detecting faces &amp; subjects...</>
-          ) : (
-            <>Continue to Layout <i className="bi bi-arrow-right ms-1"></i></>
-          )}
-        </button>
-      </div>
     </div>
   )
-
-  async function handleContinue() {
-    if (!smartPlacement) {
-      onContinue({})
-      return
-    }
-
-    // Run exclusion zone detection for each resize with a fitting background
-    setDetecting(true)
-    setDetectError(null)
-    const exclusionMap = {}
-
-    try {
-      const fittingResizes = resizeStatuses.filter((r) => r.bgFits)
-      const results = await Promise.allSettled(
-        fittingResizes.map(async (r) => {
-          const data = await apiFetch(
-            `/api/clients/${clientId}/ads/${ad.id}/detect_exclusion_zones`,
-            {
-              method: 'POST',
-              body: JSON.stringify({ target_width: r.width, target_height: r.height }),
-            }
-          )
-          return { resizeId: r.id, ...data }
-        })
-      )
-
-      results.forEach((r) => {
-        if (r.status === 'fulfilled') {
-          exclusionMap[r.value.resizeId] = r.value.exclusion_zones || []
-        }
-      })
-
-      // Also detect for the original ad dimensions (no resize)
-      try {
-        const origData = await apiFetch(
-          `/api/clients/${clientId}/ads/${ad.id}/detect_exclusion_zones`,
-          {
-            method: 'POST',
-            body: JSON.stringify({ target_width: ad.width, target_height: ad.height }),
-          }
-        )
-        exclusionMap['original'] = origData.exclusion_zones || []
-      } catch (_) {}
-
-      onContinue(exclusionMap)
-    } catch (e) {
-      setDetectError(e.message || 'Failed to detect exclusion zones')
-    } finally {
-      setDetecting(false)
-    }
-  }
 }
+
+export default AdBackgroundPicker
 
 function ResizeBackgroundCard({ resize, bgSrc, bgWidth, bgHeight }) {
   const { width, height, bgFits, label, platform_labels } = resize

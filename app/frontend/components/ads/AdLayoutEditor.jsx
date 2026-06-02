@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react'
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { apiFetch } from '~/lib/api'
 
 export default function AdLayoutEditor({
@@ -12,12 +12,45 @@ export default function AdLayoutEditor({
   onBack,
   transitioning,
 }) {
-  const [drawing, setDrawing] = useState(false) // is the user currently dragging a new box
-  const [drawStart, setDrawStart] = useState(null) // { x, y } in canvas coords
+  const [drawing, setDrawing] = useState(false)
+  const [drawStart, setDrawStart] = useState(null)
   const [drawCurrent, setDrawCurrent] = useState(null)
   const [selectedZoneIdx, setSelectedZoneIdx] = useState(null)
   const [labelInput, setLabelInput] = useState('')
+  const [detecting, setDetecting] = useState(false)
   const svgRef = useRef(null)
+  const detectedRef = useRef(false)
+
+  // Auto-detect exclusion zones on mount if smart placement is enabled and no zones yet
+  useEffect(() => {
+    if (!smartPlacement || detectedRef.current) return
+    const zones = exclusionZones?.['original'] || []
+    if (zones.length > 0) return // already have zones
+    if (!ad.width || !ad.height) return
+
+    detectedRef.current = true
+    setDetecting(true)
+
+    const detect = async () => {
+      try {
+        const data = await apiFetch(
+          `/api/clients/${clientId}/ads/${ad.id}/detect_exclusion_zones`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ target_width: ad.width, target_height: ad.height }),
+          }
+        )
+        if (data.exclusion_zones?.length > 0) {
+          onExclusionZonesChange({ ...exclusionZones, original: data.exclusion_zones })
+        }
+      } catch (e) {
+        console.error('Exclusion zone detection failed:', e)
+      } finally {
+        setDetecting(false)
+      }
+    }
+    detect()
+  }, [smartPlacement, ad, clientId, exclusionZones, onExclusionZonesChange])
 
   const bgLayer = useMemo(() => {
     return (ad.classified_layers || []).find((l) => l.type === 'background')
@@ -109,8 +142,19 @@ export default function AdLayoutEditor({
 
   return (
     <div>
+      {/* Detecting spinner */}
+      {detecting && (
+        <div className="alert alert-info mb-4 d-flex align-items-center gap-3">
+          <span className="spinner-border spinner-border-sm text-info" />
+          <div>
+            <strong>Detecting faces and subjects...</strong>
+            <p className="small mb-0 mt-1">AI is analyzing the background image to find areas where text should not be placed.</p>
+          </div>
+        </div>
+      )}
+
       {/* Info */}
-      {smartPlacement && (
+      {smartPlacement && !detecting && (
         <div className="alert alert-info mb-4">
           <div className="d-flex align-items-center gap-2 mb-1">
             <i className="bi bi-shield-check"></i>
@@ -121,7 +165,7 @@ export default function AdLayoutEditor({
           </div>
           <p className="small mb-0">
             Red boxes mark areas where text should NOT be placed (faces, logos, key subjects).
-            AI detected {zones.length} zone{zones.length !== 1 ? 's' : ''}.
+            {zones.length > 0 && <> AI detected {zones.length} zone{zones.length !== 1 ? 's' : ''}.</>}
             <strong> Click and drag on the image to add more zones.</strong> Click a zone to select, rename, or delete it.
           </p>
         </div>
@@ -262,16 +306,6 @@ export default function AdLayoutEditor({
         </div>
       </div>
 
-      {/* Continue */}
-      <div className="d-flex gap-2">
-        <button className="btn btn-primary" onClick={onContinue} disabled={transitioning}>
-          {transitioning ? (
-            <><span className="spinner-border spinner-border-sm me-2" />Reflowing text around faces...</>
-          ) : (
-            <>Continue to Style <i className="bi bi-arrow-right ms-1"></i></>
-          )}
-        </button>
-      </div>
     </div>
   )
 }

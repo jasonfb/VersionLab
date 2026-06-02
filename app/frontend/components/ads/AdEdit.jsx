@@ -602,10 +602,20 @@ export default function AdEdit() {
       {/* Step 2: Resize */}
       {step === 2 && (
         <>
-          <div className="mb-3">
+          <div className="d-flex justify-content-between align-items-center mb-3">
             <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToClassify}>
               <i className="bi bi-arrow-left me-1"></i>Back to Classify
             </button>
+            <div className="d-flex align-items-center gap-2">
+              {resizes.length > 0 && resizes.every(r => r.state === 'resized') && (
+                <button className="btn btn-sm btn-primary" onClick={handleContinueToBackgrounds}>
+                  Continue to Backgrounds <i className="bi bi-arrow-right ms-1"></i>
+                </button>
+              )}
+              <button className="btn btn-sm btn-link text-muted" onClick={handleSkipResizing}>
+                Skip Resizing
+              </button>
+            </div>
           </div>
           <AdResizePicker
             ad={ad}
@@ -627,19 +637,31 @@ export default function AdEdit() {
       {/* Step 3: Backgrounds */}
       {step === 3 && (
         <>
-          <div className="mb-3">
+          <div className="d-flex justify-content-between align-items-center mb-3">
             <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToResize}>
               <i className="bi bi-arrow-left me-1"></i>Back to Resize
             </button>
+            <div className="d-flex align-items-center gap-3">
+              <div className="form-check mb-0" title="Uses AI to detect faces and busy areas, then places text only in clean regions">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="smart-placement"
+                  checked={smartPlacement}
+                  onChange={(e) => setSmartPlacement(e.target.checked)}
+                />
+                <label className="form-check-label small" htmlFor="smart-placement">
+                  Smart text placement
+                </label>
+              </div>
+              <button className="btn btn-sm btn-primary" onClick={() => handleContinueToLayout({})}>
+                Continue to Layout <i className="bi bi-arrow-right ms-1"></i>
+              </button>
+            </div>
           </div>
           <AdBackgroundPicker
             ad={ad}
-            clientId={clientId}
             resizes={resizes}
-            smartPlacement={smartPlacement}
-            onSmartPlacementChange={setSmartPlacement}
-            onContinue={handleContinueToLayout}
-            onBack={handleBackToResize}
           />
         </>
       )}
@@ -647,9 +669,16 @@ export default function AdEdit() {
       {/* Step 4: Layout */}
       {step === 4 && (
         <>
-          <div className="mb-3">
+          <div className="d-flex justify-content-between align-items-center mb-3">
             <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToBackgrounds}>
               <i className="bi bi-arrow-left me-1"></i>Back to Backgrounds
+            </button>
+            <button className="btn btn-sm btn-primary" onClick={handleContinueToStyling} disabled={reflowingText}>
+              {reflowingText ? (
+                <><span className="spinner-border spinner-border-sm me-1" />Reflowing text...</>
+              ) : (
+                <>Continue to Style <i className="bi bi-arrow-right ms-1"></i></>
+              )}
             </button>
           </div>
           <AdLayoutEditor
@@ -669,10 +698,12 @@ export default function AdEdit() {
       {/* Step 5: Style settings + preview */}
       {step === 5 && (
         <>
-          {/* Back to layout button */}
-          <div className="mb-3">
+          <div className="d-flex justify-content-between align-items-center mb-3">
             <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToLayout}>
               <i className="bi bi-arrow-left me-1"></i>Back to Layout
+            </button>
+            <button className="btn btn-sm btn-primary" onClick={handleContinueToVersioning} disabled={saving}>
+              {saving ? 'Saving…' : <>Continue to Versioning <i className="bi bi-arrow-right ms-1"></i></>}
             </button>
           </div>
 
@@ -906,13 +937,10 @@ export default function AdEdit() {
                 </div>
               </div>
 
-              {/* Action buttons */}
+              {/* Save button (continue is in top bar) */}
               <div className="d-flex gap-2 flex-wrap">
                 <button className="btn btn-outline-secondary btn-sm" onClick={save} disabled={saving}>
                   {saving ? 'Saving…' : 'Save Settings'}
-                </button>
-                <button className="btn btn-danger btn-sm" onClick={handleContinueToVersioning} disabled={saving}>
-                  {saving ? 'Saving…' : <><span className="me-1">&rarr;</span>Continue to Versioning</>}
                 </button>
               </div>
             </div>
