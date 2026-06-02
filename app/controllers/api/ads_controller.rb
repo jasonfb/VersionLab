@@ -2,7 +2,7 @@
 
 class Api::AdsController < Api::BaseController
   before_action :set_client
-  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version, :classifications, :confirm_classifications, :ai_classify, :upload_logo, :remove_logo ]
+  before_action :set_ad, only: [ :show, :update, :destroy, :run, :reject, :resize, :resizes, :results, :download_version, :classifications, :confirm_classifications, :ai_classify, :detect_exclusion_zones, :reflow_text, :save_layout, :upload_logo, :remove_logo ]
   before_action :require_active_subscription!, only: [ :run, :reject ]
 
   def index
@@ -92,6 +92,74 @@ class Api::AdsController < Api::BaseController
     }
   rescue AdAiClassifyService::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  # POST /api/clients/:client_id/ads/:id/detect_exclusion_zones
+  # Accepts { target_width:, target_height: } and returns exclusion zones
+  # for the center-cropped background at those dimensions.
+  def detect_exclusion_zones
+    target_w = params[:target_width].to_i
+    target_h = params[:target_height].to_i
+
+    if target_w <= 0 || target_h <= 0
+      return render json: { error: "target_width and target_height are required" }, status: :unprocessable_entity
+    end
+
+    result = AdTextSafeRegionService.new(@ad).call(target_width: target_w, target_height: target_h)
+    render json: result
+  rescue AdTextSafeRegionService::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  # POST /api/clients/:client_id/ads/:id/reflow_text
+  # Repositions text layers to avoid exclusion zones.
+  def reflow_text
+    target_w = params[:target_width].to_i
+    target_h = params[:target_height].to_i
+    exclusion_zones = (params[:exclusion_zones] || []).map { |z|
+      z.permit(:x, :y, :width, :height, :label).to_h.symbolize_keys
+    }
+    text_layers = (params[:text_layers] || []).map { |l|
+      l.permit(:id, :x, :y, :width, :height, :content, :role, :font_size).to_h
+    }
+
+    if target_w <= 0 || target_h <= 0
+      return render json: { error: "target_width and target_height are required" }, status: :unprocessable_entity
+    end
+
+    result = AdTextReflowService.new(@ad).call(
+      target_width: target_w,
+      target_height: target_h,
+      exclusion_zones: exclusion_zones,
+      text_layers: text_layers
+    )
+    render json: { layers: result }
+  rescue AdTextReflowService::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  # POST /api/clients/:client_id/ads/:id/save_layout
+  # Persists reflowed text positions back to classified_layers.
+  def save_layout
+    updated_layers = params[:layers]
+    unless updated_layers.is_a?(Array) && updated_layers.any?
+      return render json: { error: "layers array required" }, status: :unprocessable_entity
+    end
+
+    # Merge updated positions into existing classified_layers
+    layers = @ad.classified_layers.dup
+    by_id = updated_layers.index_by { |l| l["id"] }
+
+    layers.each do |layer|
+      update = by_id[layer["id"]]
+      next unless update
+      layer["x"] = update["x"].to_s if update.key?("x")
+      layer["y"] = update["y"].to_s if update.key?("y")
+      layer["width"] = update["width"].to_s if update.key?("width")
+    end
+
+    @ad.update!(classified_layers: layers)
+    render json: { classified_layers: layers }
   end
 
   # POST /api/clients/:client_id/ads/:id/confirm_classifications

@@ -47,6 +47,14 @@ module AiProviders
       end
     end
 
+    # Normalize multimodal message content from the internal format to
+    # a provider-specific format. Subclasses override to transform
+    # { type: "image_base64", media_type: "image/png", data: "..." }
+    # items inside content arrays into their native API shape.
+    def normalize_messages(messages)
+      messages
+    end
+
     def http_post(uri, body, headers)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true

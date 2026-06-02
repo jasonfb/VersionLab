@@ -54,6 +54,16 @@ class AdParseService
 
     AdClassifyService.new(@ad).call if result[:layers].any?
 
+    # Run AI vision to correct garbled text from broken PDF font encodings
+    # and improve role classification. Falls back silently to rule-based results.
+    if result[:layers].any?
+      begin
+        AdAiClassifyService.new(@ad).call
+      rescue => e
+        Rails.logger.info("AdParseService: AI classify skipped: #{e.message}")
+      end
+    end
+
     result
   end
 
@@ -66,6 +76,7 @@ class AdParseService
     width, height = extract_svg_dimensions(root)
     layers = extract_svg_text_layers(doc)
     layers += extract_svg_image_layers(doc, width, height)
+    layers += extract_background_layers(doc, width, height)
     layers += extract_svg_shape_layers(doc, width, height)
     warnings = check_svg_warnings(layers, doc)
     aspect_ratio = compute_aspect_ratio(width, height)
@@ -135,6 +146,10 @@ class AdParseService
     index = 0
 
     doc.css("image").each do |node|
+      # Skip images inside <defs> — they're definitions, not rendered elements.
+      # Rendered <use> references to these are handled by extract_background_layers.
+      next if node.ancestors.any? { |a| a.name == "defs" }
+
       href = node["href"] || node["xlink:href"]
       next if href.blank?
 
@@ -143,8 +158,10 @@ class AdParseService
       w = node["width"].to_f
       h = node["height"].to_f
 
-      # Skip images that cover the full canvas (likely background fills, not logos)
-      next if canvas_width && canvas_height && w >= canvas_width * 0.95 && h >= canvas_height * 0.95
+      # Full-canvas images are backgrounds, not logos
+      if canvas_width && canvas_height && w >= canvas_width * 0.95 && h >= canvas_height * 0.95
+        next # handled by extract_background_layers
+      end
 
       layer_id = node["id"].presence || "image_#{index}"
 
@@ -161,6 +178,66 @@ class AdParseService
     end
 
     layers
+  end
+
+  # Detect full-canvas background images. Handles two patterns:
+  # 1. Native SVG: <image> elements covering >=95% of the canvas
+  # 2. PDF-converted SVG (pdftocairo): bare <use> elements at SVG root that
+  #    reference <image> definitions in <defs>
+  def extract_background_layers(doc, canvas_width, canvas_height)
+    return [] unless canvas_width && canvas_height && canvas_width > 0 && canvas_height > 0
+    layers = []
+
+    # Pattern 1: Direct <image> elements covering the canvas
+    doc.css("image").each do |node|
+      next if node.ancestors.any? { |a| a.name == "defs" }
+      href = node["href"] || node["xlink:href"]
+      next if href.blank?
+      w = node["width"].to_f
+      h = node["height"].to_f
+      next unless w >= canvas_width * 0.95 && h >= canvas_height * 0.95
+
+      layers << build_background_layer(href, node["x"].to_f, node["y"].to_f, w, h)
+    end
+
+    # Pattern 2: Top-level <use> elements referencing images in <defs>
+    # (common in pdftocairo output where each layer is a <use> + clip-path group)
+    svg = doc.at_css("svg")
+    return layers unless svg
+
+    svg.children.select { |n| n.element? && n.name == "use" }.each do |use_el|
+      # Skip if inside a clip-path group (those are text region renders)
+      next if use_el.parent != svg
+
+      ref_id = (use_el["href"] || use_el["xlink:href"]).to_s.sub("#", "")
+      next if ref_id.blank?
+
+      source = doc.at_css("##{ref_id}")
+      next unless source&.name == "image"
+
+      href = source["href"] || source["xlink:href"]
+      next if href.blank?
+
+      w = source["width"].to_f
+      h = source["height"].to_f
+      next unless w >= canvas_width * 0.95 && h >= canvas_height * 0.95
+
+      layers << build_background_layer(href, source["x"].to_f, source["y"].to_f, w, h)
+    end
+
+    layers.first(1) # only one background layer
+  end
+
+  def build_background_layer(href, x, y, w, h)
+    {
+      id: "background_0",
+      type: "background",
+      href: href,
+      x: x.round.to_s,
+      y: y.round.to_s,
+      width: w.round.to_s,
+      height: h.round.to_s
+    }
   end
 
   # Extract filled shape elements (rects + paths) so the classifier can later
@@ -331,6 +408,7 @@ class AdParseService
       fill_clipped_layer_text(layers, reader.pages.first, height) if layers.any?
     end
     layers += extract_svg_image_layers(doc, width, height)
+    layers += extract_background_layers(doc, width, height)
     layers += extract_svg_shape_layers(doc, width, height)
     warnings += check_svg_warnings(layers, doc) if layers.any? { |l| l[:type] == "text" && l[:content].present? }
 
@@ -618,7 +696,7 @@ class AdParseService
     result = line_runs.first.text.dup
     line_runs.each_cons(2) do |prev, curr|
       gap = curr.origin.x - prev.origin.x
-      advance_estimate = CHAR_WIDTH_RATIO[prev.text] * prev.font_size
+      advance_estimate = prev.text.chars.sum { |c| CHAR_WIDTH_RATIO[c] } * prev.font_size
       extra_space = gap - advance_estimate
       result << " " if extra_space > prev.font_size * 0.12
       result << curr.text

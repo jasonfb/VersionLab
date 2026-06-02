@@ -180,7 +180,10 @@ class AdClassifyService
   def classify_non_text_layers(layers)
     layers.map do |layer|
       classified = layer.dup
-      if layer["type"] == "image"
+      if layer["type"] == "background"
+        classified["role"] = "background"
+        classified["confidence"] = 1.0
+      elsif layer["type"] == "image"
         classified["role"] = "logo"
         classified["confidence"] = 0.8
       else

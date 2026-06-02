@@ -10,9 +10,9 @@ module AiProviders
 
     def complete(model:, messages:, temperature: 0.7, json_mode: false)
       system_content = messages.find { |m| m[:role].to_s == "system" }&.dig(:content)
-      chat_messages  = messages
-        .reject { |m| m[:role].to_s == "system" }
-        .map { |m| { role: m[:role].to_s, content: m[:content] } }
+      chat_messages  = normalize_messages(
+        messages.reject { |m| m[:role].to_s == "system" }
+      )
 
       body = {
         model: model,
@@ -54,6 +54,22 @@ module AiProviders
     end
 
     private
+
+    def normalize_messages(messages)
+      messages.map do |m|
+        content = m[:content]
+        if content.is_a?(Array)
+          content = content.map do |part|
+            if part[:type] == "image_base64"
+              { type: "image", source: { type: "base64", media_type: part[:media_type], data: part[:data] } }
+            else
+              part
+            end
+          end
+        end
+        { role: m[:role].to_s, content: content }
+      end
+    end
 
     def request_headers
       {

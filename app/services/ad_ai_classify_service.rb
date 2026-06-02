@@ -52,10 +52,40 @@ class AdAiClassifyService
   end
 
   def build_messages(text_layers)
+    user_content = build_user_content(text_layers)
     [
       { role: "system", content: build_system_prompt },
-      { role: "user", content: build_user_prompt(text_layers) }
+      { role: "user", content: user_content }
     ]
+  end
+
+  def build_user_content(text_layers)
+    text_part = { type: "text", text: build_user_prompt(text_layers) }
+    image_data = ad_preview_base64
+    if image_data
+      [
+        { type: "image_base64", media_type: "image/png", data: image_data },
+        text_part
+      ]
+    else
+      build_user_prompt(text_layers)
+    end
+  end
+
+  def ad_preview_base64
+    svg_data = if @ad.converted_svg.attached?
+      @ad.converted_svg.download
+    elsif @ad.file.attached? && @ad.file.blob.content_type&.include?("svg")
+      @ad.file.download
+    end
+    return nil unless svg_data.present?
+
+    image = Vips::Image.new_from_buffer(svg_data, "")
+    png_data = image.pngsave_buffer(compression: 6)
+    Base64.strict_encode64(png_data)
+  rescue => e
+    Rails.logger.warn("AdAiClassifyService: could not generate preview image: #{e.message}")
+    nil
   end
 
   def build_system_prompt
@@ -81,15 +111,17 @@ class AdAiClassifyService
       - The CTA, logo, and headline roles should almost never be continuations
       - When in doubt, do NOT link — false positives are worse than missed links
 
+      3. TEXT CORRECTION — The extracted text may be garbled due to broken PDF font encodings. If an image of the ad is provided, read the ACTUAL text visible in the image and correct each fragment's content. Common extraction errors include: missing characters ("Al" instead of "All"), merged words ("XMyI" instead of "X My I"), spurious spaces ("mp act" instead of "mpact"), and scrambled letters. Always trust what you see in the image over the extracted text.
+
       You MUST respond with valid JSON in this exact shape:
       {
         "layers": [
-          { "id": "<layer_id>", "role": "<role>", "continuation_of": "<previous_layer_id_or_null>" },
+          { "id": "<layer_id>", "role": "<role>", "continuation_of": "<previous_layer_id_or_null>", "corrected_content": "<actual_text_from_image_or_null>" },
           ...
         ]
       }
 
-      Include every input fragment in the response. Use null (not the string "null") when there is no continuation.
+      Include every input fragment in the response. Use null (not the string "null") when there is no continuation. Set `corrected_content` to the correct text if it differs from the extracted content, or null if the extraction is already correct.
     PROMPT
   end
 
@@ -171,6 +203,12 @@ class AdAiClassifyService
         layer["continuation_of"] = cont
       else
         layer.delete("continuation_of")
+      end
+
+      # Apply AI-corrected text content (from vision-based OCR)
+      corrected = suggestion["corrected_content"]
+      if corrected.present? && corrected.is_a?(String) && corrected.strip.present?
+        layer["content"] = corrected.strip
       end
 
       layer["confidence"] = 0.95

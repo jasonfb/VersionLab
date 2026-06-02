@@ -140,6 +140,13 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
     }))
   }
 
+  const updateContent = (index, newContent) => {
+    setLayers((prev) => prev.map((l, i) => {
+      if (i !== index) return l
+      return { ...l, content: newContent }
+    }))
+  }
+
   const toggleJoins = (index) => {
     setLayers((prev) => {
       const target = prev[index]
@@ -519,9 +526,15 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                     {isContinuation && (
                       <span className="text-muted" style={{ fontSize: '0.85rem' }} title="Continuation of previous element">↳</span>
                     )}
-                    <span className="small fw-semibold text-truncate" style={{ maxWidth: 200 }}>
-                      {layer.content}
-                    </span>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm fw-semibold"
+                      style={{ maxWidth: 200, fontSize: '0.85rem', padding: '0.1rem 0.35rem' }}
+                      value={layer.content}
+                      onChange={(e) => { e.stopPropagation(); updateContent(globalIndex, e.target.value) }}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Edit extracted text"
+                    />
                     {layer.font_size && (
                       <span className="badge bg-light text-dark border" style={{ fontSize: '0.65rem' }}>
                         {layer.font_size}px
@@ -798,7 +811,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
               )}
             </button>
             <small className="text-muted">
-              Re-classify roles and detect multi-line sentence continuations
+              Re-classify roles, correct extracted text, and detect multi-line sentence continuations
             </small>
           </div>
           {aiError && (

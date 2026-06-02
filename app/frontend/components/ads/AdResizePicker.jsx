@@ -227,7 +227,7 @@ export default function AdResizePicker({
 
           {allResized && (
             <button className="btn btn-success btn-sm" onClick={onContinue}>
-              <i className="bi bi-arrow-right me-1"></i>Continue to Styling
+              <i className="bi bi-arrow-right me-1"></i>Continue to Backgrounds
             </button>
           )}
 

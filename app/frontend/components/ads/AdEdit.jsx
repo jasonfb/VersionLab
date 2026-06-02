@@ -9,6 +9,8 @@ import InteractiveSvgEditor from './InteractiveSvgEditor'
 import CompositePreview from './CompositePreview'
 import AdResizePicker from './AdResizePicker'
 import AdElementClassifier from './AdElementClassifier'
+import AdBackgroundPicker from './AdBackgroundPicker'
+import AdLayoutEditor from './AdLayoutEditor'
 
 // Platform aspect ratio hints (for original ad display)
 const PLATFORM_HINTS = {
@@ -42,21 +44,24 @@ export default function AdEdit() {
   const [styleGuideOpen, setStyleGuideOpen] = useState(false)
   const [layerOverrides, setLayerOverrides] = useState({})
 
-  // Four-step flow state: 1 = classify, 2 = resize, 3 = style, 4 = version
+  // Six-step flow: 1=classify, 2=resize, 3=backgrounds, 4=layout, 5=style, 6=version
   // Synced with ?step= query param so reloads preserve position
-  const STEP_NAMES = { 1: 'classify', 2: 'resize', 3: 'style', 4: 'version' }
-  const STEP_FROM_NAME = { classify: 1, resize: 2, style: 3, version: 4 }
+  const STEP_NAMES = { 1: 'classify', 2: 'resize', 3: 'backgrounds', 4: 'layout', 5: 'style', 6: 'version' }
+  const STEP_FROM_NAME = { classify: 1, resize: 2, backgrounds: 3, layout: 4, style: 5, version: 6,
+    // Backwards-compat: old step names map to new positions
+    presize: 2 }
   const stepParam = searchParams.get('step')
   const [step, setStepRaw] = useState(STEP_FROM_NAME[stepParam] || 1)
   const setStep = (n) => {
     setStepRaw(n)
-    if (n === 4) setHasVisitedStep4(true)
+    if (n === 6) setHasVisitedStep4(true)
     setSearchParams({ step: STEP_NAMES[n] || 'classify' }, { replace: true })
   }
   const [selectedPlatforms, setSelectedPlatforms] = useState({})
   const [customSizes, setCustomSizes] = useState([])
   const [resizes, setResizes] = useState([])
   const [resizing, setResizing] = useState(false)
+  const [smartPlacement, setSmartPlacement] = useState(false)
   const [editingResize, setEditingResize] = useState(null)
   const [switchingVariant, setSwitchingVariant] = useState(false)
   const toolbarPortalRef = useRef(null)
@@ -152,7 +157,7 @@ export default function AdEdit() {
 
         // Otherwise determine initial step from ad state
         if (['pending', 'merged', 'regenerating'].includes(a.state)) {
-          setStep(4)
+          setStep(6)
         } else if (loadedResizes.length > 0) {
           setStep(2)
         } else if (a.classifications_confirmed) {
@@ -252,8 +257,15 @@ export default function AdEdit() {
     setStep(2)
   }
 
-  const handleContinueToStyling = () => {
+  const handleContinueToBackgrounds = () => {
     setStep(3)
+  }
+
+  const [exclusionZones, setExclusionZones] = useState({})
+
+  const handleContinueToLayout = (zones) => {
+    if (zones) setExclusionZones(zones)
+    setStep(4)
   }
 
   // Regenerate server-side SVG + preview for a single resize applying overrides.
@@ -283,14 +295,71 @@ export default function AdEdit() {
     setStep(3)
   }
 
+  const [reflowingText, setReflowingText] = useState(false)
+
+  const handleContinueToStyling = async () => {
+    await save()
+
+    // If exclusion zones exist, reflow text to avoid them before entering Style
+    const zones = exclusionZones?.['original'] || []
+    if (zones.length > 0) {
+      const textLayers = (ad.classified_layers || []).filter(
+        (l) => l.type === 'text' && l.content
+      )
+      if (textLayers.length > 0) {
+        setReflowingText(true)
+        try {
+          const data = await apiFetch(
+            `/api/clients/${clientId}/ads/${adId}/reflow_text`,
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                target_width: ad.width,
+                target_height: ad.height,
+                exclusion_zones: zones,
+                text_layers: textLayers,
+              }),
+            }
+          )
+          if (data.layers) {
+            // Save reflowed positions to classified_layers
+            await apiFetch(
+              `/api/clients/${clientId}/ads/${adId}/save_layout`,
+              {
+                method: 'POST',
+                body: JSON.stringify({ layers: data.layers }),
+              }
+            )
+            // Update local ad state with new positions
+            setAd((prev) => {
+              if (!prev) return prev
+              const updated = prev.classified_layers.map((l) => {
+                const reflowed = data.layers.find((r) => r.id === l.id)
+                if (!reflowed) return l
+                return { ...l, x: reflowed.x?.toString(), y: reflowed.y?.toString(), width: reflowed.width?.toString() || l.width }
+              })
+              return { ...prev, classified_layers: updated }
+            })
+          }
+        } catch (e) {
+          console.error('Text reflow failed, continuing with original positions:', e)
+        } finally {
+          setReflowingText(false)
+        }
+      }
+    }
+
+    setStep(5)
+  }
+
   const handleContinueToVersioning = () => {
-    save().then(() => setStep(4))
+    save().then(() => setStep(6))
   }
 
   const handleStepClick = (targetStep) => {
     if (targetStep === step) return
-    // Warn when leaving step 4 if versioning is in progress
-    if (step === 4 && (ad.state === 'merged' || ad.state === 'regenerating')) {
+    // Warn when leaving step 6 (Version) if versioning is in progress
+    if (step === 6 && (ad.state === 'merged' || ad.state === 'regenerating')) {
       if (!confirm('Going back will discard all generated versions. Continue?')) return
     }
     setStep(targetStep)
@@ -304,11 +373,19 @@ export default function AdEdit() {
     setStep(2)
   }
 
+  const handleBackToBackgrounds = () => {
+    setStep(3)
+  }
+
+  const handleBackToLayout = () => {
+    setStep(4)
+  }
+
   const handleBackToStyle = () => {
     if (ad.state === 'merged' || ad.state === 'regenerating') {
       if (!confirm('Going back will discard all generated versions. Continue?')) return
     }
-    setStep(3)
+    setStep(5)
   }
 
   const handleEditResize = (resize) => {
@@ -473,19 +550,25 @@ export default function AdEdit() {
       </div>
 
       {/* Step indicator */}
-      <div className="d-flex align-items-center gap-3 mb-4">
+      <div className="d-flex align-items-center gap-2 mb-4 flex-wrap">
         <StepIndicator number={1} label="Classify" active={step === 1} completed={step > 1}
           clickable={true} onClick={() => handleStepClick(1)} />
-        <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
+        <div className="border-top flex-grow-0" style={{ width: 24 }}></div>
         <StepIndicator number={2} label="Resize" active={step === 2} completed={step > 2 && resizes.length > 0}
           clickable={!!ad.classifications_confirmed} onClick={() => handleStepClick(2)} />
-        <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
-        <StepIndicator number={3} label="Style" active={step === 3} completed={step > 3}
-          clickable={!!ad.classifications_confirmed} onClick={() => handleStepClick(3)} />
-        <div className="border-top flex-grow-0" style={{ width: 40 }}></div>
-        <StepIndicator number={4} label="Version" active={step === 4}
-          clickable={hasVisitedStep4} onClick={() => handleStepClick(4)} />
-        {step === 4 && resizes.length > 0 && (
+        <div className="border-top flex-grow-0" style={{ width: 24 }}></div>
+        <StepIndicator number={3} label="Backgrounds" active={step === 3} completed={step > 3}
+          clickable={resizes.length > 0} onClick={() => handleStepClick(3)} />
+        <div className="border-top flex-grow-0" style={{ width: 24 }}></div>
+        <StepIndicator number={4} label="Layout" active={step === 4} completed={step > 4}
+          clickable={resizes.length > 0} onClick={() => handleStepClick(4)} />
+        <div className="border-top flex-grow-0" style={{ width: 24 }}></div>
+        <StepIndicator number={5} label="Style" active={step === 5} completed={step > 5}
+          clickable={!!ad.classifications_confirmed} onClick={() => handleStepClick(5)} />
+        <div className="border-top flex-grow-0" style={{ width: 24 }}></div>
+        <StepIndicator number={6} label="Version" active={step === 6}
+          clickable={hasVisitedStep4} onClick={() => handleStepClick(6)} />
+        {step === 6 && resizes.length > 0 && (
           <small className="text-muted ms-2">
             Versioning {resizeCount} size{resizeCount !== 1 ? 's' : ''}
           </small>
@@ -534,22 +617,74 @@ export default function AdEdit() {
             onGenerateResizes={generateResizes}
             onEditResize={handleEditResize}
             onRebuildResize={handleRebuildResize}
-            onContinue={handleContinueToStyling}
+            onContinue={handleContinueToBackgrounds}
             onSkip={handleSkipResizing}
             resizing={resizing}
           />
         </>
       )}
 
-      {/* Step 3: Style settings + preview */}
+      {/* Step 3: Backgrounds */}
       {step === 3 && (
         <>
-          {/* Back to resize button */}
           <div className="mb-3">
             <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToResize}>
               <i className="bi bi-arrow-left me-1"></i>Back to Resize
             </button>
           </div>
+          <AdBackgroundPicker
+            ad={ad}
+            clientId={clientId}
+            resizes={resizes}
+            smartPlacement={smartPlacement}
+            onSmartPlacementChange={setSmartPlacement}
+            onContinue={handleContinueToLayout}
+            onBack={handleBackToResize}
+          />
+        </>
+      )}
+
+      {/* Step 4: Layout */}
+      {step === 4 && (
+        <>
+          <div className="mb-3">
+            <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToBackgrounds}>
+              <i className="bi bi-arrow-left me-1"></i>Back to Backgrounds
+            </button>
+          </div>
+          <AdLayoutEditor
+            ad={ad}
+            clientId={clientId}
+            resizes={resizes}
+            exclusionZones={exclusionZones}
+            onExclusionZonesChange={setExclusionZones}
+            smartPlacement={smartPlacement}
+            onContinue={handleContinueToStyling}
+            onBack={handleBackToBackgrounds}
+            transitioning={reflowingText}
+          />
+        </>
+      )}
+
+      {/* Step 5: Style settings + preview */}
+      {step === 5 && (
+        <>
+          {/* Back to layout button */}
+          <div className="mb-3">
+            <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToLayout}>
+              <i className="bi bi-arrow-left me-1"></i>Back to Layout
+            </button>
+          </div>
+
+          {(exclusionZones?.['original'] || []).length > 0 && (
+            <div className="alert alert-success py-2 mb-3 d-flex align-items-center gap-2">
+              <i className="bi bi-shield-check"></i>
+              <span className="small">
+                Text positions adjusted to avoid {(exclusionZones['original'] || []).length} exclusion zone{(exclusionZones['original'] || []).length !== 1 ? 's' : ''} (faces, logos).
+                Edit positions in the preview if needed.
+              </span>
+            </div>
+          )}
 
           <div className="row g-4">
             {/* Left panel: style settings */}
@@ -959,8 +1094,8 @@ export default function AdEdit() {
         ) : null
       })()}
 
-      {/* Step 4: Version settings + preview */}
-      {step === 4 && (
+      {/* Step 6: Version settings + preview */}
+      {step === 6 && (
         <>
           {/* Back to style button */}
           <div className="mb-3">

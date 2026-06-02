@@ -14,7 +14,18 @@ module AiProviders
         .reject { |m| m[:role].to_s == "system" }
         .map do |m|
           role = m[:role].to_s == "assistant" ? "model" : "user"
-          { role: role, parts: [ { text: m[:content] } ] }
+          parts = if m[:content].is_a?(Array)
+            m[:content].map do |part|
+              if part[:type] == "image_base64"
+                { inline_data: { mime_type: part[:media_type], data: part[:data] } }
+              else
+                { text: part[:text] || part[:content] || "" }
+              end
+            end
+          else
+            [ { text: m[:content] } ]
+          end
+          { role: role, parts: parts }
         end
 
       body = {

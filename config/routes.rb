@@ -77,6 +77,9 @@ Rails.application.routes.draw do
           get  :classifications
           post :confirm_classifications
           post :ai_classify
+          post :detect_exclusion_zones
+          post :reflow_text
+          post :save_layout
           post :upload_logo
           delete :remove_logo
         end
