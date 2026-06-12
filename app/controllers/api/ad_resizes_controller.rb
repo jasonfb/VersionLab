@@ -6,9 +6,11 @@ class Api::AdResizesController < Api::BaseController
   before_action :set_resize
 
   def update
-    if params[:layer_overrides].present?
-      @resize.update!(layer_overrides: params[:layer_overrides])
-    end
+    updates = {}
+    updates[:layer_overrides] = params[:layer_overrides] if params[:layer_overrides].present?
+    updates[:background_asset_id] = params[:background_asset_id] if params.key?(:background_asset_id)
+    updates[:background_crop] = params[:background_crop] if params.key?(:background_crop)
+    @resize.update!(updates) if updates.any?
 
     render json: resize_json(@resize)
   end
@@ -74,7 +76,13 @@ class Api::AdResizesController < Api::BaseController
       preview_image_url: resize.preview_image.attached? ?
         Rails.application.routes.url_helpers.rails_blob_url(resize.preview_image, only_path: true) : nil,
       resized_svg_url: resize.resized_svg.attached? ?
-        Rails.application.routes.url_helpers.rails_blob_url(resize.resized_svg, only_path: true) : nil
+        Rails.application.routes.url_helpers.rails_blob_url(resize.resized_svg, only_path: true) : nil,
+      background_asset_id: resize.background_asset_id,
+      background_asset_url: resize.background_asset&.file&.attached? ?
+        Rails.application.routes.url_helpers.rails_blob_url(resize.background_asset.file, only_path: true) : nil,
+      background_asset_width: resize.background_asset&.width,
+      background_asset_height: resize.background_asset&.height,
+      background_crop: resize.background_crop
     }
   end
 end

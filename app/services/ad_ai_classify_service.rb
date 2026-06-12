@@ -30,6 +30,10 @@ class AdAiClassifyService
     parsed = parse_response(result[:content])
     apply_to_layers!(layers, parsed)
 
+    # Re-run CTA background attachment: the AI may have reclassified a layer
+    # as CTA that the rule-based pass missed, so it needs shape data.
+    reattach_cta_backgrounds!(layers)
+
     @ad.update!(classified_layers: layers)
     layers
   end
@@ -163,6 +167,16 @@ class AdAiClassifyService
     )
   rescue StandardError => e
     Rails.logger.error("AiLog failed to save for ad #{@ad.id}: #{e.message}")
+  end
+
+  # Re-run CTA background attachment using shape layers from parsed_layers.
+  # This catches cases where the AI reclassified a layer as CTA after the
+  # initial rule-based pass already ran (and missed it).
+  def reattach_cta_backgrounds!(layers)
+    shape_layers = (@ad.parsed_layers || []).select { |l| l["type"] == "shape" }
+    return if shape_layers.empty?
+
+    AdClassifyService.new(@ad).send(:attach_cta_backgrounds, layers, shape_layers)
   end
 
   def parse_response(json_string)

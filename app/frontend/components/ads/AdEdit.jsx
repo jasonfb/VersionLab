@@ -560,10 +560,10 @@ export default function AdEdit() {
         <StepIndicator number={3} label="Backgrounds" active={step === 3} completed={step > 3}
           clickable={resizes.length > 0} onClick={() => handleStepClick(3)} />
         <div className="border-top flex-grow-0" style={{ width: 24 }}></div>
-        <StepIndicator number={4} label="Layout" active={step === 4} completed={step > 4}
+        <StepIndicator number={4} label="Face Detection" active={step === 4} completed={step > 4}
           clickable={resizes.length > 0} onClick={() => handleStepClick(4)} />
         <div className="border-top flex-grow-0" style={{ width: 24 }}></div>
-        <StepIndicator number={5} label="Style" active={step === 5} completed={step > 5}
+        <StepIndicator number={5} label="Layout" active={step === 5} completed={step > 5}
           clickable={!!ad.classifications_confirmed} onClick={() => handleStepClick(5)} />
         <div className="border-top flex-grow-0" style={{ width: 24 }}></div>
         <StepIndicator number={6} label="Version" active={step === 6}
@@ -641,6 +641,27 @@ export default function AdEdit() {
             <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToResize}>
               <i className="bi bi-arrow-left me-1"></i>Back to Resize
             </button>
+            <button className="btn btn-sm btn-primary" onClick={() => handleContinueToLayout({})}>
+              Continue to Face Detection <i className="bi bi-arrow-right ms-1"></i>
+            </button>
+          </div>
+          <AdBackgroundPicker
+            ad={ad}
+            clientId={clientId}
+            resizes={resizes}
+            assets={assets}
+            onResizeUpdate={(updated) => setResizes((prev) => prev.map((r) => r.id === updated.id ? updated : r))}
+          />
+        </>
+      )}
+
+      {/* Step 4: Face Detection */}
+      {step === 4 && (
+        <>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToBackgrounds}>
+              <i className="bi bi-arrow-left me-1"></i>Back to Backgrounds
+            </button>
             <div className="d-flex align-items-center gap-3">
               <div className="form-check mb-0" title="Uses AI to detect faces and busy areas, then places text only in clean regions">
                 <input
@@ -651,35 +672,17 @@ export default function AdEdit() {
                   onChange={(e) => setSmartPlacement(e.target.checked)}
                 />
                 <label className="form-check-label small" htmlFor="smart-placement">
-                  Smart text placement
+                  Auto-detect on each size
                 </label>
               </div>
-              <button className="btn btn-sm btn-primary" onClick={() => handleContinueToLayout({})}>
-                Continue to Layout <i className="bi bi-arrow-right ms-1"></i>
+              <button className="btn btn-sm btn-primary" onClick={handleContinueToStyling} disabled={reflowingText}>
+                {reflowingText ? (
+                  <><span className="spinner-border spinner-border-sm me-1" />Reflowing text...</>
+                ) : (
+                  <>Continue to Layout <i className="bi bi-arrow-right ms-1"></i></>
+                )}
               </button>
             </div>
-          </div>
-          <AdBackgroundPicker
-            ad={ad}
-            resizes={resizes}
-          />
-        </>
-      )}
-
-      {/* Step 4: Layout */}
-      {step === 4 && (
-        <>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToBackgrounds}>
-              <i className="bi bi-arrow-left me-1"></i>Back to Backgrounds
-            </button>
-            <button className="btn btn-sm btn-primary" onClick={handleContinueToStyling} disabled={reflowingText}>
-              {reflowingText ? (
-                <><span className="spinner-border spinner-border-sm me-1" />Reflowing text...</>
-              ) : (
-                <>Continue to Style <i className="bi bi-arrow-right ms-1"></i></>
-              )}
-            </button>
           </div>
           <AdLayoutEditor
             ad={ad}
@@ -688,19 +691,17 @@ export default function AdEdit() {
             exclusionZones={exclusionZones}
             onExclusionZonesChange={setExclusionZones}
             smartPlacement={smartPlacement}
-            onContinue={handleContinueToStyling}
-            onBack={handleBackToBackgrounds}
-            transitioning={reflowingText}
+            onResizeUpdate={(updated) => setResizes((prev) => prev.map((r) => r.id === updated.id ? updated : r))}
           />
         </>
       )}
 
-      {/* Step 5: Style settings + preview */}
+      {/* Step 5: Layout settings + preview */}
       {step === 5 && (
         <>
           <div className="d-flex justify-content-between align-items-center mb-3">
             <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToLayout}>
-              <i className="bi bi-arrow-left me-1"></i>Back to Layout
+              <i className="bi bi-arrow-left me-1"></i>Back to Face Detection
             </button>
             <button className="btn btn-sm btn-primary" onClick={handleContinueToVersioning} disabled={saving}>
               {saving ? 'Saving…' : <>Continue to Versioning <i className="bi bi-arrow-right ms-1"></i></>}
@@ -952,8 +953,11 @@ export default function AdEdit() {
                 {(() => {
                   const readyResizes = resizes.filter((r) => r.state === 'resized' && r.resized_svg_url)
                   const activeResize = readyResizes.find((r) => r.id === stylePreviewResizeId)
-                  const bgAsset = assets.find((a) => a.id === form.background_asset_id)
-                  const bgAssetUrl = bgAsset?.file_url || bgAsset?.url
+                  // Prefer resize-level background (from Backgrounds step), fall back to ad-level
+                  const resizeBgUrl = activeResize?.background_asset_url
+                  const adBgAsset = assets.find((a) => a.id === form.background_asset_id)
+                  const bgAssetUrl = resizeBgUrl || adBgAsset?.file_url || adBgAsset?.url
+                  const bgCrop = activeResize?.background_crop
 
                   // Determine preview dimensions
                   const previewW = activeResize ? activeResize.width : (ad.width || 1080)
@@ -992,15 +996,18 @@ export default function AdEdit() {
                         onClick={() => setStyleEditorOpen(true)}
                         title="Click to edit"
                       >
-                        {/* Background layer */}
-                        {form.background_type === 'image' && bgAssetUrl ? (
+                        {/* Background layer — resize bg from Backgrounds step, or ad-level setting */}
+                        {bgAssetUrl ? (
                           <img
                             src={bgAssetUrl}
                             alt=""
                             style={{
                               position: 'absolute', inset: 0,
                               width: '100%', height: '100%',
-                              objectFit: 'cover', objectPosition: 'center',
+                              objectFit: 'cover',
+                              objectPosition: bgCrop
+                                ? `${(bgCrop.x * 100).toFixed(1)}% ${(bgCrop.y * 100).toFixed(1)}%`
+                                : 'center',
                               zIndex: 0,
                             }}
                           />
@@ -1074,18 +1081,26 @@ export default function AdEdit() {
                   </button>
                 </div>
                 <div className="modal-body position-relative" style={{
-                  ...(form.background_type === 'solid_color'
-                    ? { backgroundColor: form.background_color }
-                    : form.background_type === 'image' && (() => {
-                        const bgAsset = assets.find((a) => a.id === form.background_asset_id)
-                        const bgUrl = bgAsset?.file_url || bgAsset?.url
-                        return bgUrl ? {
-                          backgroundImage: `url(${bgUrl})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                        } : {}
-                      })()
-                  ),
+                  ...(() => {
+                    // Prefer resize-level background from Backgrounds step
+                    const resizeBgUrl = activeResize?.background_asset_url
+                    const adBgAsset = assets.find((a) => a.id === form.background_asset_id)
+                    const bgUrl = resizeBgUrl || adBgAsset?.file_url || adBgAsset?.url
+                    const bgCrop = activeResize?.background_crop
+                    if (bgUrl) {
+                      return {
+                        backgroundImage: `url(${bgUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: bgCrop
+                          ? `${(bgCrop.x * 100).toFixed(1)}% ${(bgCrop.y * 100).toFixed(1)}%`
+                          : 'center',
+                      }
+                    }
+                    if (form.background_type === 'solid_color') {
+                      return { backgroundColor: form.background_color }
+                    }
+                    return {}
+                  })(),
                 }}>
                   <InteractiveSvgEditor
                     key={`style-${activeResize?.id || 'original'}-${activeResize?.updated_at || ''}`}
@@ -1128,7 +1143,7 @@ export default function AdEdit() {
           {/* Back to style button */}
           <div className="mb-3">
             <button className="btn btn-sm btn-outline-secondary" onClick={handleBackToStyle}>
-              <i className="bi bi-arrow-left me-1"></i>Back to Style
+              <i className="bi bi-arrow-left me-1"></i>Back to Layout
             </button>
           </div>
 
@@ -1299,8 +1314,10 @@ export default function AdEdit() {
                 {(() => {
                   const readyResizes = resizes.filter((r) => r.state === 'resized' && r.resized_svg_url)
                   const activeResize = readyResizes.find((r) => r.id === stylePreviewResizeId)
-                  const bgAsset = assets.find((a) => a.id === form.background_asset_id)
-                  const bgAssetUrl = bgAsset?.file_url || bgAsset?.url
+                  const resizeBgUrl = activeResize?.background_asset_url
+                  const adBgAsset = assets.find((a) => a.id === form.background_asset_id)
+                  const bgAssetUrl = resizeBgUrl || adBgAsset?.file_url || adBgAsset?.url
+                  const bgCrop = activeResize?.background_crop
                   const previewW = activeResize ? activeResize.width : (ad.width || 1080)
                   const previewH = activeResize ? activeResize.height : (ad.height || 1080)
 
@@ -1377,15 +1394,18 @@ export default function AdEdit() {
                           className="position-relative rounded overflow-hidden border"
                           style={{ maxWidth: '100%', aspectRatio: `${previewW} / ${previewH}`, maxHeight: 600, background: '#1a1a1a' }}
                         >
-                          {/* Background layer */}
-                          {form.background_type === 'image' && bgAssetUrl ? (
+                          {/* Background layer — resize bg from Backgrounds step, or ad-level setting */}
+                          {bgAssetUrl ? (
                             <img
                               src={bgAssetUrl}
                               alt=""
                               style={{
                                 position: 'absolute', inset: 0,
                                 width: '100%', height: '100%',
-                                objectFit: 'cover', objectPosition: 'center',
+                                objectFit: 'cover',
+                                objectPosition: bgCrop
+                                  ? `${(bgCrop.x * 100).toFixed(1)}% ${(bgCrop.y * 100).toFixed(1)}%`
+                                  : 'center',
                                 zIndex: 0,
                               }}
                             />

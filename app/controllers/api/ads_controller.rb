@@ -105,7 +105,8 @@ class Api::AdsController < Api::BaseController
       return render json: { error: "target_width and target_height are required" }, status: :unprocessable_entity
     end
 
-    result = AdTextSafeRegionService.new(@ad).call(target_width: target_w, target_height: target_h)
+    bg_asset = params[:background_asset_id].present? ? Asset.find_by(id: params[:background_asset_id]) : nil
+    result = AdTextSafeRegionService.new(@ad).call(target_width: target_w, target_height: target_h, background_asset: bg_asset)
     render json: result
   rescue AdTextSafeRegionService::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
@@ -487,7 +488,13 @@ class Api::AdsController < Api::BaseController
       preview_image_url: resize.preview_image.attached? ?
         Rails.application.routes.url_helpers.rails_blob_url(resize.preview_image, only_path: true) : nil,
       resized_svg_url: resize.resized_svg.attached? ?
-        Rails.application.routes.url_helpers.rails_blob_url(resize.resized_svg, only_path: true) : nil
+        Rails.application.routes.url_helpers.rails_blob_url(resize.resized_svg, only_path: true) : nil,
+      background_asset_id: resize.background_asset_id,
+      background_asset_url: resize.background_asset&.file&.attached? ?
+        Rails.application.routes.url_helpers.rails_blob_url(resize.background_asset.file, only_path: true) : nil,
+      background_asset_width: resize.background_asset&.width,
+      background_asset_height: resize.background_asset&.height,
+      background_crop: resize.background_crop
     }
   end
 

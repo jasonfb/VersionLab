@@ -34,6 +34,7 @@ module AdLayout
       classified = AdContinuation.collapse(@ad.classified_layers)
 
       classified.each do |layer|
+        next if layer["excluded"]
         role = layer["role"]
         next unless role
         next unless placed_roles.include?(role)

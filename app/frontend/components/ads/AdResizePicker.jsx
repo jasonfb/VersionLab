@@ -248,70 +248,40 @@ export default function AdResizePicker({
           </div>
         ) : (
           <div className="row g-3">
-            {resizes.map((resize) => (
-              <div key={resize.id} className="col-sm-6 col-md-4">
-                <div
-                  className="card h-100 border"
-                  style={{ cursor: resize.state === 'resized' ? 'pointer' : 'default' }}
-                  onClick={() => resize.state === 'resized' && onEditResize(resize)}
-                >
-                  <div
-                    className="card-img-top bg-dark d-flex align-items-center justify-content-center"
-                    style={{ height: 120, overflow: 'hidden' }}
-                  >
-                    {resize.preview_image_url ? (
-                      <img
-                        src={resize.preview_image_url}
-                        alt={resize.dimensions}
-                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                      />
-                    ) : (
-                      <div className="text-muted small">
-                        {resize.state === 'pending' && (
-                          <span className="spinner-border spinner-border-sm" />
-                        )}
-                        {resize.state === 'failed' && (
-                          <i className="bi bi-exclamation-triangle text-danger"></i>
-                        )}
+            {resizes.map((resize) => {
+              const [w, h] = (resize.dimensions || '0x0').split('x').map(Number)
+              const aspect = w && h ? w / h : 1
+              // Scale the black box to fit within the card, max 120px tall or 160px wide
+              const maxW = 160, maxH = 120
+              const boxW = aspect >= maxW / maxH ? maxW : Math.round(maxH * aspect)
+              const boxH = aspect >= maxW / maxH ? Math.round(maxW / aspect) : maxH
+              return (
+                <div key={resize.id} className="col-sm-6 col-md-4">
+                  <div className="card h-100 border">
+                    <div
+                      className="card-img-top d-flex align-items-center justify-content-center"
+                      style={{ height: 130, background: '#f0f0f0' }}
+                    >
+                      <div style={{ width: boxW, height: boxH, backgroundColor: '#111', borderRadius: 2 }} />
+                    </div>
+                    <div className="card-body p-2">
+                      <div className="d-flex align-items-center justify-content-between mb-1">
+                        <span className="fw-semibold small">{resize.dimensions}</span>
+                        <ResizeStateBadge state={resize.state} />
                       </div>
-                    )}
-                  </div>
-                  <div className="card-body p-2">
-                    <div className="d-flex align-items-center justify-content-between mb-1">
-                      <span className="fw-semibold small">{resize.dimensions}</span>
-                      <ResizeStateBadge state={resize.state} />
+                      <div className="text-muted" style={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
+                        {resize.platform_labels.map((pl, i) => (
+                          <span key={i}>
+                            {i > 0 && ', '}
+                            {pl.platform} {pl.size_name}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div className="text-muted" style={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
-                      {resize.platform_labels.map((pl, i) => (
-                        <span key={i}>
-                          {i > 0 && ', '}
-                          {pl.platform} {pl.size_name}
-                        </span>
-                      ))}
-                    </div>
-                    {resize.state === 'resized' && (
-                      <small className="text-primary d-block mt-1">
-                        <i className="bi bi-pencil me-1"></i>Click to adjust
-                      </small>
-                    )}
-                    {onRebuildResize && resize.state !== 'pending' && (
-                      <button
-                        type="button"
-                        className="btn btn-link btn-sm p-0 mt-1 text-muted"
-                        style={{ fontSize: '0.7rem' }}
-                        title="Destroy and rebuild this size from current classifications"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onRebuildResize(resize)
-                        }}
-                      >
-                        <i className="bi bi-arrow-clockwise me-1"></i>Rebuild
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

@@ -29,6 +29,7 @@
 class AdResize < ApplicationRecord
   belongs_to :ad
   belongs_to :ad_shape, optional: true
+  belongs_to :background_asset, class_name: "Asset", optional: true
   has_many :ad_versions, dependent: :nullify
 
   has_one_attached :preview_image

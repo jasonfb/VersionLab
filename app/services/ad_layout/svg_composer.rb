@@ -29,6 +29,7 @@ module AdLayout
 
           # Text and other elements
           layout_result.layers.each do |layer|
+            next if layer["excluded"]
             ov = overrides[layer["id"]]&.stringify_keys || {}
             next if ov["deleted"]
 

@@ -304,6 +304,13 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
     }
 
     interactiveEls.forEach(({ el, layerId, type }) => {
+      // Apply persisted position offset (must happen here because region IDs
+      // are assigned during the interactiveEls build above, not in the SVG DOM)
+      const savedOffset = layerOffsets.current[layerId]
+      if (savedOffset && (savedOffset.x || savedOffset.y)) {
+        el.setAttribute('transform', `translate(${savedOffset.x}, ${savedOffset.y})`)
+      }
+
       if (deletedIds.current.has(layerId)) {
         el.style.display = 'none'
         return
@@ -673,6 +680,9 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           }
         }
         if (svg) {
+          // Note: position transforms are applied later in interactiveEls.forEach
+          // to handle PDF-converted regions whose IDs aren't in the SVG DOM.
+          // Native SVG text elements with actual IDs still get their transforms here:
           Object.entries(layerOffsets.current).forEach(([id, { x, y }]) => {
             const el = svg.getElementById(id)
             if (el && (x || y)) el.setAttribute('transform', `translate(${x}, ${y})`)
@@ -792,12 +802,19 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           d.textEl.setAttribute('height', h)
         }
 
-        // Resize CTA button background with the text box
+        // Resize CTA button background with the text box, preserving corner radius
         if (d.companionRect) {
           d.companionRect.setAttribute('x', x)
           d.companionRect.setAttribute('y', y)
           d.companionRect.setAttribute('width', w)
           d.companionRect.setAttribute('height', h)
+          // Clamp rx/ry to half the shorter side so it stays a rounded rect, not an oval
+          const maxR = Math.min(w, h) / 2
+          const curRx = parseFloat(d.companionRect.getAttribute('rx')) || 0
+          if (curRx > maxR) {
+            d.companionRect.setAttribute('rx', maxR)
+            d.companionRect.setAttribute('ry', maxR)
+          }
         }
 
         // Smart text fitting during resize (text elements only)
@@ -859,10 +876,67 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
           d.companionRect.setAttribute('y', d.companionStartY + dy)
         }
 
-        // Move resize handles too
-        const handles = d.svg.querySelectorAll(`#vl-interactive rect[data-handle][data-layer-id="${d.layerId}"]`)
+        // --- Alignment guides ---
         const rw = parseFloat(d.rect.getAttribute('width'))
         const rh = parseFloat(d.rect.getAttribute('height'))
+        const SNAP_CENTER = 1 // canvas center: exact (1 SVG unit tolerance)
+        const SNAP_ELEM = 2   // element-to-element alignment tolerance
+        const vb = d.svg.getAttribute('viewBox')?.split(/\s+/).map(Number) || [0, 0, 300, 250]
+        const canvasW = vb[2], canvasH = vb[3]
+        const centerX = rx + rw / 2, centerY = ry + rh / 2
+        const guides = []
+
+        // Canvas center guides — nearly exact match only
+        if (Math.abs(centerX - canvasW / 2) < SNAP_CENTER) {
+          guides.push({ x1: canvasW / 2, y1: 0, x2: canvasW / 2, y2: canvasH })
+        }
+        if (Math.abs(centerY - canvasH / 2) < SNAP_CENTER) {
+          guides.push({ x1: 0, y1: canvasH / 2, x2: canvasW, y2: canvasH / 2 })
+        }
+
+        // Alignment with other elements
+        const otherRects = d.svg.querySelectorAll(`#vl-interactive rect[data-layer-id]:not([data-handle]):not([data-layer-id="${d.layerId}"])`)
+        otherRects.forEach((other) => {
+          if (other.getAttribute('stroke') === 'transparent' && other.getAttribute('fill') === 'transparent') return
+          const ox = parseFloat(other.getAttribute('x'))
+          const oy = parseFloat(other.getAttribute('y'))
+          const ow = parseFloat(other.getAttribute('width'))
+          const oh = parseFloat(other.getAttribute('height'))
+          const oCenterX = ox + ow / 2, oCenterY = oy + oh / 2
+
+          // Center-to-center alignment
+          if (Math.abs(centerX - oCenterX) < SNAP_ELEM) {
+            guides.push({ x1: oCenterX, y1: Math.min(ry, oy), x2: oCenterX, y2: Math.max(ry + rh, oy + oh) })
+          }
+          if (Math.abs(centerY - oCenterY) < SNAP_ELEM) {
+            guides.push({ x1: Math.min(rx, ox), y1: oCenterY, x2: Math.max(rx + rw, ox + ow), y2: oCenterY })
+          }
+          // Edge alignment (left, right, top, bottom)
+          if (Math.abs(rx - ox) < SNAP_ELEM) guides.push({ x1: ox, y1: Math.min(ry, oy), x2: ox, y2: Math.max(ry + rh, oy + oh) })
+          if (Math.abs(rx + rw - (ox + ow)) < SNAP_ELEM) guides.push({ x1: ox + ow, y1: Math.min(ry, oy), x2: ox + ow, y2: Math.max(ry + rh, oy + oh) })
+          if (Math.abs(ry - oy) < SNAP_ELEM) guides.push({ x1: Math.min(rx, ox), y1: oy, x2: Math.max(rx + rw, ox + ow), y2: oy })
+          if (Math.abs(ry + rh - (oy + oh)) < SNAP_ELEM) guides.push({ x1: Math.min(rx, ox), y1: oy + oh, x2: Math.max(rx + rw, ox + ow), y2: oy + oh })
+        })
+
+        // Render guide lines
+        const interG = d.svg.querySelector('#vl-interactive')
+        if (interG) {
+          interG.querySelectorAll('.vl-guide').forEach((g) => g.remove())
+          guides.forEach((g) => {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+            line.setAttribute('class', 'vl-guide')
+            line.setAttribute('x1', g.x1); line.setAttribute('y1', g.y1)
+            line.setAttribute('x2', g.x2); line.setAttribute('y2', g.y2)
+            line.setAttribute('stroke', '#00b4d8')
+            line.setAttribute('stroke-width', '0.8')
+            line.setAttribute('stroke-dasharray', '3,2')
+            line.setAttribute('pointer-events', 'none')
+            interG.appendChild(line)
+          })
+        }
+
+        // Move resize handles too
+        const handles = d.svg.querySelectorAll(`#vl-interactive rect[data-handle][data-layer-id="${d.layerId}"]`)
         handles.forEach((handle) => {
           const hs = parseFloat(handle.getAttribute('width'))
           const name = handle.getAttribute('data-handle')
@@ -882,6 +956,9 @@ export default function InteractiveSvgEditor({ svgUrl, layers, classifiedLayers,
     const onUp = (e) => {
       if (!dragRef.current) return
       const d = dragRef.current
+
+      // Clear alignment guides
+      d.svg?.querySelectorAll('.vl-guide').forEach((g) => g.remove())
 
       if (d.mode === 'resize') {
         // Finalize resize

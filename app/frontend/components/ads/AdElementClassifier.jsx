@@ -92,7 +92,10 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
     if (!svgEl) return
 
     const textNodes = Array.from(svgEl.querySelectorAll('text'))
-    const imageNodes = Array.from(svgEl.querySelectorAll('image'))
+    // Exclude <image> elements inside <defs> — those are full-canvas source
+    // images used by clip-path groups, not positioned elements. Matching against
+    // them gives incorrect (full-canvas) bboxes that block click targets.
+    const imageNodes = Array.from(svgEl.querySelectorAll('image')).filter(n => !n.closest('defs'))
     const map = {}
 
     // Match by id when available; otherwise fall back to content+order for text.
@@ -137,6 +140,13 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
     setLayers((prev) => prev.map((l, i) => {
       if (i !== index) return l
       return { ...l, role: newRole, confidence: 1.0 }
+    }))
+  }
+
+  const toggleExcluded = (index) => {
+    setLayers((prev) => prev.map((l, i) => {
+      if (i !== index) return l
+      return { ...l, excluded: !l.excluded }
     }))
   }
 
@@ -382,11 +392,20 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                 return (
                   <>
                     {textLayers.map((layer, i) => {
-                      // Prefer the actual rendered bbox (handles text-anchor, fonts, transforms).
+                      // If the text sits inside a shape (e.g. a CTA button),
+                      // outline the full shape instead of just the text.
+                      const shape = layer.containing_shape
                       const bbox = bboxByLayerId[layer.id]
-                      let x, y, w, h
-                      if (bbox) {
+                      let x, y, w, h, cornerRadius
+                      if (shape) {
+                        x = parseFloat(shape.x) || 0
+                        y = parseFloat(shape.y) || 0
+                        w = parseFloat(shape.width) || 0
+                        h = parseFloat(shape.height) || 0
+                        cornerRadius = parseFloat(shape.rx) || 0
+                      } else if (bbox) {
                         x = bbox.x; y = bbox.y; w = bbox.width; h = bbox.height
+                        cornerRadius = 2
                       } else {
                         x = parseFloat(layer.x) || 0
                         const fontSize = parseFloat(layer.font_size) || 20
@@ -394,9 +413,10 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                         h = hasExplicitHeight ? parseFloat(layer.height) : fontSize * 1.4
                         y = hasExplicitHeight ? parseFloat(layer.y) || 0 : (parseFloat(layer.y) || 0) - fontSize
                         w = parseFloat(layer.width) || Math.max(fontSize * 0.6 * (layer.content?.length || 5), 30)
+                        cornerRadius = 2
                       }
                       const isSelected = selectedLayerId === layer.id
-                      const pad = 3
+                      const pad = shape ? 0 : 3
                       return (
                         <g
                           key={layer.id || i}
@@ -413,12 +433,12 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                             strokeWidth={isSelected ? 2.5 : 1.5}
                             strokeOpacity={isSelected ? 1 : 0.7}
                             strokeDasharray={isSelected ? 'none' : '8,4'}
-                            rx={2}
+                            rx={cornerRadius}
                           />
                         </g>
                       )
                     })}
-                    {imageLayers.map((layer, i) => {
+                    {imageLayers.filter((l) => !l.excluded).map((layer, i) => {
                       const bbox = bboxByLayerId[layer.id]
                       const x = bbox ? bbox.x : (parseFloat(layer.x) || 0)
                       const y = bbox ? bbox.y : (parseFloat(layer.y) || 0)
@@ -518,7 +538,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                   paddingLeft: isContinuation ? '2.25rem' : undefined,
                   transition: 'background-color 0.15s, border-color 0.15s',
                 }}
-                onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
+                onClickCapture={() => setSelectedLayerId(isSelected ? null : layer.id)}
               >
                 {/* Content + metadata */}
                 <div className="flex-grow-1 min-width-0">
@@ -659,6 +679,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
               {imageLayers.map((layer, i) => {
                 const globalIndex = layers.indexOf(layer)
                 const isSelected = selectedLayerId === layer.id
+                const isExcluded = !!layer.excluded
                 return (
                   <div
                     key={layer.id || `img-${i}`}
@@ -667,13 +688,18 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                       cursor: 'pointer',
                       backgroundColor: isSelected ? 'rgba(13, 110, 253, 0.08)' : 'transparent',
                       borderLeft: isSelected ? '3px solid #0d6efd' : '3px solid transparent',
-                      transition: 'background-color 0.15s, border-color 0.15s',
+                      opacity: isExcluded ? 0.4 : 1,
+                      transition: 'background-color 0.15s, border-color 0.15s, opacity 0.15s',
                     }}
                     onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
                   >
-                    <div
-                      className="rounded-circle flex-shrink-0"
-                      style={{ width: 12, height: 12, backgroundColor: roleColor(layer.role) }}
+                    <input
+                      className="form-check-input flex-shrink-0"
+                      type="checkbox"
+                      checked={!isExcluded}
+                      onChange={(e) => { e.stopPropagation(); toggleExcluded(globalIndex) }}
+                      onClick={(e) => e.stopPropagation()}
+                      title={isExcluded ? 'Excluded from resizes' : 'Included in resizes'}
                     />
                     <div className="flex-grow-1">
                       <div className="d-flex align-items-center gap-2 mb-1">
@@ -695,6 +721,7 @@ export default function AdElementClassifier({ ad, clientId, onConfirm }) {
                       className="form-select form-select-sm flex-shrink-0"
                       style={{ width: 130 }}
                       value={layer.role || 'logo'}
+                      disabled={isExcluded}
                       onChange={(e) => { e.stopPropagation(); updateRole(globalIndex, e.target.value) }}
                     >
                       {ROLE_OPTIONS.map((opt) => (

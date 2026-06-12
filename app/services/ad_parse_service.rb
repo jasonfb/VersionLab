@@ -324,6 +324,130 @@ class AdParseService
     { x: x1, y: y1, w: w, h: h }
   end
 
+  # Extract shape layers from non-rectangular clip paths (e.g. rounded-rect
+  # buttons rendered by pdftocairo as clipped image groups). These are clip
+  # paths whose `d` attribute contains curve commands (C/Q/A), indicating
+  # a shape rather than a plain rectangular clip.
+  def extract_clip_path_shapes(doc, canvas_width, canvas_height)
+    layers = []
+    return layers unless canvas_width && canvas_height && canvas_width > 0 && canvas_height > 0
+    canvas_area = canvas_width.to_f * canvas_height.to_f
+    index = 0
+
+    doc.css("clipPath").each do |clip_el|
+      path_el = clip_el.at_css("path")
+      next unless path_el
+      d = path_el["d"].to_s
+      next if d.blank?
+
+      # Only interested in paths with curves (rounded corners, circles, etc.)
+      next unless d.match?(/[CcQqAa]/)
+
+      bbox = path_bounding_box(d)
+      next unless bbox
+      area = bbox[:w] * bbox[:h]
+      next if area >= canvas_area * 0.5
+      next if area < 50
+
+      # Determine corner radius from the curve control points.
+      # For a standard rounded rect, the first C command's control points
+      # indicate the radius. Approximate by finding the distance from the
+      # first curve's start point to the bbox corner.
+      rx = estimate_corner_radius(d, bbox)
+
+      layers << {
+        id: "clip_shape_#{index}",
+        type: "shape",
+        shape: "path",
+        fill: sample_clip_fill(doc, clip_el),
+        rx: rx,
+        x: bbox[:x].round.to_s,
+        y: bbox[:y].round.to_s,
+        width: bbox[:w].round.to_s,
+        height: bbox[:h].round.to_s
+      }
+      index += 1
+    end
+
+    layers
+  end
+
+  # Estimate corner radius from a rounded-rect path by measuring the first
+  # curve segment. For a standard rounded rect, the first L→C transition
+  # reveals the radius as the distance from the curve start to the bbox edge.
+  def estimate_corner_radius(d, bbox)
+    # Match the first C (cubic bezier) command's first control point
+    match = d.match(/[LC]\s*([\d.]+)\s+([\d.]+)\s+C\s*([\d.]+)\s+([\d.]+)/i)
+    return bbox[:h] * 0.15 unless match
+
+    # The distance between the line end and the first control point ≈ the radius
+    lx = match[1].to_f
+    cx = match[3].to_f
+    ly = match[2].to_f
+    cy = match[4].to_f
+
+    rx_estimate = Math.sqrt((cx - lx)**2 + (cy - ly)**2)
+    rx_estimate.clamp(0, [bbox[:w], bbox[:h]].min / 2.0)
+  end
+
+  # Try to determine the fill color of a clip-path shape by finding its
+  # usage in the SVG body and sampling the source image.
+  def sample_clip_fill(doc, clip_el)
+    clip_id = clip_el["id"]
+    return nil unless clip_id
+
+    # Find the <g> that references this clip path
+    g_el = doc.at_css("g[clip-path='url(##{clip_id})']")
+    # Also check parent <g> — pdftocairo nests the shape clip inside a bounding-rect clip
+    g_el ||= doc.at_xpath("//xmlns:g[xmlns:g[@clip-path='url(##{clip_id})']]", "xmlns" => "http://www.w3.org/2000/svg")
+    return nil unless g_el
+
+    # Look for a <use> referencing a source image (may be nested)
+    use_el = g_el.at_css("use")
+    return nil unless use_el
+
+    ref_id = (use_el["href"] || use_el["xlink:href"]).to_s.sub("#", "")
+    return nil if ref_id.blank?
+
+    source_el = doc.at_css("##{ref_id}")
+    return nil unless source_el&.name == "image"
+
+    href = source_el["href"] || source_el["xlink:href"]
+    return nil if href.blank? || !href.start_with?("data:image")
+
+    # Get clip path bbox so we sample at the shape's center, not the image center
+    path_el = clip_el.at_css("path")
+    bbox = path_el ? path_bounding_box(path_el["d"].to_s) : nil
+
+    # Decode the image and sample a pixel at the clip path's center
+    begin
+      base64_data = href.sub(%r{^data:image/[^;]+;base64,}, "")
+      image_data = Base64.decode64(base64_data)
+      image = Vips::Image.new_from_buffer(image_data, "")
+
+      # The source image covers the full canvas; sample at the clip's center
+      if bbox
+        # Scale from SVG coords to image pixel coords
+        img_w = source_el["width"].to_f
+        img_h = source_el["height"].to_f
+        scale_x = img_w > 0 ? image.width.to_f / img_w : 1.0
+        scale_y = img_h > 0 ? image.height.to_f / img_h : 1.0
+        cx = ((bbox[:x] + bbox[:w] / 2.0) * scale_x).round.clamp(0, image.width - 1)
+        cy = ((bbox[:y] + bbox[:h] / 2.0) * scale_y).round.clamp(0, image.height - 1)
+      else
+        cx = (image.width / 2).clamp(0, image.width - 1)
+        cy = (image.height / 2).clamp(0, image.height - 1)
+      end
+
+      pixel = image.getpoint(cx, cy)
+      r, g, b = pixel[0..2].map(&:to_i)
+      "#%02x%02x%02x" % [r, g, b]
+    rescue => e
+      Rails.logger.debug("AdParseService: could not sample clip fill: #{e.message}")
+      nil
+    end
+  end
+
   def check_svg_warnings(layers, doc)
     warnings = []
 
@@ -410,6 +534,7 @@ class AdParseService
     layers += extract_svg_image_layers(doc, width, height)
     layers += extract_background_layers(doc, width, height)
     layers += extract_svg_shape_layers(doc, width, height)
+    layers += extract_clip_path_shapes(doc, width, height)
     warnings += check_svg_warnings(layers, doc) if layers.any? { |l| l[:type] == "text" && l[:content].present? }
 
     if layers.empty?
@@ -513,7 +638,11 @@ class AdParseService
 
     claimed_runs = Set.new
 
-    layers.each do |layer|
+    # Process smallest regions first so tight text areas (e.g. a button label)
+    # claim their runs before a larger enclosing region swallows them.
+    sorted_layers = layers.sort_by { |l| l[:width].to_f * l[:height].to_f }
+
+    sorted_layers.each do |layer|
       rx = layer[:x].to_f
       ry = layer[:y].to_f
       rw = layer[:width].to_f

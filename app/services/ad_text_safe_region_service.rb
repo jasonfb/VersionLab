@@ -16,15 +16,23 @@ class AdTextSafeRegionService
   #     target_width:, target_height: }
   #
   # Coordinates are pixels relative to the center-cropped target dimensions.
-  def call(target_width:, target_height:)
-    bg_layer = (@ad.classified_layers || []).find { |l| l["type"] == "background" }
-    raise Error, "No background image found" unless bg_layer&.dig("href").present?
+  def call(target_width:, target_height:, background_asset: nil)
+    bg_href = if background_asset&.file&.attached?
+      # Use the assigned background asset's image data as a data URI
+      blob = background_asset.file.blob
+      data = blob.download
+      "data:#{blob.content_type};base64,#{Base64.strict_encode64(data)}"
+    else
+      bg_layer = (@ad.classified_layers || []).find { |l| l["type"] == "background" }
+      bg_layer&.dig("href")
+    end
+    raise Error, "No background image found" unless bg_href.present?
 
     ai_model = resolve_ai_model
     raise Error, "No AI service configured" unless ai_model
 
     # Center-crop the background to target dimensions
-    cropped_b64 = center_crop_background(bg_layer["href"], target_width, target_height)
+    cropped_b64 = center_crop_background(bg_href, target_width, target_height)
     raise Error, "Failed to crop background image" unless cropped_b64
 
     messages = build_messages(cropped_b64, target_width, target_height)

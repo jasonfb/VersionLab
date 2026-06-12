@@ -3,10 +3,17 @@
 class OnboardingController < ApplicationController
   layout "devise"
 
+  rescue_from ActionController::InvalidAuthenticityToken, with: :reject_bot
+
   def new
   end
 
   def check_email
+    if params[:website].present?
+      head :unprocessable_entity
+      return
+    end
+
     email = params[:email].to_s.strip.downcase
 
     if User.exists?(email: email)
@@ -28,6 +35,11 @@ class OnboardingController < ApplicationController
   end
 
   def create
+    if params[:website].present?
+      head :unprocessable_entity
+      return
+    end
+
     @email = onboarding_params[:email].to_s.strip.downcase
 
     if User.exists?(email: @email)
@@ -68,5 +80,9 @@ class OnboardingController < ApplicationController
 
   def onboarding_params
     params.require(:onboarding).permit(:email, :account_name, :password, :password_confirmation)
+  end
+
+  def reject_bot
+    head :unprocessable_entity
   end
 end

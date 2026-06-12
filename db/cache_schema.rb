@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_02_200545) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_10_140916) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -145,6 +145,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_02_200545) do
     t.uuid "ad_id", null: false
     t.uuid "ad_shape_id"
     t.string "aspect_ratio"
+    t.uuid "background_asset_id"
+    t.jsonb "background_crop"
     t.datetime "created_at", null: false
     t.integer "height", null: false
     t.jsonb "layer_overrides", default: {}

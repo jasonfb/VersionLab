@@ -18,6 +18,7 @@ class AdClassifyService
     non_text_layers = layers.select { |l| l["type"] != "text" && l["type"] != "shape" || (l["type"] == "text" && l["content"].blank?) }
 
     classified_text = classify_text_layers(text_layers)
+    attach_containing_shapes(classified_text, shape_layers)
     attach_cta_backgrounds(classified_text, shape_layers)
 
     classified = classified_text + classify_non_text_layers(non_text_layers)
@@ -137,6 +138,37 @@ class AdClassifyService
     true
   end
 
+  # For every text layer, check whether it sits inside a shape (e.g. a
+  # rounded-rect button). If so, attach the shape's bounding box so the
+  # classify screen can outline the full button instead of just the text.
+  def attach_containing_shapes(classified_text, shape_layers)
+    return if shape_layers.empty?
+
+    classified_text.each do |layer|
+      cx = layer["x"].to_f
+      cy = layer["y"].to_f
+
+      candidates = shape_layers.select do |s|
+        sx = s["x"].to_f
+        sy = s["y"].to_f
+        sw = s["width"].to_f
+        sh = s["height"].to_f
+        cx >= sx && cx <= sx + sw && cy >= sy && cy <= sy + sh
+      end
+      next if candidates.empty?
+
+      best = candidates.min_by { |s| s["width"].to_f * s["height"].to_f }
+      layer["containing_shape"] = {
+        "x" => best["x"],
+        "y" => best["y"],
+        "width" => best["width"],
+        "height" => best["height"],
+        "fill" => best["fill"],
+        "rx" => best["rx"]
+      }
+    end
+  end
+
   # For each layer classified as a CTA, find the smallest shape whose
   # bounding box contains the CTA's anchor point. If found, capture the
   # shape's fill and corner radius (as a ratio of its height) so the
@@ -154,7 +186,7 @@ class AdClassifyService
         sy = s["y"].to_f
         sw = s["width"].to_f
         sh = s["height"].to_f
-        cx >= sx && cx <= sx + sw && cy >= sy - sh && cy <= sy + sh
+        cx >= sx && cx <= sx + sw && cy >= sy && cy <= sy + sh
       end
       next if candidates.empty?
 
