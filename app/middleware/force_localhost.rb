@@ -6,6 +6,11 @@ class ForceLocalhost
   end
 
   def call(env)
+    path = env["PATH_INFO"].to_s
+    unless path.valid_encoding?
+      return [400, { "Content-Type" => "text/plain" }, ["Bad Request"]]
+    end
+
     host = env["HTTP_HOST"]&.split(":")&.first
 
     if host == "127.0.0.1"
