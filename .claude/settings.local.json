@@ -22,7 +22,8 @@
       "Bash(/tmp/compare_models.sh)",
       "Bash(bin/rspec:*)",
       "Bash(bin/rubocop --format simple)",
-      "Bash(bin/rubocop -A)"
+      "Bash(bin/rubocop -A)",
+      "Bash(bundle update:*)"
     ]
   }
 }
