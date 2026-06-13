@@ -183,26 +183,26 @@ class AdRenderService
     font_style = ov[:is_italic] ? "italic" : "normal"
     text_decoration = ov[:is_underline] ? "underline" : "none"
     text_anchor = case ov[:text_align].to_s
-                  when "center" then "middle"
-                  when "right" then "end"
-                  else "start"
-                  end
+    when "center" then "middle"
+    when "right" then "end"
+    else "start"
+    end
     letter_spacing = ov[:letter_spacing].presence || "0"
     line_height = (ov[:line_height].presence || "1.3").to_f
 
     # Calculate text x position based on alignment
     text_x = case text_anchor
-             when "middle" then x + (w > 0 ? w / 2 : 0)
-             when "end" then x + (w > 0 ? w : 0)
-             else x
-             end
+    when "middle" then x + (w > 0 ? w / 2 : 0)
+    when "end" then x + (w > 0 ? w : 0)
+    else x
+    end
 
     # Word-wrap into lines that fit within the region width
     lines = if w > 0
               wrap_text(content, font_size, w, font_weight == "bold")
-            else
+    else
               [ content ]
-            end
+    end
 
     line_spacing = font_size * line_height
     # Start at y + font_size to account for SVG text baseline

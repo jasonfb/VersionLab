@@ -5,5 +5,5 @@ if Rails.env.development?
 
   ActiveRecordQueryTrace.level = :full # :app, :rails, or :full
   ActiveRecordQueryTrace.lines = 10
-  
+
 end

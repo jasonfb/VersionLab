@@ -205,7 +205,7 @@ class AdAiClassifyService
       layer["role"] = role if ROLES.include?(role)
 
       cont = suggestion["continuation_of"]
-      cont = nil if cont.is_a?(String) && cont.strip.downcase.in?(["", "null"])
+      cont = nil if cont.is_a?(String) && cont.strip.downcase.in?([ "", "null" ])
       if cont.present? && valid_ids.include?(cont) && cont != layer["id"]
         layer["continuation_of"] = cont
       else

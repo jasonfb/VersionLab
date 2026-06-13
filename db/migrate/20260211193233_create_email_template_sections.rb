@@ -9,6 +9,6 @@ class CreateEmailTemplateSections < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :email_template_sections, [:email_template_id, :position]
+    add_index :email_template_sections, [ :email_template_id, :position ]
   end
 end

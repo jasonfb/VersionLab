@@ -143,7 +143,7 @@ module AdLayout
       lines = if layer["content_overridden"]
         wrap_text(layer["content"], region_width, font_size)
       else
-        layer["wrapped_lines"] || [layer["content"]]
+        layer["wrapped_lines"] || [ layer["content"] ]
       end
 
       # Compute text-anchor and x position based on alignment
@@ -222,9 +222,9 @@ module AdLayout
 
     # Simple word wrap using estimated character width (matches frontend logic)
     def wrap_text(content, region_width, font_size)
-      return [content] if content.blank? || region_width <= 0 || font_size <= 0
+      return [ content ] if content.blank? || region_width <= 0 || font_size <= 0
       char_width = font_size * 0.52
-      chars_per_line = [1, (region_width / char_width).floor].max
+      chars_per_line = [ 1, (region_width / char_width).floor ].max
       words = content.split(/\s+/)
       lines = []
       current = []
@@ -235,7 +235,7 @@ module AdLayout
           current_len += (current.length == 1 ? 0 : 1) + word.length
         else
           lines << current.join(" ")
-          current = [word]
+          current = [ word ]
           current_len = word.length
         end
       end
@@ -246,11 +246,11 @@ module AdLayout
     def compute_alignment(align, region_x, region_width)
       case align
       when "center"
-        ["middle", region_x + region_width / 2.0]
+        [ "middle", region_x + region_width / 2.0 ]
       when "right"
-        ["end", region_x + region_width]
+        [ "end", region_x + region_width ]
       else
-        ["start", region_x]
+        [ "start", region_x ]
       end
     end
   end

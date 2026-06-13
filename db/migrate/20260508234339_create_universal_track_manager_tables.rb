@@ -3,7 +3,6 @@
 class CreateUniversalTrackManagerTables < ActiveRecord::Migration[8.1]
   def self.up
     ActiveRecord::Base.transaction do
-
       create_table :utm_browsers do |t|
         # this table gets automatically populated by inbound traffic
         t.string :name, limit: 255
@@ -13,12 +12,12 @@ class CreateUniversalTrackManagerTables < ActiveRecord::Migration[8.1]
       add_index :utm_browsers, :name
 
       create_table :utm_campaigns do |t|
-        # this table gets automatically populated by inbound traffic
-          t.string :utm_source, limit:256
-          t.string :utm_medium, limit:256
-          t.string :utm_campaign, limit:256
-          t.string :utm_content, limit:256
-          t.string :utm_term, limit:256
+          # this table gets automatically populated by inbound traffic
+          t.string :utm_source, limit: 256
+          t.string :utm_medium, limit: 256
+          t.string :utm_campaign, limit: 256
+          t.string :utm_content, limit: 256
+          t.string :utm_term, limit: 256
 
         t.string :sha1, limit: 40
         t.boolean :gclid_present

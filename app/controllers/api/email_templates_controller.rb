@@ -2,7 +2,7 @@
 
 class Api::EmailTemplatesController < Api::BaseController
   before_action :set_client
-  before_action :set_email_template, only: [:show, :update, :destroy, :reset]
+  before_action :set_email_template, only: [ :show, :update, :destroy, :reset ]
 
   def index
     templates = @client.email_templates.order(updated_at: :desc)
@@ -35,7 +35,7 @@ class Api::EmailTemplatesController < Api::BaseController
               parent_id: sub.parent_id,
               element_selector: sub.element_selector,
               name: sub.name,
-              variables: sub.template_variables.order(:position).map { |v| serialize_variable(v) },
+              variables: sub.template_variables.order(:position).map { |v| serialize_variable(v) }
             }
           }
         }
@@ -109,7 +109,7 @@ class Api::EmailTemplatesController < Api::BaseController
       slot_role: v.slot_role,
       word_count: v.word_count,
       image_location: v.image_location,
-      position: v.position,
+      position: v.position
     }
   end
 

@@ -142,7 +142,7 @@ RSpec.describe AdResizeService do
 
   describe ".rebuild" do
     it "destroys and recreates a resize" do
-      service = described_class.new(ad, platforms: ["Threads"])
+      service = described_class.new(ad, platforms: [ "Threads" ])
       resizes = service.call
       original = resizes.first
       original_id = original.id

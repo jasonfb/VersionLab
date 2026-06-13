@@ -71,7 +71,7 @@ RSpec.describe AdRenderService do
 
     it "returns single-line array for short text" do
       lines = service.send(:wrap_text, "Short", 20, 200)
-      expect(lines).to eq(["Short"])
+      expect(lines).to eq([ "Short" ])
     end
   end
 

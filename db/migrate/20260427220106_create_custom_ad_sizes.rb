@@ -13,6 +13,6 @@ class CreateCustomAdSizes < ActiveRecord::Migration[8.1]
 
     add_foreign_key :custom_ad_sizes, :clients
     add_index :custom_ad_sizes, :client_id
-    add_index :custom_ad_sizes, [:client_id, :width, :height], unique: true
+    add_index :custom_ad_sizes, [ :client_id, :width, :height ], unique: true
   end
 end

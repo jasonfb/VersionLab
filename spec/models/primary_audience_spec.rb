@@ -39,7 +39,7 @@ RSpec.describe PrimaryAudience, type: :model do
       first = create(:primary_audience, position: 1)
       third = create(:primary_audience, position: 3)
 
-      expect(described_class.all.to_a).to eq([first, second, third])
+      expect(described_class.all.to_a).to eq([ first, second, third ])
     end
   end
 end

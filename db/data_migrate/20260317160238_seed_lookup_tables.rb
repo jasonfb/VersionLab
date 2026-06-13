@@ -9,7 +9,7 @@ class SeedLookupTables < ActiveRecord::Migration[8.1]
       "Government",
       "Education",
       "Healthcare Provider",
-      "Other",
+      "Other"
     ].each_with_index do |name, i|
       OrganizationType.find_or_create_by!(name: name) { |r| r.position = i + 1 }
     end
@@ -34,7 +34,7 @@ class SeedLookupTables < ActiveRecord::Migration[8.1]
       "Hospitality and Travel",
       "Nonprofit",
       "Government",
-      "Other",
+      "Other"
     ].each_with_index do |name, i|
       Industry.find_or_create_by!(name: name) { |r| r.position = i + 1 }
     end
@@ -48,7 +48,7 @@ class SeedLookupTables < ActiveRecord::Migration[8.1]
       "Volunteers",
       "Customers",
       "Prospects",
-      "Other",
+      "Other"
     ].each_with_index do |name, i|
       PrimaryAudience.find_or_create_by!(name: name) { |r| r.position = i + 1 }
     end
@@ -61,7 +61,7 @@ class SeedLookupTables < ActiveRecord::Migration[8.1]
       "Optimistic",
       "Authoritative",
       "Conversational",
-      "Other",
+      "Other"
     ].each_with_index do |name, i|
       ToneRule.find_or_create_by!(name: name) { |r| r.position = i + 1 }
     end
@@ -75,7 +75,7 @@ class SeedLookupTables < ActiveRecord::Migration[8.1]
       "Asia",
       "Australia",
       "Central America",
-      "South America",
+      "South America"
     ].each_with_index do |name, i|
       Geography.find_or_create_by!(name: name) { |r| r.position = i + 1 }
     end

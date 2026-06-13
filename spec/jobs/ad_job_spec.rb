@@ -58,7 +58,7 @@ RSpec.describe AdJob do
 
       expect(AdMergeService).to have_received(:new).with(
         ad,
-        audience_ids: [audience.id.to_s],
+        audience_ids: [ audience.id.to_s ],
         rejection_context: { audience.id.to_s => "Wrong tone" },
         ad_resize_id: nil
       )

@@ -39,7 +39,7 @@ class SubscriptionUpgradeService
     return 0 if total_days.zero?
 
     remaining_days = (subscription.paid_through_date - Date.current).to_i
-    remaining_days = [remaining_days, 0].max
+    remaining_days = [ remaining_days, 0 ].max
 
     price_cents = subscription.current_period_price_cents
     (price_cents * remaining_days.to_f / total_days).round

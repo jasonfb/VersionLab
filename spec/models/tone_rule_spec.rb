@@ -39,7 +39,7 @@ RSpec.describe ToneRule, type: :model do
       first = create(:tone_rule, position: 1)
       third = create(:tone_rule, position: 3)
 
-      expect(described_class.all.to_a).to eq([first, second, third])
+      expect(described_class.all.to_a).to eq([ first, second, third ])
     end
   end
 end

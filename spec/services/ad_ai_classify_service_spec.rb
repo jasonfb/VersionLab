@@ -57,13 +57,13 @@ RSpec.describe AdAiClassifyService do
     end
 
     it "raises when ad has no text layers" do
-      ad.update!(parsed_layers: [{ "id" => "bg", "type" => "image" }],
-                 classified_layers: [{ "id" => "bg", "type" => "image" }])
+      ad.update!(parsed_layers: [ { "id" => "bg", "type" => "image" } ],
+                 classified_layers: [ { "id" => "bg", "type" => "image" } ])
       expect { described_class.new(ad).call }.to raise_error(AdAiClassifyService::Error, /no text layers/)
     end
 
     it "raises when ad has no text layers" do
-      ad.update!(parsed_layers: [{ "id" => "bg", "type" => "image" }])
+      ad.update!(parsed_layers: [ { "id" => "bg", "type" => "image" } ])
       expect { described_class.new(ad).call }.to raise_error(AdAiClassifyService::Error, /no text layers/)
     end
 

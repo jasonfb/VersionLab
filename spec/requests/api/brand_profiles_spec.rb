@@ -38,7 +38,7 @@ RSpec.describe "Api::BrandProfiles", type: :request do
     it "syncs lookup associations" do
       geo = create(:geography)
       post "/api/clients/#{api_client.id}/brand_profile/upsert",
-           params: { organization_name: "Test", geography_ids: [geo.id] }
+           params: { organization_name: "Test", geography_ids: [ geo.id ] }
       expect(response.parsed_body["geography_ids"]).to include(geo.id)
     end
   end

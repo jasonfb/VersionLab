@@ -544,7 +544,7 @@ class Api::AdsController < Api::BaseController
         {
           name: f.font_name,
           postscript_name: f.postscript_name,
-          url: rails_blob_url(f.font_file, only_path: true),
+          url: rails_blob_url(f.font_file, only_path: true)
         }
       }
     }

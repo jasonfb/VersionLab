@@ -32,7 +32,7 @@ RSpec.describe EmailJob do
 
       expect(AiMergeService).to have_received(:new).with(
         email,
-        audience_ids: [audience.id.to_s],
+        audience_ids: [ audience.id.to_s ],
         rejection_context: {}
       )
     end
@@ -46,7 +46,7 @@ RSpec.describe EmailJob do
 
       expect(AiMergeService).to have_received(:new).with(
         email,
-        audience_ids: [audience.id.to_s],
+        audience_ids: [ audience.id.to_s ],
         rejection_context: { audience.id.to_s => "Too long" }
       )
     end

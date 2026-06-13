@@ -22,7 +22,6 @@ class RenameMergeToEmail < ActiveRecord::Migration[8.1]
 
     # Update polymorphic loggable_type references from 'Merge' to 'Email'
     execute "UPDATE ai_logs SET loggable_type = 'Email' WHERE loggable_type = 'Merge'"
-
   end
 
   def down

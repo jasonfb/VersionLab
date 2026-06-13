@@ -34,7 +34,7 @@ class RecreateHeliosPressTablesWithUuids < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :helios_press_blocks, [:post_id, :position]
+    add_index :helios_press_blocks, [ :post_id, :position ]
 
     create_table :helios_press_block_images, id: :uuid do |t|
       t.references :block, null: false, foreign_key: { to_table: :helios_press_blocks }, type: :uuid
@@ -45,8 +45,8 @@ class RecreateHeliosPressTablesWithUuids < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :helios_press_block_images, [:block_id, :position]
-    add_index :helios_press_block_images, [:block_id, :reference_key], unique: true
+    add_index :helios_press_block_images, [ :block_id, :position ]
+    add_index :helios_press_block_images, [ :block_id, :reference_key ], unique: true
   end
 
   def down

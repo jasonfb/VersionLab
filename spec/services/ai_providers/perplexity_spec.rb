@@ -5,7 +5,7 @@ RSpec.describe AiProviders::Perplexity do
 
   let(:success_body) do
     {
-      "choices" => [{ "message" => { "content" => '{"answer": "yes"}' } }],
+      "choices" => [ { "message" => { "content" => '{"answer": "yes"}' } } ],
       "usage" => { "prompt_tokens" => 60, "completion_tokens" => 30, "total_tokens" => 90 }
     }.to_json
   end
@@ -50,7 +50,7 @@ RSpec.describe AiProviders::Perplexity do
     end
 
     it "uses Bearer auth header" do
-      provider.complete(model: "pplx-7b", messages: [{ role: "user", content: "Hi" }])
+      provider.complete(model: "pplx-7b", messages: [ { role: "user", content: "Hi" } ])
 
       expect(provider).to have_received(:http_post) do |_uri, _body, headers|
         expect(headers["Authorization"]).to eq("Bearer test-key")
@@ -62,16 +62,16 @@ RSpec.describe AiProviders::Perplexity do
       allow(provider).to receive(:http_post).and_return(rate_response)
       allow(provider).to receive(:sleep)
 
-      expect { provider.complete(model: "m", messages: [{ role: "user", content: "hi" }]) }
+      expect { provider.complete(model: "m", messages: [ { role: "user", content: "hi" } ]) }
         .to raise_error(AiProviders::Base::Error, /rate limit/)
     end
 
     it "raises on empty response" do
-      empty_body = { "choices" => [{ "message" => { "content" => "" } }], "usage" => {} }.to_json
+      empty_body = { "choices" => [ { "message" => { "content" => "" } } ], "usage" => {} }.to_json
       empty_response = instance_double(Net::HTTPResponse, code: "200", body: empty_body)
       allow(provider).to receive(:http_post).and_return(empty_response)
 
-      expect { provider.complete(model: "m", messages: [{ role: "user", content: "hi" }]) }
+      expect { provider.complete(model: "m", messages: [ { role: "user", content: "hi" } ]) }
         .to raise_error(AiProviders::Base::Error, /Empty response/)
     end
   end

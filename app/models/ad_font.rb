@@ -58,7 +58,7 @@ class AdFont < ApplicationRecord
 
   def word_wrap(text, font_size, max_width)
     words = text.split(/\s+/)
-    return [text] if words.size <= 1
+    return [ text ] if words.size <= 1
 
     lines = []
     current_line = []
@@ -66,7 +66,7 @@ class AdFont < ApplicationRecord
 
     words.each do |word|
       word_width = measure_text_width(word, font_size)
-      return [text] unless word_width # bail if measurement fails
+      return [ text ] unless word_width # bail if measurement fails
 
       current_width = if current_line.empty?
         0
@@ -78,7 +78,7 @@ class AdFont < ApplicationRecord
         current_line << word
       else
         lines << current_line.join(" ")
-        current_line = [word]
+        current_line = [ word ]
       end
     end
 

@@ -143,7 +143,7 @@ module AdLayout
 
         # Clamp to canvas bottom — don't let elements fall off
         if bbox[:y] + bbox[:h] > canvas_height
-          layer["y"] = [canvas_height - bbox[:h], 0].max.round.to_s
+          layer["y"] = [ canvas_height - bbox[:h], 0 ].max.round.to_s
           bbox[:y] = layer["y"].to_f
         end
       end
@@ -161,8 +161,8 @@ module AdLayout
 
       if layer["type"] == "text"
         font_size = layer["font_size"].to_f
-        lines = layer["wrapped_lines"] || [layer["content"]]
-        line_count = [lines.size, 1].max
+        lines = layer["wrapped_lines"] || [ layer["content"] ]
+        line_count = [ lines.size, 1 ].max
         line_height = font_size * 1.3
         h = font_size + (line_count - 1) * line_height
       else
@@ -205,7 +205,7 @@ module AdLayout
         end
 
         scaled_size = (original_size * base_scale * role_template[:font_scale]).round(1)
-        scaled_size = [scaled_size, 8.0].max # minimum readable size
+        scaled_size = [ scaled_size, 8.0 ].max # minimum readable size
 
         result["font_size"] = scaled_size.to_s
         result["align"] = role_template[:align]
@@ -234,7 +234,7 @@ module AdLayout
       else
         # Approximate: assume average character width is ~0.55 * font_size
         approx_char_width = font_size * 0.55
-        chars_per_line = [(max_width / approx_char_width).floor, 1].max
+        chars_per_line = [ (max_width / approx_char_width).floor, 1 ].max
         simple_wrap(text, chars_per_line)
       end
     end
@@ -252,12 +252,12 @@ module AdLayout
         # and font_size ~= height / line_count
         # Start with single-line assumption and iterate once
         estimated_size = height * 0.75 # assume single line, cap-height ratio
-        chars_per_line = [(width / (estimated_size * 0.55)).floor, 1].max
-        line_count = [(content.length.to_f / chars_per_line).ceil, 1].max
+        chars_per_line = [ (width / (estimated_size * 0.55)).floor, 1 ].max
+        line_count = [ (content.length.to_f / chars_per_line).ceil, 1 ].max
         estimated_size = (height / (line_count * 1.3)) # 1.3 line-height
-        [estimated_size, 12.0].max
+        [ estimated_size, 12.0 ].max
       else
-        [height * 0.75, 12.0].max
+        [ height * 0.75, 12.0 ].max
       end
     end
 
@@ -273,7 +273,7 @@ module AdLayout
           current_len += (current.empty? ? 0 : 1) + word.length
         else
           lines << current.join(" ")
-          current = [word]
+          current = [ word ]
           current_len = word.length
         end
       end
@@ -303,7 +303,7 @@ module AdLayout
 
       scale_x = target_width.to_f / @ad.width
       scale_y = target_height.to_f / @ad.height
-      [scale_x, scale_y].min
+      [ scale_x, scale_y ].min
     end
 
     def legacy_layout(target_width, target_height, shape_override: nil)
@@ -318,8 +318,8 @@ module AdLayout
         resized["height"] = (layer["height"].to_f * scale_y).round.to_s if layer["height"]
 
         if layer["font_size"].present?
-          min_scale = [scale_x, scale_y].min
-          resized["font_size"] = [layer["font_size"].to_f * min_scale, 8].max.round.to_s
+          min_scale = [ scale_x, scale_y ].min
+          resized["font_size"] = [ layer["font_size"].to_f * min_scale, 8 ].max.round.to_s
         end
 
         resized

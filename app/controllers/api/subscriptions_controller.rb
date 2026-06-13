@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Api::SubscriptionsController < Api::BaseController
-  before_action :require_billing_access!, only: [:create_payment_intent, :confirm]
+  before_action :require_billing_access!, only: [ :create_payment_intent, :confirm ]
 
   def show
     subscription = @current_account.active_subscription
@@ -19,7 +19,7 @@ class Api::SubscriptionsController < Api::BaseController
     billing_interval = params[:billing_interval]
 
     unless %w[monthly annual].include?(billing_interval)
-      return render json: { errors: ["Invalid billing interval"] }, status: :unprocessable_entity
+      return render json: { errors: [ "Invalid billing interval" ] }, status: :unprocessable_entity
     end
 
     service = StripeCheckoutService.new(account: @current_account)
@@ -27,7 +27,7 @@ class Api::SubscriptionsController < Api::BaseController
 
     render json: result
   rescue StripeCheckoutService::Error => e
-    render json: { errors: [e.message] }, status: :unprocessable_entity
+    render json: { errors: [ e.message ] }, status: :unprocessable_entity
   end
 
   def confirm
@@ -39,7 +39,7 @@ class Api::SubscriptionsController < Api::BaseController
 
     render json: { subscription: subscription_json(subscription) }
   rescue StripeCheckoutService::Error => e
-    render json: { errors: [e.message] }, status: :unprocessable_entity
+    render json: { errors: [ e.message ] }, status: :unprocessable_entity
   end
 
   private
@@ -69,7 +69,7 @@ class Api::SubscriptionsController < Api::BaseController
       tokens: {
         monthly_allotment: allotment,
         used_this_cycle: used,
-        remaining: [allotment - used, 0].max,
+        remaining: [ allotment - used, 0 ].max,
         overage_tokens: overage_tokens,
         overage_cents: overage_cents,
         overage_rate_per_1000_cents: subscription.overage_cents_per_1000_tokens,

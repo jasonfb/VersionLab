@@ -1,0 +1,26 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "3e9f4d5fbc08e1d549a70153fa5a8aae4459c820e83812c4891af993613d14ad",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/admin/ad_shape_layout_rules_controller.rb",
+      "line": 97,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.require(:ad_shape_layout_rule).permit(:role, :anchor_x, :anchor_y, :anchor_w, :anchor_h, :font_scale, :align, :drop, :position)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::AdShapeLayoutRulesController",
+        "method": "ad_shape_layout_rule_params"
+      },
+      "user_input": ":role",
+      "confidence": "Medium",
+      "note": "False positive: :role here is a layout role (headline/subhead/body/cta/logo/decoration), not an authorization role. Controller is admin-only."
+    }
+  ],
+  "updated": "2026-06-13",
+  "brakeman_version": "8.0.2"
+}

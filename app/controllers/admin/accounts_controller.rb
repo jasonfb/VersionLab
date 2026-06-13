@@ -6,19 +6,19 @@ class Admin::AccountsController < Admin::BaseController
 
   helper :hot_glue
   include HotGlue::ControllerHelper
-  
 
-  
+
+
   before_action :load_account, only: %i[show edit update destroy]
   before_action :load_ai_services, only: %i[new edit create update ai_models]
   after_action -> { flash.discard }, if: -> { request.format.symbol == :turbo_stream }
-  
+
   def load_account
     @account = Account.find(params[:id])
   end
-  
-  
-  
+
+
+
   def load_all_accounts
     @accounts = Account.includes(:ai_service, :ai_model, subscriptions: :subscription_tier).reverse_sort
     @pagy, @accounts = pagy(@accounts)
@@ -26,36 +26,35 @@ class Admin::AccountsController < Admin::BaseController
 
   def index
     load_all_accounts
-    
   end
 
   def new
     @account = Account.new
-    
 
-    
-    @action = 'new' 
+
+
+    @action = "new"
   end
 
   def create
-    flash[:notice] = +''
+    flash[:notice] = +""
     modified_params = modify_date_inputs_on_params(account_params.dup, nil, {})
 
-    
-    @account = Account.new(modified_params)
-    
 
-      
-      
-    
+    @account = Account.new(modified_params)
+
+
+
+
+
     if @account.save
       flash[:notice] = "Successfully created #{@account.name}"
-      
+
       load_all_accounts
       render :create
     else
       flash[:alert] = "Oops, your Account could not be created. #{@hawk_alarm}"
-      @action = 'new'
+      @action = "new"
       render :create, status: :unprocessable_entity
     end
   end
@@ -67,14 +66,14 @@ class Admin::AccountsController < Admin::BaseController
   end
 
   def edit
-    @action = 'edit'
+    @action = "edit"
     render :edit
   end
 
   def update
-    flash[:notice] = +''
+    flash[:notice] = +""
     flash[:alert] = nil
-    
+
 
     modified_params = modify_date_inputs_on_params(update_account_params.dup, nil, {})
 
@@ -91,21 +90,21 @@ class Admin::AccountsController < Admin::BaseController
     modified_params[:ai_model_preferences] = prefs
 
     @account.assign_attributes(modified_params)
-      
-      
+
+
     if @account.save
-      
-      
-      
+
+
+
       flash[:notice] << "Saved #{@account.name}"
       flash[:alert] = @hawk_alarm if @hawk_alarm
-      
+
       redirect_to admin_accounts_path
-     
+
     else
       flash[:alert] = "Account could not be saved. #{@hawk_alarm}"
-      
-      @action = 'edit'
+
+      @action = "edit"
       render :edit, status: :unprocessable_entity
     end
   end
@@ -126,7 +125,7 @@ class Admin::AccountsController < Admin::BaseController
     email = params[:email].to_s.strip.downcase
     company_name = params[:company_name].to_s.strip
 
-    if [first_name, last_name, email, company_name].any?(&:blank?)
+    if [ first_name, last_name, email, company_name ].any?(&:blank?)
       flash[:alert] = "All fields are required."
       redirect_to quick_onboard_admin_accounts_path
       return
@@ -191,14 +190,13 @@ class Admin::AccountsController < Admin::BaseController
   end
 
   def destroy
-    
     begin
       @account.destroy!
-      flash[:notice] = 'Account successfully deleted'
+      flash[:notice] = "Account successfully deleted"
     rescue ActiveRecord::RecordNotDestroyed => e
-      flash[:alert] = 'Account could not be deleted'
+      flash[:alert] = "Account could not be deleted"
     end
-    
+
     load_all_accounts
   end
 
@@ -215,16 +213,14 @@ class Admin::AccountsController < Admin::BaseController
 
     params.require(:account).permit(fields)
   end
-  
 
-  
+
+
   def load_ai_services
     @ai_services = AiService.includes(:ai_models).order(:name)
   end
 
   def namespace
-    'admin/'
+    "admin/"
   end
 end
-
-

@@ -100,7 +100,7 @@ RSpec.describe User, type: :model do
     it ".reverse_sort orders by created_at desc" do
       old_user = create(:user, created_at: 2.days.ago)
       new_user = create(:user, created_at: 1.hour.ago)
-      expect(described_class.reverse_sort.to_a).to eq([new_user, old_user])
+      expect(described_class.reverse_sort.to_a).to eq([ new_user, old_user ])
     end
   end
 end

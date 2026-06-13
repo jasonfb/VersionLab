@@ -76,7 +76,7 @@ RSpec.describe Invoice, type: :model do
     it ".recent orders by created_at desc" do
       old = create(:invoice, created_at: 2.days.ago)
       recent = create(:invoice, created_at: 1.hour.ago)
-      expect(described_class.recent.to_a).to eq([recent, old])
+      expect(described_class.recent.to_a).to eq([ recent, old ])
     end
   end
 

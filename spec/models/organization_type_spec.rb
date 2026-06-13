@@ -33,7 +33,7 @@ RSpec.describe OrganizationType, type: :model do
       first = create(:organization_type, position: 1)
       third = create(:organization_type, position: 3)
 
-      expect(described_class.all.to_a).to eq([first, second, third])
+      expect(described_class.all.to_a).to eq([ first, second, third ])
     end
   end
 end

@@ -2,7 +2,7 @@
 
 class CreateSubscriptions < ActiveRecord::Migration[8.1]
   def change
-    create_enum :subscription_billing_interval, ["monthly", "annual"]
+    create_enum :subscription_billing_interval, [ "monthly", "annual" ]
 
     create_table :subscriptions, id: :uuid do |t|
       t.uuid :account_id, null: false

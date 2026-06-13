@@ -113,7 +113,7 @@ RSpec.describe EmailTemplate, type: :model do
 
       it "substitutes with default value from template_variables when no override" do
         variable = instance_double(TemplateVariable, id: var_id, default_value: "Default")
-        allow(template).to receive(:template_variables).and_return([variable])
+        allow(template).to receive(:template_variables).and_return([ variable ])
 
         result = template.render_html
         expect(result).to include("Hello Default")

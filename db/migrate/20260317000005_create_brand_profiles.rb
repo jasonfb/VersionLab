@@ -27,7 +27,7 @@ class CreateBrandProfiles < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :brand_profile_primary_audiences, [:brand_profile_id, :primary_audience_id], unique: true, name: "idx_bp_primary_audiences"
+    add_index :brand_profile_primary_audiences, [ :brand_profile_id, :primary_audience_id ], unique: true, name: "idx_bp_primary_audiences"
     add_foreign_key :brand_profile_primary_audiences, :brand_profiles
     add_foreign_key :brand_profile_primary_audiences, :primary_audiences
 
@@ -37,7 +37,7 @@ class CreateBrandProfiles < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :brand_profile_tone_rules, [:brand_profile_id, :tone_rule_id], unique: true, name: "idx_bp_tone_rules"
+    add_index :brand_profile_tone_rules, [ :brand_profile_id, :tone_rule_id ], unique: true, name: "idx_bp_tone_rules"
     add_foreign_key :brand_profile_tone_rules, :brand_profiles
     add_foreign_key :brand_profile_tone_rules, :tone_rules
 
@@ -47,7 +47,7 @@ class CreateBrandProfiles < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :brand_profile_geographies, [:brand_profile_id, :geography_id], unique: true, name: "idx_bp_geographies"
+    add_index :brand_profile_geographies, [ :brand_profile_id, :geography_id ], unique: true, name: "idx_bp_geographies"
     add_foreign_key :brand_profile_geographies, :brand_profiles
     add_foreign_key :brand_profile_geographies, :geographies
   end

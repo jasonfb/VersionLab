@@ -12,7 +12,7 @@ class StripeCheckoutService
     price_cents = billing_interval == "annual" ? tier.annual_price_cents : tier.monthly_price_cents
 
     credit = calculate_credit
-    charge_amount = [price_cents - credit, 50].max # Stripe minimum is 50 cents
+    charge_amount = [ price_cents - credit, 50 ].max # Stripe minimum is 50 cents
 
     intent = Stripe::PaymentIntent.create(
       amount: charge_amount,
@@ -117,7 +117,7 @@ class StripeCheckoutService
   def calculate_prorated_refund(subscription)
     total_days = subscription.monthly? ? 30 : 365
     remaining_days = (subscription.paid_through_date - Date.current).to_i
-    remaining_days = [remaining_days, 0].max
+    remaining_days = [ remaining_days, 0 ].max
 
     price_cents = subscription.current_period_price_cents
     (price_cents * remaining_days.to_f / total_days).round

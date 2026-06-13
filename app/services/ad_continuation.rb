@@ -83,7 +83,7 @@ module AdContinuation
     head = parts.find { |p| p["continuation_of"].blank? || !by_id.key?(p["continuation_of"]) }
     return parts unless head
 
-    ordered = [head]
+    ordered = [ head ]
     children_by_parent = parts.group_by { |p| p["continuation_of"] }
     current = head
     while (next_parts = children_by_parent[current["id"]])

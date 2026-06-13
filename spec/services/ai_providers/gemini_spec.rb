@@ -5,7 +5,7 @@ RSpec.describe AiProviders::Gemini do
 
   let(:success_body) do
     {
-      "candidates" => [{ "content" => { "parts" => [{ "text" => '{"result": "ok"}' }] } }],
+      "candidates" => [ { "content" => { "parts" => [ { "text" => '{"result": "ok"}' } ] } } ],
       "usageMetadata" => { "promptTokenCount" => 80, "candidatesTokenCount" => 40, "totalTokenCount" => 120 }
     }.to_json
   end
@@ -55,7 +55,7 @@ RSpec.describe AiProviders::Gemini do
       allow(provider).to receive(:http_post).and_return(rate_response)
       allow(provider).to receive(:sleep)
 
-      expect { provider.complete(model: "m", messages: [{ role: "user", content: "hi" }]) }
+      expect { provider.complete(model: "m", messages: [ { role: "user", content: "hi" } ]) }
         .to raise_error(AiProviders::Base::Error, /rate limit/)
     end
 
@@ -63,7 +63,7 @@ RSpec.describe AiProviders::Gemini do
       error_response = instance_double(Net::HTTPResponse, code: "400", body: "Bad Request")
       allow(provider).to receive(:http_post).and_return(error_response)
 
-      expect { provider.complete(model: "m", messages: [{ role: "user", content: "hi" }]) }
+      expect { provider.complete(model: "m", messages: [ { role: "user", content: "hi" } ]) }
         .to raise_error(AiProviders::Base::Error, /Gemini API error/)
     end
   end

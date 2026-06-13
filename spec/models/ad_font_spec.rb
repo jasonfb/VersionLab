@@ -71,7 +71,7 @@ RSpec.describe AdFont do
       # Measure the full text first to find a generous max_width
       full_width = ad_font.measure_text_width("Short text", 24)
       lines = ad_font.word_wrap("Short text", 24, full_width + 10)
-      expect(lines).to eq(["Short text"])
+      expect(lines).to eq([ "Short text" ])
     end
 
     it "wraps text into multiple lines when it exceeds max_width" do
@@ -84,7 +84,7 @@ RSpec.describe AdFont do
 
     it "returns single-element array for single-word text" do
       lines = ad_font.word_wrap("Hello", 24, 50)
-      expect(lines).to eq(["Hello"])
+      expect(lines).to eq([ "Hello" ])
     end
 
     it "preserves all words across wrapped lines" do

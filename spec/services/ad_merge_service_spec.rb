@@ -50,7 +50,7 @@ RSpec.describe AdMergeService do
     end
 
     it "raises when no text layers exist" do
-      ad.update!(parsed_layers: [{ "id" => "bg", "type" => "image" }])
+      ad.update!(parsed_layers: [ { "id" => "bg", "type" => "image" } ])
       expect { described_class.new(ad).call }.to raise_error(AdMergeService::Error, /No text layers/)
     end
 

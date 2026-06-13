@@ -21,7 +21,7 @@ HeliosTracker.configure do |config|
   # simply remove any lines you don't need.
   config.user_fields = {
     email:                      :email,
-    created_at:                 :created_at,
+    created_at:                 :created_at
     # source_ip:                :source_ip,
     # first_unconfirmed_visit_id: :first_unconfirmed_visit_id,
     # login_attempt_count:      :login_attempt_count,
@@ -46,9 +46,7 @@ HeliosTracker.configure do |config|
   # Map API response field names to your visit model's attributes or lambdas.
   # :hmid is required by the Helios API.
   config.visit_fields = {
-    hmid: :hmid,
+    hmid: :hmid
     # visited_download_page: ->(visit) { visit.visited_download_page? },
   }
-
-
 end

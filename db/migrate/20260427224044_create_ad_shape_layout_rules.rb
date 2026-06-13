@@ -19,6 +19,6 @@ class CreateAdShapeLayoutRules < ActiveRecord::Migration[8.1]
 
     add_foreign_key :ad_shape_layout_rules, :ad_shapes
     add_index :ad_shape_layout_rules, :ad_shape_id
-    add_index :ad_shape_layout_rules, [:ad_shape_id, :role], unique: true
+    add_index :ad_shape_layout_rules, [ :ad_shape_id, :role ], unique: true
   end
 end

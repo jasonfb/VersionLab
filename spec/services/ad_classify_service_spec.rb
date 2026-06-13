@@ -213,5 +213,4 @@ RSpec.describe AdClassifyService do
       expect(img["confidence"]).to eq(0.8)
     end
   end
-
 end

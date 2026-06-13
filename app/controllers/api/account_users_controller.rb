@@ -2,7 +2,7 @@
 
 class Api::AccountUsersController < Api::BaseController
   before_action :require_owner_or_admin
-  before_action :set_account_user, only: [:update, :destroy]
+  before_action :set_account_user, only: [ :update, :destroy ]
 
   def index
     account_users = @current_account.account_users.includes(:user).order(:created_at)
@@ -10,7 +10,7 @@ class Api::AccountUsersController < Api::BaseController
     # Preload all client assignments for this account's users in one query
     client_user_map = @current_account.clients.visible
       .joins(:client_users)
-      .pluck('clients.id', 'clients.name', 'client_users.user_id')
+      .pluck("clients.id", "clients.name", "client_users.user_id")
       .each_with_object(Hash.new { |h, k| h[k] = [] }) do |(cid, cname, uid), map|
         map[uid] << { id: cid, name: cname }
       end
@@ -68,7 +68,7 @@ class Api::AccountUsersController < Api::BaseController
       end
     end
 
-    allowed = [:is_admin]
+    allowed = [ :is_admin ]
     allowed << :is_billing_admin if requester_au.is_owner?
     allowed << :is_owner if requester_au.is_owner?
 

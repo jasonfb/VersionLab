@@ -2,7 +2,7 @@
 
 Rails.application.routes.draw do
   get "sitemap.xml", to: "sitemap#show"
-  mount HeliosTracker::Engine, at: '/'
+  mount HeliosTracker::Engine, at: "/"
   mount Helios::Press::Admin::Engine, at: "/admin/press"
   mount Helios::Press::Api::Engine, at: "/api/press"
   mount Helios::Videos::Engine, at: "/videos"
@@ -35,7 +35,7 @@ Rails.application.routes.draw do
     resources :ai_usage_summaries, only: [ :index ]
     resources :ai_logs, only: [ :index ]
     get "lookups", to: "lookups#index"
-    resources :ad_shapes, only: [:index]
+    resources :ad_shapes, only: [ :index ]
     resources :clients, only: [ :index, :create, :update ] do
       resources :campaigns, only: [ :index, :show, :create, :update, :destroy ] do
         member do

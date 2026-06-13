@@ -7,7 +7,7 @@ abort("The Rails environment is running in production mode!") if Rails.env.produ
 # Uncomment the line below in case you have `--require rails_helper` in the `.rspec` file
 # that will avoid rails generators crashing because migrations haven't been run yet
 # return unless Rails.env.test?
-require 'rspec/rails' 
+require 'rspec/rails'
 require 'support/capybara_login.rb'
 require 'support/react_helpers.rb'
 require 'support/api_helpers.rb'
@@ -57,7 +57,7 @@ VCR.configure do |config|
   config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
   config.hook_into :webmock
   config.ignore_request do |request|
-    ["127.0.0.1", "localhost", "chromedriver.storage.googleapis.com" ,  "googlechromelabs.github.io", "edgedl.me.gvt1.com"].include? URI(request.uri).host
+    [ "127.0.0.1", "localhost", "chromedriver.storage.googleapis.com",  "googlechromelabs.github.io", "edgedl.me.gvt1.com" ].include? URI(request.uri).host
   end
 end
 
@@ -104,7 +104,7 @@ Capybara.register_driver :selenium do |app|
   options = Selenium::WebDriver::Chrome::Options.new(
     # It's the headlese arg that make Chrome headless
     # + you also need the disable-gpu arg due to a bug
-    args: ['headless', 'disable-gpu window-size=1366,1200'],
+    args: [ 'headless', 'disable-gpu window-size=1366,1200' ],
     )
 
   Capybara::Selenium::Driver.new(

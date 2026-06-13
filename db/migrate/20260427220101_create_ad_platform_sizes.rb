@@ -14,6 +14,6 @@ class CreateAdPlatformSizes < ActiveRecord::Migration[8.1]
 
     add_foreign_key :ad_platform_sizes, :ad_platforms
     add_index :ad_platform_sizes, :ad_platform_id
-    add_index :ad_platform_sizes, [:ad_platform_id, :name], unique: true
+    add_index :ad_platform_sizes, [ :ad_platform_id, :name ], unique: true
   end
 end

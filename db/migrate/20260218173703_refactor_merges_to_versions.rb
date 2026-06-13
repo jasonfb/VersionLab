@@ -28,9 +28,9 @@ class RefactorMergesToVersions < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :merge_versions, [:merge_id, :audience_id, :version_number],
+    add_index :merge_versions, [ :merge_id, :audience_id, :version_number ],
               unique: true, name: "idx_merge_versions_unique"
-    add_index :merge_versions, [:merge_id, :audience_id],
+    add_index :merge_versions, [ :merge_id, :audience_id ],
               name: "idx_merge_versions_on_merge_and_audience"
 
     # Create merge_version_variables
@@ -41,7 +41,7 @@ class RefactorMergesToVersions < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :merge_version_variables, [:merge_version_id, :template_variable_id],
+    add_index :merge_version_variables, [ :merge_version_id, :template_variable_id ],
               unique: true, name: "idx_merge_version_variables_unique"
   end
 

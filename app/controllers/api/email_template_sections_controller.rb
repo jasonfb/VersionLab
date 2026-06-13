@@ -15,7 +15,7 @@ class Api::EmailTemplateSectionsController < Api::BaseController
     name = params.dig(:section, :name).presence
     if name.nil? && parent_id.present?
       parent = @email_template.sections.find(parent_id)
-      letter = ('A'..'Z').to_a[next_position - 1] || next_position.to_s
+      letter = ("A".."Z").to_a[next_position - 1] || next_position.to_s
       name = "#{parent.position}#{letter}"
     end
 
@@ -61,7 +61,7 @@ class Api::EmailTemplateSectionsController < Api::BaseController
       position: section.position,
       parent_id: section.parent_id,
       element_selector: section.element_selector,
-      name: section.name,
+      name: section.name
     }
   end
 

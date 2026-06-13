@@ -20,7 +20,9 @@
       "Bash(cat)",
       "Bash(chmod +x /tmp/compare_models.sh)",
       "Bash(/tmp/compare_models.sh)",
-      "Bash(bin/rspec:*)"
+      "Bash(bin/rspec:*)",
+      "Bash(bin/rubocop --format simple)",
+      "Bash(bin/rubocop -A)"
     ]
   }
 }

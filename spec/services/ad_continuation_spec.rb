@@ -8,7 +8,7 @@ RSpec.describe AdContinuation do
     end
 
     it "returns single text layers unchanged" do
-      layers = [{ "id" => "1", "type" => "text", "content" => "Hello", "x" => 0, "y" => 0, "width" => 100, "height" => 20 }]
+      layers = [ { "id" => "1", "type" => "text", "content" => "Hello", "x" => 0, "y" => 0, "width" => 100, "height" => 20 } ]
       result = described_class.collapse(layers)
       expect(result.length).to eq(1)
       expect(result.first["content"]).to eq("Hello")

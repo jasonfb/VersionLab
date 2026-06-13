@@ -11,6 +11,6 @@ class CreateAiKeys < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :ai_keys, [:account_id, :ai_service_id], unique: true
+    add_index :ai_keys, [ :account_id, :ai_service_id ], unique: true
   end
 end

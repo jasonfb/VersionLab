@@ -2,8 +2,8 @@
 
 class Api::EmailsController < Api::BaseController
   before_action :set_client
-  before_action :set_email, only: [:show, :update, :destroy, :run, :results, :preview, :reject, :export, :summarize]
-  before_action :require_active_subscription!, only: [:run, :reject]
+  before_action :set_email, only: [ :show, :update, :destroy, :run, :results, :preview, :reject, :export, :summarize ]
+  before_action :require_active_subscription!, only: [ :run, :reject ]
 
   def index
     emails = Email.joins(:email_template)

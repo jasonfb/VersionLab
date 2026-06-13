@@ -56,7 +56,7 @@ module AdLayout
         x: (anchor[:x] * canvas_width).round,
         y: (anchor[:y] * canvas_height).round,
         w: (anchor[:w] * canvas_width).round,
-        h: (anchor[:h] * canvas_height).round,
+        h: (anchor[:h] * canvas_height).round
       }
     end
   end

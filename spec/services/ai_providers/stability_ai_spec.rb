@@ -69,7 +69,7 @@ RSpec.describe AiProviders::StabilityAi do
     end
 
     it "raises when all images filtered" do
-      filtered_body = { "artifacts" => [{ "base64" => "x", "finishReason" => "CONTENT_FILTERED" }] }.to_json
+      filtered_body = { "artifacts" => [ { "base64" => "x", "finishReason" => "CONTENT_FILTERED" } ] }.to_json
       filtered_response = instance_double(Net::HTTPResponse, code: "200", body: filtered_body)
       allow(provider).to receive(:http_post).and_return(filtered_response)
 

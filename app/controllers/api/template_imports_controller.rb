@@ -67,6 +67,6 @@ class Api::TemplateImportsController < Api::BaseController
   end
 
   def render_error(message)
-    render json: { errors: [message] }, status: :unprocessable_entity
+    render json: { errors: [ message ] }, status: :unprocessable_entity
   end
 end

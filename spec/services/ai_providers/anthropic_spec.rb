@@ -5,7 +5,7 @@ RSpec.describe AiProviders::Anthropic do
 
   let(:success_body) do
     {
-      "content" => [{ "text" => '{"headline": "Hello"}' }],
+      "content" => [ { "text" => '{"headline": "Hello"}' } ],
       "usage" => { "input_tokens" => 100, "output_tokens" => 50 }
     }.to_json
   end
@@ -54,7 +54,7 @@ RSpec.describe AiProviders::Anthropic do
       allow(provider).to receive(:http_post).and_return(rate_response)
       allow(provider).to receive(:sleep) # prevent actual sleep
 
-      expect { provider.complete(model: "m", messages: [{ role: "user", content: "hi" }]) }
+      expect { provider.complete(model: "m", messages: [ { role: "user", content: "hi" } ]) }
         .to raise_error(AiProviders::Base::Error, /rate limit/)
     end
 
@@ -62,16 +62,16 @@ RSpec.describe AiProviders::Anthropic do
       error_response = instance_double(Net::HTTPResponse, code: "500", body: "Internal Server Error")
       allow(provider).to receive(:http_post).and_return(error_response)
 
-      expect { provider.complete(model: "m", messages: [{ role: "user", content: "hi" }]) }
+      expect { provider.complete(model: "m", messages: [ { role: "user", content: "hi" } ]) }
         .to raise_error(AiProviders::Base::Error, /Anthropic API error 500/)
     end
 
     it "raises on empty response" do
-      empty_body = { "content" => [{ "text" => "" }], "usage" => {} }.to_json
+      empty_body = { "content" => [ { "text" => "" } ], "usage" => {} }.to_json
       empty_response = instance_double(Net::HTTPResponse, code: "200", body: empty_body)
       allow(provider).to receive(:http_post).and_return(empty_response)
 
-      expect { provider.complete(model: "m", messages: [{ role: "user", content: "hi" }]) }
+      expect { provider.complete(model: "m", messages: [ { role: "user", content: "hi" } ]) }
         .to raise_error(AiProviders::Base::Error, /Empty response/)
     end
   end

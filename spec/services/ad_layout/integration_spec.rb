@@ -118,12 +118,12 @@ RSpec.describe "Ad Layout Engine — end-to-end integration", type: :model do
 
       it "generates valid SVG for all 6 shape types" do
         targets = {
-          square:      [1080, 1080],
-          landscape:   [1920, 1080],
-          leaderboard: [728, 90],
-          portrait:    [1080, 1350],
-          story:       [1080, 1920],
-          skyscraper:  [160, 600],
+          square:      [ 1080, 1080 ],
+          landscape:   [ 1920, 1080 ],
+          leaderboard: [ 728, 90 ],
+          portrait:    [ 1080, 1350 ],
+          story:       [ 1080, 1920 ],
+          skyscraper:  [ 160, 600 ]
         }
 
         engine = AdLayout::LayoutEngine.new(ad)

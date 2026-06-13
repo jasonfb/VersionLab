@@ -89,7 +89,7 @@ RSpec.describe AiMergeService do
       other_audience = create(:audience, client: client, name: "Old Donors")
       create(:email_audience, email: email, audience: other_audience)
 
-      described_class.new(email, audience_ids: [audience.id]).call
+      described_class.new(email, audience_ids: [ audience.id ]).call
       expect(provider).to have_received(:complete).once
     end
 

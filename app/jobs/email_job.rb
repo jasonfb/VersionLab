@@ -6,7 +6,7 @@ class EmailJob < ApplicationJob
   def perform(email_id, audience_id: nil, rejection_comment: nil)
     email = Email.find(email_id)
 
-    audience_ids = audience_id ? [audience_id] : nil
+    audience_ids = audience_id ? [ audience_id ] : nil
     rejection_context = (audience_id && rejection_comment) ? { audience_id => rejection_comment } : {}
 
     AiMergeService.new(email, audience_ids: audience_ids, rejection_context: rejection_context).call

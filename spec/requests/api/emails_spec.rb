@@ -36,7 +36,7 @@ RSpec.describe "Api::Emails", type: :request do
              email_template_id: template.id,
              ai_service_id: ai_service.id,
              ai_model_id: ai_model.id,
-             audience_ids: [audience.id]
+             audience_ids: [ audience.id ]
            } }
       expect(response).to have_http_status(:created)
       expect(response.parsed_body["state"]).to eq("setup")

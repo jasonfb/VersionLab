@@ -387,7 +387,7 @@ class AdParseService
     cy = match[4].to_f
 
     rx_estimate = Math.sqrt((cx - lx)**2 + (cy - ly)**2)
-    rx_estimate.clamp(0, [bbox[:w], bbox[:h]].min / 2.0)
+    rx_estimate.clamp(0, [ bbox[:w], bbox[:h] ].min / 2.0)
   end
 
   # Try to determine the fill color of a clip-path shape by finding its
@@ -441,7 +441,7 @@ class AdParseService
 
       pixel = image.getpoint(cx, cy)
       r, g, b = pixel[0..2].map(&:to_i)
-      "#%02x%02x%02x" % [r, g, b]
+      "#%02x%02x%02x" % [ r, g, b ]
     rescue => e
       Rails.logger.debug("AdParseService: could not sample clip fill: #{e.message}")
       nil

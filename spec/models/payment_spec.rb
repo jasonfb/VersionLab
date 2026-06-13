@@ -46,7 +46,7 @@ RSpec.describe Payment do
     let!(:new_payment) { create(:payment, created_at: 1.hour.ago) }
 
     it ".recent orders by created_at desc" do
-      expect(described_class.recent).to eq([new_payment, old_payment])
+      expect(described_class.recent).to eq([ new_payment, old_payment ])
     end
   end
 

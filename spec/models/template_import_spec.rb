@@ -55,7 +55,7 @@ RSpec.describe TemplateImport, type: :model do
       before { template_import.warnings = '["missing font","large image"]' }
 
       it "returns the parsed array" do
-        expect(template_import.warnings_list).to eq(["missing font", "large image"])
+        expect(template_import.warnings_list).to eq([ "missing font", "large image" ])
       end
     end
 

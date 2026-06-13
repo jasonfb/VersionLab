@@ -211,7 +211,7 @@ RSpec.describe AdParseService, "SVG parsing" do
       # Test with mock run objects
       run1 = double("run", text: "Hello", origin: double(x: 0, y: 100), font_size: 14)
       run2 = double("run", text: "World", origin: double(x: 50, y: 100), font_size: 14)
-      result = service.send(:join_runs_into_text, [run1, run2])
+      result = service.send(:join_runs_into_text, [ run1, run2 ])
       expect(result).to include("Hello")
       expect(result).to include("World")
     end

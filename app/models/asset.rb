@@ -34,7 +34,7 @@ class Asset < ApplicationRecord
     { key: "banner_2_1",      value: 2.0 / 1 },
     { key: "widescreen_16_9", value: 16.0 / 9 },
     { key: "square_1_1",      value: 1.0 / 1 },
-    { key: "portrait_4_5",    value: 4.0 / 5 },
+    { key: "portrait_4_5",    value: 4.0 / 5 }
   ].freeze
 
   def self.snap_to_standard_ratio(width, height)

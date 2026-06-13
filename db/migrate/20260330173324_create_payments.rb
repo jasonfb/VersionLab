@@ -2,7 +2,7 @@
 
 class CreatePayments < ActiveRecord::Migration[8.1]
   def change
-    create_enum :payment_status, ["succeeded", "failed", "pending", "refunded"]
+    create_enum :payment_status, [ "succeeded", "failed", "pending", "refunded" ]
 
     create_table :payments, id: :uuid do |t|
       t.uuid :account_id, null: false

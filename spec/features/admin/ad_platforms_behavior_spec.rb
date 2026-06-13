@@ -5,7 +5,7 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
   include ActionView::RecordIdentifier
   include Rails.application.routes.url_helpers
 
-    # HOTGLUE-SAVESTART
+  # HOTGLUE-SAVESTART
   # HOTGLUE-END
 
   let(:admin_user) do
@@ -20,14 +20,14 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
 
 
   let!(:ad_platform1) {
-    ad_platform = create(:ad_platform , 
-                          name: FFaker::Movie.title, 
-                          position: rand(1..100) )
+    ad_platform = create(:ad_platform,
+                          name: FFaker::Movie.title,
+                          position: rand(1..100))
 
     ad_platform.save!
     ad_platform
   }
-  
+
   describe "index" do
     it "should show me the list" do
       visit admin_ad_platforms_path
@@ -41,9 +41,9 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
       visit admin_ad_platforms_path
       click_link "New Ad Platform"
       expect(page).to have_selector(:xpath, './/h3[contains(., "New Ad Platform")]')
-      new_name = FFaker::Movie.title 
+      new_name = FFaker::Movie.title
       find("[name='ad_platform[name]']").fill_in(with: new_name)
-      new_position = rand(1..10) 
+      new_position = rand(1..10)
       find("[name='ad_platform[position]']").fill_in(with: new_position)
       click_button "Save"
 
@@ -59,9 +59,9 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
       find("a.edit-ad_platform-button[href='/admin/ad_platforms/#{ad_platform1.id}/edit']").click
 
       expect(page).to have_content("Editing #{ad_platform1.name.squish || "(no name)"}")
-      new_name = FFaker::Movie.title 
+      new_name = FFaker::Movie.title
       find("[name='ad_platform[name]']").fill_in(with: new_name)
-      new_position = rand(1..10) 
+      new_position = rand(1..10)
       find("[name='ad_platform[position]']").fill_in(with: new_position)
       click_button "Save"
       within("turbo-frame#admin__#{dom_id(ad_platform1)} ") do
@@ -69,7 +69,7 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
        expect(page).to have_content(new_position)
       end
     end
-  end 
+  end
 
   describe "destroy" do
     it "should destroy" do
@@ -82,4 +82,3 @@ describe 'interaction for Admin::AdPlatformsController', type: :feature, js: tru
     end
   end
 end
-

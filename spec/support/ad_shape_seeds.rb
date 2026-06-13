@@ -8,7 +8,7 @@ RSpec.shared_context "seeded ad shapes" do
       { name: "square",      min_ratio: 0.85, max_ratio: 1.15 },
       { name: "portrait",    min_ratio: 0.65, max_ratio: 0.85 },
       { name: "story",       min_ratio: 0.45, max_ratio: 0.65 },
-      { name: "skyscraper",  min_ratio: 0.0,  max_ratio: 0.45 },
+      { name: "skyscraper",  min_ratio: 0.0,  max_ratio: 0.45 }
     ]
 
     layout_rules = {
@@ -18,7 +18,7 @@ RSpec.shared_context "seeded ad shapes" do
         body:       { anchor: { x: 0.08, y: 0.60, w: 0.84, h: 0.18 }, font_scale: 0.85, align: "center" },
         cta:        { anchor: { x: 0.25, y: 0.80, w: 0.50, h: 0.12 }, font_scale: 0.9,  align: "center" },
         logo:       { anchor: { x: 0.35, y: 0.93, w: 0.30, h: 0.05 }, font_scale: 0.8,  align: "center" },
-        decoration: { anchor: { x: 0.0,  y: 0.0,  w: 1.0,  h: 1.0  }, font_scale: 1.0,  align: "center" },
+        decoration: { anchor: { x: 0.0,  y: 0.0,  w: 1.0,  h: 1.0  }, font_scale: 1.0,  align: "center" }
       },
       landscape: {
         headline:   { anchor: { x: 0.03, y: 0.22, w: 0.55, h: 0.30 }, font_scale: 0.95, align: "left" },
@@ -26,7 +26,7 @@ RSpec.shared_context "seeded ad shapes" do
         body:       { anchor: { x: 0.03, y: 0.74, w: 0.55, h: 0.18 }, font_scale: 0.8,  align: "left" },
         cta:        { anchor: { x: 0.62, y: 0.60, w: 0.34, h: 0.15 }, font_scale: 0.9,  align: "center" },
         logo:       { anchor: { x: 0.62, y: 0.08, w: 0.34, h: 0.15 }, font_scale: 0.8,  align: "right" },
-        decoration: { anchor: { x: 0.0,  y: 0.0,  w: 1.0,  h: 1.0  }, font_scale: 1.0,  align: "center" },
+        decoration: { anchor: { x: 0.0,  y: 0.0,  w: 1.0,  h: 1.0  }, font_scale: 1.0,  align: "center" }
       },
       leaderboard: {
         headline:   { anchor: { x: 0.02, y: 0.10, w: 0.40, h: 0.80 }, font_scale: 0.75, align: "left" },
@@ -34,7 +34,7 @@ RSpec.shared_context "seeded ad shapes" do
         body:       { drop: true },
         cta:        { anchor: { x: 0.62, y: 0.15, w: 0.25, h: 0.70 }, font_scale: 0.7,  align: "center" },
         logo:       { anchor: { x: 0.89, y: 0.15, w: 0.10, h: 0.70 }, font_scale: 0.6,  align: "center" },
-        decoration: { drop: true },
+        decoration: { drop: true }
       },
       portrait: {
         headline:   { anchor: { x: 0.05, y: 0.14, w: 0.90, h: 0.20 }, font_scale: 1.0,  align: "center" },
@@ -42,7 +42,7 @@ RSpec.shared_context "seeded ad shapes" do
         body:       { anchor: { x: 0.08, y: 0.51, w: 0.84, h: 0.20 }, font_scale: 0.85, align: "center" },
         cta:        { anchor: { x: 0.20, y: 0.74, w: 0.60, h: 0.10 }, font_scale: 0.9,  align: "center" },
         logo:       { anchor: { x: 0.30, y: 0.86, w: 0.40, h: 0.08 }, font_scale: 0.8,  align: "center" },
-        decoration: { anchor: { x: 0.0,  y: 0.0,  w: 1.0,  h: 1.0  }, font_scale: 1.0,  align: "center" },
+        decoration: { anchor: { x: 0.0,  y: 0.0,  w: 1.0,  h: 1.0  }, font_scale: 1.0,  align: "center" }
       },
       story: {
         headline:   { anchor: { x: 0.05, y: 0.16, w: 0.90, h: 0.20 }, font_scale: 1.1,  align: "center" },
@@ -50,7 +50,7 @@ RSpec.shared_context "seeded ad shapes" do
         body:       { anchor: { x: 0.08, y: 0.52, w: 0.84, h: 0.18 }, font_scale: 0.85, align: "center" },
         cta:        { anchor: { x: 0.15, y: 0.75, w: 0.70, h: 0.10 }, font_scale: 1.0,  align: "center" },
         logo:       { anchor: { x: 0.30, y: 0.90, w: 0.40, h: 0.06 }, font_scale: 0.8,  align: "center" },
-        decoration: { anchor: { x: 0.0,  y: 0.0,  w: 1.0,  h: 1.0  }, font_scale: 1.0,  align: "center" },
+        decoration: { anchor: { x: 0.0,  y: 0.0,  w: 1.0,  h: 1.0  }, font_scale: 1.0,  align: "center" }
       },
       skyscraper: {
         headline:   { anchor: { x: 0.05, y: 0.13, w: 0.90, h: 0.13 }, font_scale: 0.7,  align: "center" },
@@ -58,8 +58,8 @@ RSpec.shared_context "seeded ad shapes" do
         body:       { drop: true },
         cta:        { anchor: { x: 0.08, y: 0.70, w: 0.84, h: 0.10 }, font_scale: 0.65, align: "center" },
         logo:       { anchor: { x: 0.15, y: 0.85, w: 0.70, h: 0.08 }, font_scale: 0.6,  align: "center" },
-        decoration: { drop: true },
-      },
+        decoration: { drop: true }
+      }
     }
 
     priority = %w[headline cta logo subhead body decoration]

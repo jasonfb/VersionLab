@@ -231,7 +231,7 @@ class AiMergeService
       "Creative and Imagery Rules"                           => audience.creative_and_imagery_rules,
       "Risk Scoring Model (1-100)"                           => audience.risk_scoring_model,
       "Prohibited Patterns — Language and Framing"          => audience.prohibited_patterns,
-      "Success Indicators and Macro-Trends"                  => audience.success_indicators_and_macro_trends,
+      "Success Indicators and Macro-Trends"                  => audience.success_indicators_and_macro_trends
     }
 
     present = fields.select { |_, v| v.present? }

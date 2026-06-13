@@ -5,7 +5,7 @@ describe 'interaction for Admin::AdShapesController', type: :feature, js: true d
   include ActionView::RecordIdentifier
   include Rails.application.routes.url_helpers
 
-    # HOTGLUE-SAVESTART
+  # HOTGLUE-SAVESTART
   # HOTGLUE-END
 
   let(:admin_user) do
@@ -22,16 +22,16 @@ describe 'interaction for Admin::AdShapesController', type: :feature, js: true d
 
 
   let!(:ad_shape1) {
-    ad_shape = create(:ad_shape , 
-                          name: FFaker::Movie.title, 
-                          min_ratio: rand(1..10000), 
-                          max_ratio: rand(1..10000), 
-                          position: rand(1..100) )
+    ad_shape = create(:ad_shape,
+                          name: FFaker::Movie.title,
+                          min_ratio: rand(1..10000),
+                          max_ratio: rand(1..10000),
+                          position: rand(1..100))
 
     ad_shape.save!
     ad_shape
   }
-  
+
   describe "index" do
     it "should show me the list" do
       visit admin_ad_shapes_path
@@ -47,13 +47,13 @@ describe 'interaction for Admin::AdShapesController', type: :feature, js: true d
       visit admin_ad_shapes_path
       click_link "New Ad Shape"
       expect(page).to have_selector(:xpath, './/h3[contains(., "New Ad Shape")]')
-      new_name = FFaker::Movie.title 
+      new_name = FFaker::Movie.title
       find("[name='ad_shape[name]']").fill_in(with: new_name)
-      new_min_ratio = rand(1..10) 
+      new_min_ratio = rand(1..10)
       find("[name='ad_shape[min_ratio]']").fill_in(with: new_min_ratio)
-      new_max_ratio = rand(1..10) 
+      new_max_ratio = rand(1..10)
       find("[name='ad_shape[max_ratio]']").fill_in(with: new_max_ratio)
-      new_position = rand(1..10) 
+      new_position = rand(1..10)
       find("[name='ad_shape[position]']").fill_in(with: new_position)
       click_button "Save"
 
@@ -71,13 +71,13 @@ describe 'interaction for Admin::AdShapesController', type: :feature, js: true d
       find("a.edit-ad_shape-button[href='/admin/ad_shapes/#{ad_shape1.id}/edit']").click
 
       expect(page).to have_content("Editing #{ad_shape1.name.squish || "(no name)"}")
-      new_name = FFaker::Movie.title 
+      new_name = FFaker::Movie.title
       find("[name='ad_shape[name]']").fill_in(with: new_name)
-      new_min_ratio = rand(1..10) 
+      new_min_ratio = rand(1..10)
       find("[name='ad_shape[min_ratio]']").fill_in(with: new_min_ratio)
-      new_max_ratio = rand(1..10) 
+      new_max_ratio = rand(1..10)
       find("[name='ad_shape[max_ratio]']").fill_in(with: new_max_ratio)
-      new_position = rand(1..10) 
+      new_position = rand(1..10)
       find("[name='ad_shape[position]']").fill_in(with: new_position)
       click_button "Save"
       within("turbo-frame#admin__#{dom_id(ad_shape1)} ") do
@@ -87,7 +87,7 @@ describe 'interaction for Admin::AdShapesController', type: :feature, js: true d
        expect(page).to have_content(new_position)
       end
     end
-  end 
+  end
 
   describe "destroy" do
     it "should destroy" do
@@ -100,4 +100,3 @@ describe 'interaction for Admin::AdShapesController', type: :feature, js: true d
     end
   end
 end
-

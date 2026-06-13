@@ -2,7 +2,7 @@
 
 class Api::TemplateVariablesController < Api::BaseController
   before_action :set_section
-  before_action :set_variable, only: [:update, :destroy]
+  before_action :set_variable, only: [ :update, :destroy ]
 
   def index
     variables = @section.template_variables.order(:position)
@@ -80,7 +80,7 @@ class Api::TemplateVariablesController < Api::BaseController
       slot_role: v.slot_role,
       word_count: v.word_count,
       image_location: v.image_location,
-      position: v.position,
+      position: v.position
     }
   end
 end

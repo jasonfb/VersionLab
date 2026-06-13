@@ -70,7 +70,7 @@ class Api::BrandProfilesController < Api::BaseController
       bold_links: bp.bold_links,
       primary_audience_ids: bp.primary_audiences.map(&:id),
       tone_rule_ids: bp.tone_rules.map(&:id),
-      geography_ids: bp.geographies.map(&:id),
+      geography_ids: bp.geographies.map(&:id)
     }
   end
 end

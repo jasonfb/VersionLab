@@ -112,7 +112,7 @@ class Subscription < ApplicationRecord
   end
 
   def current_cycle_overage_tokens
-    [current_cycle_vl_tokens_used - effective_monthly_token_allotment, 0].max
+    [ current_cycle_vl_tokens_used - effective_monthly_token_allotment, 0 ].max
   end
 
   def current_cycle_overage_cents
@@ -123,7 +123,7 @@ class Subscription < ApplicationRecord
   # by BillingService when rolling cycles or final-billing canceled subs.
   def overage_for_window(window_start, window_end)
     used = vl_tokens_used_between(window_start, window_end)
-    overage_tokens = [used - effective_monthly_token_allotment, 0].max
+    overage_tokens = [ used - effective_monthly_token_allotment, 0 ].max
     {
       vl_tokens_used: used,
       overage_tokens: overage_tokens,

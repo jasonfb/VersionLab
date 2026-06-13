@@ -25,7 +25,7 @@ class SeedAiModelPricing < ActiveRecord::Migration[8.1]
     "sonar"               => { input: 100, output: 100 },  # $1.00/$1.00 per 1M
     "sonar-pro"           => { input: 300, output: 1500 },  # $3.00/$15.00 per 1M
     "sonar-reasoning"     => { input: 100, output: 500  },  # $1.00/$5.00 per 1M
-    "sonar-reasoning-pro" => { input: 200, output: 800  },  # $2.00/$8.00 per 1M
+    "sonar-reasoning-pro" => { input: 200, output: 800  }  # $2.00/$8.00 per 1M
   }.freeze
 
   def up

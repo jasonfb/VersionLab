@@ -194,7 +194,7 @@ RSpec.describe AdLayout::LayoutEngine do
 
       it "keeps short text on one line" do
         lines = engine.send(:simple_wrap, "Short", 50)
-        expect(lines).to eq(["Short"])
+        expect(lines).to eq([ "Short" ])
       end
     end
 

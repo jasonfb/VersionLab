@@ -11,8 +11,8 @@ class CreateMergeResults < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :merge_results, [:merge_id, :audience_id]
-    add_index :merge_results, [:merge_id, :audience_id, :template_variable_id], unique: true, name: "idx_merge_results_unique"
+    add_index :merge_results, [ :merge_id, :audience_id ]
+    add_index :merge_results, [ :merge_id, :audience_id, :template_variable_id ], unique: true, name: "idx_merge_results_unique"
     add_foreign_key :merge_results, :merges
     add_foreign_key :merge_results, :audiences
     add_foreign_key :merge_results, :template_variables

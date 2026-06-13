@@ -26,10 +26,10 @@ module VersionLab
                               helper_specs: false,
                               routing_specs: false,
                               fixture: false,
-                              fixture_replacement: 'factory_bot'
+                              fixture_replacement: "factory_bot"
     end
 
-	  config.generators do |generate|
+    config.generators do |generate|
       generate.helper false
 
       generate.assets false

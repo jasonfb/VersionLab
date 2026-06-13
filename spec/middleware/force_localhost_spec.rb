@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe ForceLocalhost do
-  let(:app) { ->(env) { [200, {}, ["OK"]] } }
+  let(:app) { ->(env) { [ 200, {}, [ "OK" ] ] } }
   let(:middleware) { described_class.new(app) }
 
   it "redirects 127.0.0.1 to localhost" do

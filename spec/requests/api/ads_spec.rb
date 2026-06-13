@@ -54,7 +54,7 @@ RSpec.describe "Api::Ads", type: :request do
     it "updates audiences" do
       ad = create(:ad, client: api_client)
       patch "/api/clients/#{api_client.id}/ads/#{ad.id}",
-            params: { ad: { audience_ids: [audience.id] } }
+            params: { ad: { audience_ids: [ audience.id ] } }
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["audience_ids"]).to include(audience.id)
     end
@@ -72,7 +72,7 @@ RSpec.describe "Api::Ads", type: :request do
     it "submits the ad for AI generation" do
       allow(AdJob).to receive(:perform_later)
       ad = create(:ad, client: api_client, ai_service: ai_service, ai_model: ai_model,
-                  parsed_layers: [{ "type" => "text", "text" => "Hello" }])
+                  parsed_layers: [ { "type" => "text", "text" => "Hello" } ])
       ad.audiences << audience
 
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/run"
@@ -83,13 +83,13 @@ RSpec.describe "Api::Ads", type: :request do
 
     it "rejects run without audiences" do
       ad = create(:ad, client: api_client, ai_service: ai_service, ai_model: ai_model,
-                  parsed_layers: [{ "type" => "text" }])
+                  parsed_layers: [ { "type" => "text" } ])
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/run"
       expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects run without AI service" do
-      ad = create(:ad, client: api_client, parsed_layers: [{ "type" => "text" }])
+      ad = create(:ad, client: api_client, parsed_layers: [ { "type" => "text" } ])
       ad.audiences << audience
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/run"
       expect(response).to have_http_status(:unprocessable_content)
@@ -97,7 +97,7 @@ RSpec.describe "Api::Ads", type: :request do
 
     it "rejects run without text layers" do
       ad = create(:ad, client: api_client, ai_service: ai_service, ai_model: ai_model,
-                  parsed_layers: [{ "type" => "image" }])
+                  parsed_layers: [ { "type" => "image" } ])
       ad.audiences << audience
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/run"
       expect(response).to have_http_status(:unprocessable_content)
@@ -107,7 +107,7 @@ RSpec.describe "Api::Ads", type: :request do
   describe "GET /api/clients/:client_id/ads/:id/classifications" do
     it "returns layer classifications" do
       ad = create(:ad, client: api_client,
-                  classified_layers: [{ "id" => "1", "role" => "headline" }],
+                  classified_layers: [ { "id" => "1", "role" => "headline" } ],
                   classifications_confirmed: true)
       get "/api/clients/#{api_client.id}/ads/#{ad.id}/classifications"
       expect(response).to have_http_status(:ok)
@@ -119,7 +119,7 @@ RSpec.describe "Api::Ads", type: :request do
     it "confirms classifications" do
       ad = create(:ad, client: api_client)
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/confirm_classifications",
-           params: { classified_layers: [{ id: "1", role: "headline", type: "text" }] }
+           params: { classified_layers: [ { id: "1", role: "headline", type: "text" } ] }
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["classifications_confirmed"]).to be true
     end
@@ -144,7 +144,7 @@ RSpec.describe "Api::Ads", type: :request do
   describe "POST /api/clients/:client_id/ads/:id/ai_classify" do
     it "calls AdAiClassifyService" do
       ad = create(:ad, client: api_client,
-                  parsed_layers: [{ "id" => "l1", "type" => "text", "content" => "Hi" }])
+                  parsed_layers: [ { "id" => "l1", "type" => "text", "content" => "Hi" } ])
       allow_any_instance_of(AdAiClassifyService).to receive(:call).and_return(ad.parsed_layers)
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/ai_classify"
       expect(response).to have_http_status(:ok)
@@ -162,16 +162,16 @@ RSpec.describe "Api::Ads", type: :request do
     let(:ad) do
       create(:ad, client: api_client, state: "setup", classifications_confirmed: true,
              width: 1080, height: 1080,
-             parsed_layers: [{ "id" => "l1", "type" => "text", "content" => "Hi" }],
-             classified_layers: [{ "id" => "l1", "type" => "text", "role" => "headline" }])
+             parsed_layers: [ { "id" => "l1", "type" => "text", "content" => "Hi" } ],
+             classified_layers: [ { "id" => "l1", "type" => "text", "role" => "headline" } ])
     end
 
     it "creates resizes for selected platforms" do
       resize = create(:ad_resize, ad: ad)
-      allow_any_instance_of(AdResizeService).to receive(:call).and_return([resize])
+      allow_any_instance_of(AdResizeService).to receive(:call).and_return([ resize ])
 
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/resize",
-           params: { platforms: ["Facebook (Meta)"] }
+           params: { platforms: [ "Facebook (Meta)" ] }
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["state"]).to eq("resizing")
     end
@@ -179,7 +179,7 @@ RSpec.describe "Api::Ads", type: :request do
     it "rejects when classifications not confirmed" do
       ad.update!(classifications_confirmed: false)
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/resize",
-           params: { platforms: ["Facebook"] }
+           params: { platforms: [ "Facebook" ] }
       expect(response).to have_http_status(:unprocessable_content)
     end
 
@@ -203,7 +203,7 @@ RSpec.describe "Api::Ads", type: :request do
     let(:ad) do
       create(:ad, client: api_client, state: "merged",
              ai_service: ai_service, ai_model: ai_model,
-             parsed_layers: [{ "id" => "l1", "type" => "text" }])
+             parsed_layers: [ { "id" => "l1", "type" => "text" } ])
     end
 
     it "rejects a single version" do
@@ -247,8 +247,8 @@ RSpec.describe "Api::Ads", type: :request do
   describe "POST /api/clients/:client_id/ads/:id/upload_logo" do
     it "attaches a logo and adds logo layer" do
       ad = create(:ad, client: api_client, width: 1000, height: 1000,
-                  parsed_layers: [{ "id" => "l1", "type" => "text", "content" => "Hi" }],
-                  classified_layers: [{ "id" => "l1", "type" => "text" }])
+                  parsed_layers: [ { "id" => "l1", "type" => "text", "content" => "Hi" } ],
+                  classified_layers: [ { "id" => "l1", "type" => "text" } ])
       logo = Rack::Test::UploadedFile.new(
         StringIO.new("\x89PNG\r\n\x1a\n" + "\x00" * 100),
         "image/png", true, original_filename: "logo.png"
@@ -271,8 +271,8 @@ RSpec.describe "Api::Ads", type: :request do
   describe "DELETE /api/clients/:client_id/ads/:id/remove_logo" do
     it "removes the logo" do
       ad = create(:ad, client: api_client,
-                  parsed_layers: [{ "id" => "uploaded_logo", "type" => "image" }],
-                  classified_layers: [{ "id" => "uploaded_logo", "type" => "image" }])
+                  parsed_layers: [ { "id" => "uploaded_logo", "type" => "image" } ],
+                  classified_layers: [ { "id" => "uploaded_logo", "type" => "image" } ])
       delete "/api/clients/#{api_client.id}/ads/#{ad.id}/remove_logo"
       expect(response).to have_http_status(:ok)
       ad.reload
@@ -295,7 +295,7 @@ RSpec.describe "Api::Ads", type: :request do
     it "returns 422 when no API key for the service" do
       ai_key.destroy!
       ad = create(:ad, client: api_client, ai_service: ai_service, ai_model: ai_model,
-                  parsed_layers: [{ "type" => "text", "content" => "Hello" }])
+                  parsed_layers: [ { "type" => "text", "content" => "Hello" } ])
       ad.audiences << audience
       post "/api/clients/#{api_client.id}/ads/#{ad.id}/run"
       expect(response).to have_http_status(:unprocessable_content)
