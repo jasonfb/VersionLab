@@ -43,9 +43,10 @@ describe 'Ad element classification flow', type: :feature, js: true do
       expect(page).to have_content('ELEMENT ROLES')
 
       # Should display all three text layers with their auto-classified roles
-      expect(page).to have_content('Big Sale')
-      expect(page).to have_content('Up to 50% off everything')
-      expect(page).to have_content('Shop Now')
+      # Layer content is rendered inside <input> fields, so use have_field
+      expect(page).to have_field(with: 'Big Sale')
+      expect(page).to have_field(with: 'Up to 50% off everything')
+      expect(page).to have_field(with: 'Shop Now')
 
       # Should show role dropdowns with pre-selected values
       role_selects = all('select.form-select-sm')
@@ -95,18 +96,25 @@ describe 'Ad element classification flow', type: :feature, js: true do
       click_on 'Confirm & Continue'
       expect(page).to have_content('Back to Classify', wait: 10)
 
-      # Skip resizing to go to Style
+      # Skip resizing to go to Backgrounds
       click_on 'Skip Resizing'
 
-      # Should be on Style step
-      expect(page).to have_content('Background', wait: 10)
-      expect(page).to have_content('Back to Resize')
+      # Should be on Backgrounds step
+      expect(page).to have_content('Back to Resize', wait: 10)
+
+      # Continue to Face Detection
+      click_on 'Continue to Face Detection'
+      expect(page).to have_content('Back to Backgrounds', wait: 10)
+
+      # Continue to Layout
+      click_on 'Continue to Layout'
+      expect(page).to have_content('Back to Face Detection', wait: 10)
 
       # Continue to Versioning
       click_on 'Continue to Versioning'
 
       # Should be on Version step
-      expect(page).to have_content('Back to Style', wait: 10)
+      expect(page).to have_content('Back to Layout', wait: 10)
       expect(page).to have_content('AD NAME')
     end
   end

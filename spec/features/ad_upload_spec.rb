@@ -95,11 +95,17 @@ describe 'Ad upload and versioning', type: :feature, js: true do
       visit "/app/clients/#{client.id}/ads/#{ad.id}"
       expect(page).to have_content('Test Ad', wait: 10)
 
-      # Step 2 (Resize) is shown since classifications are confirmed — skip to Step 3 (Style)
+      # Step 2 (Resize) is shown since classifications are confirmed — skip to Step 3 (Backgrounds)
       click_on 'Skip Resizing'
       expect(page).to have_content('Back to Resize', wait: 5)
 
-      # Continue to Step 4 (Version)
+      # Continue through Backgrounds → Face Detection → Layout → Version
+      click_on 'Continue to Face Detection'
+      expect(page).to have_content('Back to Backgrounds', wait: 5)
+
+      click_on 'Continue to Layout'
+      expect(page).to have_content('Back to Face Detection', wait: 5)
+
       click_on 'Continue to Versioning'
 
       # The version step should show detected text layers

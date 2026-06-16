@@ -48,10 +48,11 @@ RSpec.describe AdParseService, type: :service do
       end
     end
 
-    it "generates region IDs in sequence" do
+    it "generates unique IDs with expected prefixes" do
       ids = ad.parsed_layers.map { |l| l["id"] }
-      ids.each_with_index do |id, i|
-        expect(id).to eq("region_#{i}")
+      expect(ids).to eq(ids.uniq) # all IDs must be unique
+      ids.each do |id|
+        expect(id).to match(/\A(region_|background_|shape_|clip_shape_)\d+\z/)
       end
     end
   end
