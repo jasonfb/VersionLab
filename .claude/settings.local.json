@@ -23,7 +23,11 @@
       "Bash(bin/rspec:*)",
       "Bash(bin/rubocop --format simple)",
       "Bash(bin/rubocop -A)",
-      "Bash(bundle update:*)"
+      "Bash(bundle update:*)",
+      "Bash(env)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(awk '/<\\\\/defs>/,0')"
     ]
   }
 }

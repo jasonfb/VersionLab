@@ -202,12 +202,12 @@ class AdParseService
 
     # Pattern 2: Top-level <use> elements referencing images in <defs>
     # (common in pdftocairo output where each layer is a <use> + clip-path group)
-    svg = doc.at_css("svg")
-    return layers unless svg
+    body = svg_body_children(doc)
+    return layers if body.empty?
 
-    svg.children.select { |n| n.element? && n.name == "use" }.each do |use_el|
+    body.select { |n| n.element? && n.name == "use" }.each do |use_el|
       # Skip if inside a clip-path group (those are text region renders)
-      next if use_el.parent != svg
+      next if use_el.parent["clip-path"].present?
 
       ref_id = (use_el["href"] || use_el["xlink:href"]).to_s.sub("#", "")
       next if ref_id.blank?
@@ -554,7 +554,7 @@ class AdParseService
   # Each text region has a pair of nested clip-path groups: outer = bounding rect, inner = glyph outlines.
   def extract_clipped_layers(doc)
     layers = []
-    body_groups = doc.at_css("svg").children.select { |n| n.element? && n.name == "g" }
+    body_groups = svg_body_children(doc).select { |n| n.element? && n.name == "g" }
 
     body_groups.each_with_index do |outer_g, i|
       clip_id = outer_g["clip-path"]&.match(/url\(#([^)]+)\)/)&.[](1)
@@ -882,5 +882,21 @@ class AdParseService
 
   def gcd(a, b)
     b == 0 ? a : gcd(b, a % b)
+  end
+
+  # Return the effective body-level children of the SVG, unwrapping the
+  # <g id="surfaceN"> wrapper that older versions of pdftocairo (< 24.x)
+  # add around all content.
+  def svg_body_children(doc)
+    svg = doc.at_css("svg")
+    return [] unless svg
+
+    children = svg.children.select(&:element?)
+    # Older pdftocairo wraps everything in <g id="surface1">
+    if children.size == 1 && children.first.name == "g" && children.first["id"]&.start_with?("surface")
+      children.first.children.select(&:element?)
+    else
+      children
+    end
   end
 end
