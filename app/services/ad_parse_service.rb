@@ -891,12 +891,12 @@ class AdParseService
     svg = doc.at_css("svg")
     return [] unless svg
 
-    children = svg.children.select(&:element?)
-    # Older pdftocairo wraps everything in <g id="surface1">
-    if children.size == 1 && children.first.name == "g" && children.first["id"]&.start_with?("surface")
-      children.first.children.select(&:element?)
+    # Older pdftocairo wraps all body content in <g id="surface1">
+    surface = svg.at_css("> g[id^='surface']")
+    if surface
+      surface.children.select(&:element?)
     else
-      children
+      svg.children.select { |n| n.element? && n.name != "defs" }
     end
   end
 end
